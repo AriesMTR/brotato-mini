@@ -82,15 +82,41 @@ function isItemAvailable(it, excludeSet = null, checkWaveMin = false) {
   return true;
 }
 
+function getPlayerBuildAffinities() {
+  const tags = new Set();
+  if (!player) return tags;
+  if (player.cls === 'engineer' || (player.bonusTurrets || 0) > 0 || (player.laserTurrets || 0) > 0 || (player.mineLayers || 0) > 0 || (player.techBonus || 0) > 0) tags.add('tech');
+  if (player.cls === 'brawler' || (player.meleeBonus || 0) >= 0.12) tags.add('melee');
+  if (player.cls === 'vampire' || (player.lifesteal || 0) >= 0.08) tags.add('vampire');
+  if (player.cls === 'bull' || (player.armor || 0) >= 4 || (player.maxHp || 30) >= 48) tags.add('tank');
+  if ((player.elemBonus || 0) >= 0.10 || (player.burnChance || 0) + (player.chillChance || 0) + (player.poisonChance || 0) >= 0.18) tags.add('elemental');
+  if ((player.blastChance || 0) > 0 || (player.explosionScale || 1) > 1.05) tags.add('explosive');
+  for (const w of (player.weapons || [])) {
+    const tpl = WEAPONS[w.id];
+    if (!tpl) continue;
+    if (tpl.melee) tags.add('melee');
+    else tags.add('ranged');
+    if (tpl.set === 'tech') tags.add('tech');
+    if (tpl.set === 'elemental') tags.add('elemental');
+    if (tpl.set === 'heavy') { tags.add('tank'); tags.add('explosive'); }
+    if (tpl.set === 'precise') tags.add('crit');
+  }
+  return tags;
+}
+
 function pickWeightedItem(targetTier, excludeSet = new Set(), checkWaveMin = false) {
   const tierOrder = [];
   for (let t = targetTier; t >= 1; t--) tierOrder.push(t);
   for (let t = targetTier + 1; t <= 4; t++) tierOrder.push(t);
 
+  const isWeaponless = player && player.maxSlots === 0;
   let pool = [];
   for (const t of tierOrder) {
-    pool = ITEMS.filter(it => it.tier === t && isItemAvailable(it, excludeSet, checkWaveMin));
+    pool = ITEMS.filter(it => it.tier === t && (!isWeaponless || !it.weaponOnly) && isItemAvailable(it, excludeSet, checkWaveMin));
     if (pool.length > 0) break;
+  }
+  if (!pool.length) {
+    pool = ITEMS.filter(it => (!isWeaponless || !it.weaponOnly) && isItemAvailable(it, excludeSet, false));
   }
   if (!pool.length) {
     pool = ITEMS.filter(it => isItemAvailable(it, excludeSet, false));
@@ -98,11 +124,16 @@ function pickWeightedItem(targetTier, excludeSet = new Set(), checkWaveMin = fal
   if (!pool.length) return null;
 
   const recent = (player && player.recentCrateIds) || [];
+  const affinities = getPlayerBuildAffinities();
   let totalW = 0;
   const weights = pool.map(it => {
     const ownedCnt = (player && player.items && player.items[it.id]) || 0;
     const recentPenalty = recent.includes(it.id) ? 2.6 : 0;
-    const w = 1 / (1 + ownedCnt * 1.15 + recentPenalty);
+    let affinityMul = 1.0;
+    if (Array.isArray(it.tags) && it.tags.some(tg => affinities.has(tg))) {
+      affinityMul = 1.32;
+    }
+    const w = affinityMul / (1 + ownedCnt * 1.15 + recentPenalty);
     totalW += w;
     return w;
   });
@@ -508,11 +539,13 @@ function renderShop() {
     if (o.kind === 'weapon') {
       const tpl = WEAPONS[o.id];
       const sLabel = SET_DEFS[tpl.set] ? SET_DEFS[tpl.set].label : '';
-      const scale = tpl.set === 'elemental' ? getElemMul() : 1;
+      const scale = tpl.set === 'elemental' ? getElemMul() : (tpl.techScale ? getTechMul() : 1);
       const aspdBonus = tpl.aspdScale ? Math.max(0, getEffectiveAtkSpd() - 1) * 9 : 0;
       const rngBonus = tpl.rangeScale ? Math.max(0, totalRange) * tpl.rangeScale : 0;
-      const dmg = Math.round((tpl.dmg + aspdBonus + rngBonus) * (1 + (o.tier - 1) * 0.55) * (getEffectiveDmgMul() + (tpl.melee ? player.meleeBonus : 0)) * scale);
-      const effRange = Math.max(68, tpl.range + (tpl.melee ? Math.round(totalRange * 0.55) : totalRange) + (o.tier - 1) * 16);
+      const hpBonus = tpl.hpScale ? Math.max(0, player.maxHp) * tpl.hpScale : 0;
+      const armBonus = tpl.armorScale ? Math.max(0, getTotalArmor()) * tpl.armorScale : 0;
+      const dmg = Math.round((tpl.dmg + aspdBonus + rngBonus + hpBonus + armBonus) * (1 + (o.tier - 1) * 0.55) * (getEffectiveDmgMul() + (tpl.melee ? player.meleeBonus : 0)) * scale);
+      const effRange = Math.max(68, tpl.range + (tpl.melee ? Math.round(totalRange * 0.55 + (player.meleeSweepBonus || 0) * 18) : totalRange) + (o.tier - 1) * 16);
       const ok = player.mats >= o.cost && canBuyWeapon(o.id, o.tier);
       const hasMergePair = o.tier < 4 && player.weapons.some(w => w.id === o.id && w.tier === o.tier);
       const pelletsTxt = tpl.pellets ? `×${tpl.pellets}` : '';

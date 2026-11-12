@@ -1,11 +1,12 @@
 {
   "name": "brotato-mini-hd",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
   "description": "迷你土豆兄弟 HD (Mini Brotato HD) — 模块化网页端肉鸽射击游戏",
   "scripts": {
     "test": "node tests/verify.mjs",
-    "build:single": "node scripts/build-singlefile.mjs"
+    "build:single": "node scripts/build-singlefile.mjs",
+    "build:portraits": "node scripts/build-portrait-demo.mjs"
   }
 }

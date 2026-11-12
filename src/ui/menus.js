@@ -194,7 +194,7 @@ if (cv.addEventListener) {
 let state = 'menu', wave = 1, waveTime = 20, waveMaxTime = 20, lastUrgentSec = -1, spawnAcc = 0, shake = 0, diff = DIFFS[1];
 let endlessMode = false, overtime = false, overtimeMeteorT = 1.6, hordeWave = false;
 let cam = { x: WORLD.w / 2, y: WORLD.h / 2 };
-let player, enemies = [], bullets = [], eBullets = [], hazards = [], drops = [], spawns = [], turrets = [], rings = [], trees = [];
+let player, enemies = [], bullets = [], eBullets = [], hazards = [], drops = [], spawns = [], turrets = [], mines = [], rings = [], trees = [];
 let relics = [], sporeZones = [], terrains = [], portals = [], portalPairCd = 0, banners = [], bossCutscene = null;
 let relicSpawnT = -1, activeSceneEvent = null, sceneEventT = 0, sandGustT = 0, sceneMobEnabled = false;
 let lastBossVariant = '', lastMiniBossVariant = '';
@@ -282,13 +282,13 @@ function startGame(cls) {
     cls, x: WORLD.w / 2, y: WORLD.h / 2, r: 21, faceDir: 1, lookA: 0,
     hp: 30, maxHp: 30, _setHp: 0, regen: 0.5, regenAcc: 0, noRegen: false, lifesteal: 0,
     armor: 0, maxShield: 0, shield: 0, shieldRegenT: 0, shieldHitT: 0,
-    spd: 182, spdMul: 1, dmgMul: 1, meleeBonus: 0, elemBonus: 0, atkSpd: 0.88, crit: 0.06, critDmg: 0,
-    dodge: 0, dodgeCap: 0.80, maxSlots: 6, bonusTurrets: 0, bullCd: 0,
+    spd: 182, spdMul: 1, dmgMul: 1, meleeBonus: 0, elemBonus: 0, techBonus: 0, atkSpd: 0.88, crit: 0.06, critDmg: 0,
+    dodge: 0, dodgeCap: 0.80, maxSlots: 6, bonusTurrets: 0, laserTurrets: 0, mineLayers: 0, mineCd: 1.4, turretCrit: false, turretElem: false, bullCd: 0,
     magnet: 130, harvest: 1, harvestFlat: 0, luck: 0, rangeBonus: 0, _displayRange: 140,
     pierceBonus: 0, bounceBonus: 0, shopDiscount: 0, freeRerolls: 0, bonusTrees: 0,
-    enemySlow: 0, thorns: 0, cyberball: 0, critHeal: 0, critMeleeHeal: false, rangeToDmg: false, hasAnvil: false, healBonus: 0,
-    burnChance: 0, chillChance: 0, freezeChance: 0, poisonChance: 0, maxPoisonStacks: 8, plagueSpread: false,
-    meleeBossGuard: 0, blastChance: 0, explosionScale: 1,
+    enemySlow: 0, thorns: 0, cyberball: 0, critHeal: 0, critMeleeHeal: false, rangeToDmg: false, hpToDmg: 0, armorToDmg: 0, hasAnvil: false, healBonus: 0,
+    burnChance: 0, chillChance: 0, freezeChance: 0, poisonChance: 0, maxPoisonStacks: 8, plagueSpread: false, elemSynergy: false,
+    meleeBossGuard: 0, meleeSweepBonus: 0, meleeShockwave: false, blastChance: 0, explosionScale: 1, napalmBlast: false, bloodNova: false,
     interest: 0, teslaCount: 0, teslaCd: 1.0, healDropBonus: 0, chillSlowT: 0, inSpore: false,
     invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, mythicCratesQueued: 0, recentCrateIds: [],
     lavaExposure: 0, lavaTick: 0, terrainHintT: 0, terrainSpdMul: 1,

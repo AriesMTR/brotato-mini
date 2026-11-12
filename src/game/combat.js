@@ -113,7 +113,8 @@ function triggerExplosion(x, y, radius, enemyDmg, hurtPlayerToo = false, playerD
         if (!e || e.hp <= 0 || e.primed) continue;
         const dE = Math.hypot(e.x - x, e.y - y);
         if (dE <= radius + e.r && (!innerSafeR || dE >= innerSafeR - e.r)) {
-          hurtEnemy(e, enemyDmg, false, Math.atan2(e.y - y, e.x - x), true, { noProc: true, knockMult: 1.4 });
+          const applyNapalm = !hurtPlayerToo && player && player.napalmBlast;
+          hurtEnemy(e, enemyDmg, false, Math.atan2(e.y - y, e.x - x), true, { noProc: true, knockMult: 1.4, forceBurn: applyNapalm });
         }
       }
       for (let i = trees.length - 1; i >= 0; i--) {
@@ -149,7 +150,9 @@ function getEffectiveDmgMul() {
   if (!player) return 1;
   const penalty = player.cls === 'multitasker' ? player.weapons.length * 0.04 : 0;
   const rangeConvert = player.rangeToDmg ? Math.max(0, Math.floor(getTotalRangeBonus() / 15)) * 0.01 : 0;
-  return Math.max(0.25, player.dmgMul - penalty + rangeConvert);
+  const hpConvert = (player.hpToDmg || 0) > 0 ? Math.max(0, Math.floor(player.maxHp / 5)) * 0.02 * player.hpToDmg : 0;
+  const armorConvert = (player.armorToDmg || 0) > 0 ? Math.max(0, getTotalArmor()) * 0.015 * player.armorToDmg : 0;
+  return Math.max(0.25, player.dmgMul - penalty + rangeConvert + hpConvert + armorConvert);
 }
 function getEffectiveAtkSpd() {
   if (!player) return 1;
@@ -160,6 +163,7 @@ function getEffectiveAtkSpd() {
 function getEffectiveCrit() { return (player ? player.crit : 0) + getSetBonuses().crit; }
 function getEffectiveCritMult(baseMult = 1.95) { return baseMult + (player ? (player.critDmg || 0) : 0); }
 function getElemMul() { return 1 + (player ? player.elemBonus : 0) + getSetBonuses().elem; }
+function getTechMul() { return 1 + (player ? (player.techBonus || 0) : 0) + getSetBonuses().tech; }
 function getBlastScale() { return (player ? player.explosionScale : 1) + getSetBonuses().blast; }
 function getEffectiveSpdMul() {
   if (!player) return 1;
@@ -275,6 +279,11 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
   // 4) 【冰冻碎裂】：对冰冻态（或持有绝对零度棱镜时的冰缓态）敌人暴击额外 +25% 伤害
   const shatterCrit = isCrit && ((e.freezeT || 0) > 0 || (player && player.freezeChance > 0 && (e.chillT || 0) > 0));
   if (shatterCrit) rawDmg *= 1.25;
+  // 5) 【三象元素秘典】元素共鸣：目标身上每存在 1 种元素异常（灼烧/冰缓或冰冻/剧毒），额外承受 +12% 伤害
+  if (player && player.elemSynergy) {
+    const ailCnt = ((e.burnT || 0) > 0 ? 1 : 0) + (((e.chillT || 0) > 0 || (e.freezeT || 0) > 0) ? 1 : 0) + ((e.poisonT || 0) > 0 ? 1 : 0);
+    if (ailCnt > 0) rawDmg *= (1 + ailCnt * 0.12);
+  }
 
   const dmg = Math.max(1, Math.round(rawDmg));
   e.hp -= dmg;
@@ -321,16 +330,31 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
       triggerExplosion(e.x, e.y, 68 * getBlastScale(), dmg * 0.55 * getElemMul(), false, 0, '#ff9f1c', true);
     }
 
-    // 生命窃取、【暴击触手】与【暗影处决徽章】近战暴击回血判定
+    // 生命窃取、【暴击触手】与【暗影处决徽章】近战暴击回血判定（含【猩红血契】鲜血新星联动）
+    let healedByHit = false;
     if (player.lifesteal > 0 && player.hp > 0 && player.hp < player.maxHp && Math.random() < player.lifesteal) {
       player.hp = Math.min(player.maxHp, player.hp + 1);
       addText(player.x, player.y - 24, '+1 🩸', '#ff4d6d', 13);
+      healedByHit = true;
     } else if (isCrit && player.critHeal > 0 && player.hp > 0 && player.hp < player.maxHp && Math.random() < player.critHeal) {
       player.hp = Math.min(player.maxHp, player.hp + 1);
       addText(player.x, player.y - 24, '+1 🦑', '#5ef29b', 13);
+      healedByHit = true;
     } else if (isCrit && opts.isMelee && player.critMeleeHeal && player.hp > 0 && player.hp < player.maxHp && Math.random() < 0.35) {
       player.hp = Math.min(player.maxHp, player.hp + 1);
       addText(player.x, player.y - 24, '+1 🗡️', '#ffd166', 13);
+      healedByHit = true;
+    }
+    if (healedByHit && !opts.noProc && player.bloodNova && Math.random() < 0.48) {
+      const novaR = 96 * getBlastScale();
+      const novaDmg = (11 + wave * 2.2) * getEffectiveDmgMul();
+      if (rings.length < 40) rings.push({ x: player.x, y: player.y, r: novaR, color: '#ff2a55', t: 0.24, maxT: 0.24, fill: true });
+      for (let k = enemies.length - 1; k >= 0; k--) {
+        const nb = enemies[k];
+        if (nb && nb.hp > 0 && !nb.primed && Math.hypot(nb.x - player.x, nb.y - player.y) <= novaR + nb.r) {
+          hurtEnemy(nb, novaDmg, false, Math.atan2(nb.y - player.y, nb.x - player.x), true, { noProc: true });
+        }
+      }
     }
   }
 

@@ -1,3 +1,307 @@
+// 绘制单个异形地形（彻底告别规则圆形，支持主战场与开发者预览共用，0渐变0滤镜）
+function tracePolygon(verts) {
+  if (!verts || !verts.length) return;
+  ctx.beginPath();
+  for (let k = 0; k < verts.length; k++) {
+    if (k === 0) ctx.moveTo(verts[k].x, verts[k].y);
+    else ctx.lineTo(verts[k].x, verts[k].y);
+  }
+  ctx.closePath();
+}
+
+function traceSmoothLoop(verts, cx, cy, scale) {
+  if (!verts || verts.length < 3) return;
+  const n = verts.length;
+  ctx.beginPath();
+  for (let k = 0; k < n; k++) {
+    const p0 = verts[k];
+    const p1 = verts[(k + 1) % n];
+    const x0 = cx + (p0.x - cx) * scale, y0 = cy + (p0.y - cy) * scale;
+    const x1 = cx + (p1.x - cx) * scale, y1 = cy + (p1.y - cy) * scale;
+    const mx = (x0 + x1) * 0.5, my = (y0 + y1) * 0.5;
+    if (k === 0) {
+      const prev = verts[(n - 1)];
+      const px = cx + (prev.x - cx) * scale, py = cy + (prev.y - cy) * scale;
+      ctx.moveTo((px + x0) * 0.5, (py + y0) * 0.5);
+    }
+    ctx.quadraticCurveTo(x0, y0, mx, my);
+  }
+  ctx.closePath();
+}
+
+function drawSingleTerrain(tr, showLabel = false) {
+  if (!tr) return;
+  if (typeof ensureTerrainGeometry === 'function') ensureTerrainGeometry(tr);
+  ctx.save();
+  if (tr.kind === 'chasm') {
+    // 锯齿折线断层大裂谷：三层断崖阶地 + 地壳横裂纹 + 紫晶虚空深渊微光（彻底告别胶囊圆肠形）
+    if (tr.outerCliff && tr.outerCliff.length >= 6) {
+      ctx.fillStyle = '#4a3859';
+      tracePolygon(tr.outerCliff);
+      ctx.fill();
+      ctx.strokeStyle = '#23182e';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+
+      ctx.fillStyle = '#22172f';
+      tracePolygon(tr.midCliff);
+      ctx.fill();
+
+      ctx.fillStyle = '#07040d';
+      tracePolygon(tr.abyssPoly);
+      ctx.fill();
+
+      if (tr.cracks) {
+        ctx.strokeStyle = '#322442';
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (let c = 0; c < tr.cracks.length; c++) {
+          const ck = tr.cracks[c];
+          ctx.moveTo(ck.x1, ck.y1); ctx.lineTo(ck.mx, ck.my); ctx.lineTo(ck.x2, ck.y2);
+        }
+        ctx.stroke();
+      }
+      if (tr.spine && tr.spine.length >= 2) {
+        ctx.strokeStyle = 'rgba(199, 125, 255, 0.48)';
+        ctx.lineWidth = 2.2;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath();
+        for (let s = 0; s < tr.spine.length; s++) {
+          if (s === 0) ctx.moveTo(tr.spine[s].x, tr.spine[s].y);
+          else ctx.lineTo(tr.spine[s].x, tr.spine[s].y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  } else if (tr.kind === 'lava') {
+    // 多瓣裂地玄武熔岩火口：不规则焦黑玄武岩岸 + 三层律动熔流瓣 + 浮游黑曜石块
+    const pls = Math.sin(tr.pulse || 0) * 0.035;
+    const verts = tr.verts || [];
+    ctx.fillStyle = '#240f0e';
+    ctx.strokeStyle = '#120707';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let k = 0; k < verts.length; k++) {
+      const vx = tr.x + (verts[k].x - tr.x) * 1.10;
+      const vy = tr.y + (verts[k].y - tr.y) * 1.10;
+      if (k === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = '#dc2626';
+    tracePolygon(verts);
+    ctx.fill();
+
+    ctx.fillStyle = '#f97316';
+    traceSmoothLoop(verts, tr.x, tr.y, 0.76 + pls);
+    ctx.fill();
+
+    ctx.fillStyle = '#facc15';
+    traceSmoothLoop(verts, tr.x + 5, tr.y - 3, 0.42 - pls);
+    ctx.fill();
+
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2;
+    tracePolygon(verts);
+    ctx.stroke();
+
+    // 熔面漂浮焦黑玄武岩碎岛（多边形，零圆形）
+    if (tr.crusts) {
+      ctx.fillStyle = '#2b1410';
+      ctx.strokeStyle = '#f97316';
+      ctx.lineWidth = 1.4;
+      for (let c = 0; c < tr.crusts.length; c++) {
+        const cr = tr.crusts[c], sz = cr.sz;
+        ctx.save();
+        ctx.translate(cr.x + Math.sin((tr.pulse || 0) * 0.6 + c) * 2, cr.y);
+        ctx.rotate(cr.rot);
+        ctx.beginPath();
+        ctx.moveTo(-sz, -sz * 0.5); ctx.lineTo(sz * 0.3, -sz * 0.85); ctx.lineTo(sz * 1.1, sz * 0.1);
+        ctx.lineTo(sz * 0.2, sz * 0.75); ctx.lineTo(-sz * 0.85, sz * 0.45);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      }
+    }
+  } else if (tr.kind === 'swamp') {
+    // 曲岸阿米巴剧毒菌沼：平滑有机曲岸 + 离岸泥滩子池 + 岸边荧光毒蕈簇
+    const verts = tr.verts || [];
+    if (tr.shoals) {
+      ctx.fillStyle = '#163528';
+      for (let s = 0; s < tr.shoals.length; s++) {
+        const sh = tr.shoals[s];
+        ctx.save();
+        ctx.translate(sh.x, sh.y); ctx.rotate(sh.rot);
+        ctx.beginPath();
+        ctx.moveTo(-sh.rx, 0); ctx.quadraticCurveTo(-sh.rx * 0.3, -sh.ry, sh.rx, -sh.ry * 0.2);
+        ctx.quadraticCurveTo(sh.rx * 0.4, sh.ry, -sh.rx, 0);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+    }
+    ctx.fillStyle = '#12261e';
+    traceSmoothLoop(verts, tr.x, tr.y, 1.07);
+    ctx.fill();
+
+    ctx.fillStyle = '#1e4635';
+    traceSmoothLoop(verts, tr.x, tr.y, 0.99);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(132, 204, 22, 0.34)';
+    traceSmoothLoop(verts, tr.x - 4, tr.y + 3, 0.68 + Math.sin(tr.pulse || 0) * 0.03);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(163, 230, 53, 0.72)';
+    ctx.lineWidth = 2.2;
+    traceSmoothLoop(verts, tr.x, tr.y, 0.98);
+    ctx.stroke();
+
+    // 岸畔荧光小毒菇点缀
+    if (verts.length >= 9) {
+      for (let m = 0; m < 3; m++) {
+        const vp = verts[m * 5];
+        if (!vp) continue;
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(vp.x - 1.5, vp.y - 2, 3, 5);
+        ctx.fillStyle = m % 2 === 0 ? '#a3e635' : '#c77dff';
+        ctx.beginPath();
+        ctx.moveTo(vp.x - 6, vp.y - 2); ctx.quadraticCurveTo(vp.x, vp.y - 9, vp.x + 6, vp.y - 2);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+  } else if (tr.kind === 'ice_sheet') {
+    // 多棱碎晶寒霜冰镜：折角多面体冰湖 + 内部冰裂折纹 + 平行四边形镜面高光带
+    const verts = tr.verts || [];
+    ctx.fillStyle = 'rgba(114, 239, 221, 0.24)';
+    tracePolygon(verts);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(224, 242, 254, 0.20)';
+    ctx.beginPath();
+    for (let k = 0; k < verts.length; k++) {
+      const vx = tr.x + (verts[k].x - tr.x) * 0.72 - 6;
+      const vy = tr.y + (verts[k].y - tr.y) * 0.72 - 5;
+      if (k === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+    }
+    ctx.closePath(); ctx.fill();
+
+    // 冰层内部折线冰脉与镜面反光带
+    const ir = tr.r || 84;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.beginPath();
+    ctx.moveTo(tr.x - ir * 0.45, tr.y - ir * 0.12);
+    ctx.lineTo(tr.x - ir * 0.05, tr.y - ir * 0.52);
+    ctx.lineTo(tr.x + ir * 0.12, tr.y - ir * 0.44);
+    ctx.lineTo(tr.x - ir * 0.28, tr.y - ir * 0.04);
+    ctx.closePath(); ctx.fill();
+
+    if (verts.length >= 12) {
+      ctx.strokeStyle = 'rgba(224, 251, 252, 0.46)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(verts[1].x, verts[1].y); ctx.lineTo(tr.x - 8, tr.y + 4); ctx.lineTo(verts[9].x, verts[9].y);
+      ctx.moveTo(tr.x - 8, tr.y + 4); ctx.lineTo(verts[5].x, verts[5].y);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.88)';
+    ctx.lineWidth = 2.6;
+    tracePolygon(verts);
+    ctx.stroke();
+  }
+
+  if (showLabel) {
+    const tLabel = tr.kind === 'lava' ? '🌋 熔岩火口 (灼烧)' : (tr.kind === 'swamp' ? '🧪 剧毒菌沼 (减速)' : (tr.kind === 'ice_sheet' ? '🧊 寒霜冰镜 (加速)' : '🕳️ 断层裂谷 (阻挡)'));
+    const ly = tr.kind === 'chasm' ? tr.y - 4 : tr.y - (tr.r || 68) + 14;
+    ctx.font = '800 11.5px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(14, 10, 24, 0.76)';
+    ctx.beginPath(); ctx.roundRect(tr.x - 58, ly - 11, 116, 16, 6); ctx.fill();
+    ctx.fillStyle = '#f1ecff';
+    ctx.fillText(tLabel, tr.x, ly + 1);
+  }
+  ctx.restore();
+}
+
+// 绘制单个菱晶次元裂隙传送门（星芒裂口 + 环绕浮游棱晶碎片，无规则圆环）
+function drawSinglePortal(p, partner, cooling, cdRemain) {
+  const pr = Math.max(18, p.r || 36);
+  ctx.save();
+  ctx.translate(p.x, p.y);
+
+  // 底层交叉次元裂隙星芒
+  ctx.save();
+  ctx.rotate((p.pulse || 0) * (cooling ? 0.18 : 0.55));
+  ctx.globalAlpha = cooling ? 0.34 : 0.88;
+  ctx.fillStyle = '#130924';
+  ctx.strokeStyle = p.color;
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4;
+    const rad = k % 2 === 0 ? pr * 1.18 : pr * 0.54;
+    if (k === 0) ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad);
+    else ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+
+  // 内层旋转菱晶核心
+  ctx.save();
+  ctx.rotate(-(p.pulse || 0) * 0.8);
+  ctx.globalAlpha = cooling ? 0.25 : 0.72;
+  ctx.fillStyle = p.color;
+  const inR = pr * (0.64 + Math.sin(p.pulse || 0) * 0.07);
+  ctx.beginPath();
+  ctx.moveTo(0, -inR * 1.15); ctx.lineTo(inR * 0.82, 0); ctx.lineTo(0, inR * 1.15); ctx.lineTo(-inR * 0.82, 0);
+  ctx.closePath(); ctx.fill();
+  if (!cooling) {
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(0, -pr * 0.34); ctx.lineTo(pr * 0.24, 0); ctx.lineTo(0, pr * 0.34); ctx.lineTo(-pr * 0.24, 0);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+
+  // 外围环绕浮游棱晶残片
+  const shards = Array.isArray(p.shards) ? p.shards.length : (p.shards || 5);
+  ctx.globalAlpha = cooling ? 0.32 : 0.92;
+  ctx.fillStyle = p.color;
+  ctx.strokeStyle = '#140c24';
+  ctx.lineWidth = 1.5;
+  for (let s = 0; s < shards; s++) {
+    const sa = (s / shards) * Math.PI * 2 + (p.pulse || 0) * 0.45;
+    const sx = Math.cos(sa) * (pr + 7), sy = Math.sin(sa) * (pr + 7);
+    ctx.save();
+    ctx.translate(sx, sy); ctx.rotate(sa);
+    ctx.beginPath();
+    ctx.moveTo(6, 0); ctx.lineTo(0, -3.5); ctx.lineTo(-5, 0); ctx.lineTo(0, 3.5);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  if (partner) {
+    const linkA = Math.atan2(partner.y - p.y, partner.x - p.x);
+    ctx.save();
+    ctx.rotate(linkA);
+    ctx.globalAlpha = cooling ? 0.35 : 0.92;
+    ctx.fillStyle = partner.color || '#ffd166';
+    ctx.beginPath(); ctx.moveTo(pr + 16, 0); ctx.lineTo(pr + 7, -5.5); ctx.lineTo(pr + 7, 5.5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  ctx.font = '800 12px -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  const pTxt = cooling ? `⏳ 充能 ${(cdRemain || 0).toFixed(1)}s` : `🌀 晶裂门 ${p.label}`;
+  ctx.fillStyle = 'rgba(14, 10, 24, 0.80)';
+  ctx.beginPath(); ctx.roundRect(-50, -pr - 26, 100, 17, 6); ctx.fill();
+  ctx.fillStyle = cooling ? '#cbd5e1' : '#f8f5ff';
+  ctx.fillText(pTxt, 0, -pr - 13);
+  ctx.restore();
+}
+
 // 战场主相机裁剪渲染、首领预警提示、悬浮摇杆绘制与 RAF 主循环
 function draw() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -49,157 +353,53 @@ function draw() {
       ctx.restore();
     }
 
-    // 交互式生态地形渲染（熔岩池、剧毒泥沼、寒霜滑冰面、断层裂谷，纯矢量分层零渐变开销）
+    // 一图一异形生态地形渲染（熔岩火口、剧毒菌沼、寒霜冰镜、断层裂谷，纯矢量异形零圆形）
     for (let i = 0; i < terrains.length; i++) {
       const tr = terrains[i];
-      const pad = (tr.halfLen || 0) + (tr.r || 68) + 28;
+      const pad = (tr.halfLen || 0) + (tr.r || 68) + 38;
       if (tr.x + pad < vL || tr.x - pad > vR || tr.y + pad < vT || tr.y - pad > vB) continue;
-      ctx.save();
-      if (tr.kind === 'chasm') {
-        const cr = Math.max(14, tr.r || 30);
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = '#453654';
-        ctx.lineWidth = cr * 2 + 10;
-        ctx.beginPath(); ctx.moveTo(tr.x1, tr.y1); ctx.lineTo(tr.x2, tr.y2); ctx.stroke();
-        ctx.strokeStyle = '#1d1528';
-        ctx.lineWidth = cr * 2 + 2;
-        ctx.beginPath(); ctx.moveTo(tr.x1, tr.y1); ctx.lineTo(tr.x2, tr.y2); ctx.stroke();
-        ctx.strokeStyle = '#07050c';
-        ctx.lineWidth = Math.max(8, cr * 2 - 10);
-        ctx.beginPath(); ctx.moveTo(tr.x1, tr.y1); ctx.lineTo(tr.x2, tr.y2); ctx.stroke();
-        ctx.strokeStyle = 'rgba(199, 125, 255, 0.34)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 10]);
-        ctx.beginPath(); ctx.moveTo(tr.x1, tr.y1); ctx.lineTo(tr.x2, tr.y2); ctx.stroke();
-        ctx.setLineDash([]);
-      } else if (tr.kind === 'lava') {
-        const lr = Math.max(20, tr.r || 66);
-        const pls = Math.sin(tr.pulse || 0);
-        ctx.fillStyle = '#2a100d';
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, lr + 5, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#dc2626';
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, lr, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#f97316';
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, Math.max(8, lr * (0.75 + pls * 0.04)), 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#facc15';
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, Math.max(5, lr * (0.40 - pls * 0.04)), 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = '#fb923c';
-        ctx.lineWidth = 2.2;
-        ctx.setLineDash([10, 7]);
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, lr - 1, 0, Math.PI * 2); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#fef08a';
-        for (let b = 0; b < 3; b++) {
-          const ba = (tr.seed || 0) + b * 2.1 + (tr.pulse || 0) * 0.45;
-          const bd = lr * (0.35 + ((b * 0.23) % 0.4));
-          const br = Math.max(1.5, 3.2 + Math.sin((tr.pulse || 0) * 1.8 + b * 2) * 1.6);
-          ctx.beginPath(); ctx.arc(tr.x + Math.cos(ba) * bd, tr.y + Math.sin(ba) * bd, br, 0, Math.PI * 2); ctx.fill();
-        }
-      } else if (tr.kind === 'swamp') {
-        const sr = Math.max(20, tr.r || 72);
-        ctx.fillStyle = '#13261e';
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, sr + 4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#1e4635';
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, sr, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'rgba(132, 204, 22, 0.32)';
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, Math.max(8, sr * 0.72), 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(163, 230, 53, 0.68)';
-        ctx.lineWidth = 2.2;
-        ctx.setLineDash([9, 7]);
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, sr - 1, 0, Math.PI * 2); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.strokeStyle = '#bef264';
-        ctx.lineWidth = 1.6;
-        for (let b = 0; b < 3; b++) {
-          const ba = (tr.seed || 0) + b * 2.09;
-          const bd = sr * (0.28 + b * 0.18);
-          const cyc = ((tr.pulse || 0) * 0.6 + b * 0.33) % 1;
-          ctx.globalAlpha = Math.max(0.1, 1 - cyc);
-          ctx.beginPath(); ctx.arc(tr.x + Math.cos(ba) * bd, tr.y + Math.sin(ba) * bd, Math.max(1.5, 2.5 + cyc * 6.5), 0, Math.PI * 2); ctx.stroke();
-        }
-        ctx.globalAlpha = 1;
-      } else if (tr.kind === 'ice_sheet') {
-        const ir = Math.max(22, tr.r || 82);
-        ctx.fillStyle = 'rgba(114, 239, 221, 0.22)';
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, ir, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'rgba(224, 242, 254, 0.18)';
-        ctx.beginPath(); ctx.arc(tr.x - ir * 0.12, tr.y - ir * 0.12, Math.max(8, ir * 0.68), 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(186, 230, 253, 0.82)';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.arc(tr.x, tr.y, ir, 0, Math.PI * 2); ctx.stroke();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.lineWidth = 2.2;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(tr.x - ir * 0.42, tr.y - ir * 0.18); ctx.lineTo(tr.x - ir * 0.08, tr.y - ir * 0.52);
-        ctx.moveTo(tr.x - ir * 0.12, tr.y + ir * 0.34); ctx.lineTo(tr.x + ir * 0.38, tr.y - ir * 0.16);
-        ctx.stroke();
-      }
-      if (player && Math.hypot(player.x - tr.x, player.y - tr.y) < (tr.halfLen || tr.r || 68) + 165) {
-        const tLabel = tr.kind === 'lava' ? '🌋 熔岩池 (灼烧)' : (tr.kind === 'swamp' ? '🧪 毒泥沼 (减速)' : (tr.kind === 'ice_sheet' ? '🧊 寒冰面 (加速)' : '🕳️ 断层裂谷 (阻挡)'));
-        const ly = tr.kind === 'chasm' ? tr.y - 4 : tr.y - (tr.r || 64) + 16;
-        ctx.font = '800 11.5px -apple-system, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(14, 10, 24, 0.72)';
-        ctx.beginPath(); ctx.roundRect(tr.x - 54, ly - 11, 108, 16, 6); ctx.fill();
-        ctx.fillStyle = '#f1ecff';
-        ctx.fillText(tLabel, tr.x, ly + 1);
-      }
-      ctx.restore();
+      const showLbl = !!(player && Math.hypot(player.x - tr.x, player.y - tr.y) < (tr.halfLen || tr.r || 68) + 175);
+      drawSingleTerrain(tr, showLbl);
     }
 
-    // 双生虚空传送门 A ↔ B 渲染（附带对向门方位角标与充能冷却环）
+    // 双生菱晶裂隙传送门 A ↔ B 渲染
     for (let i = 0; i < portals.length; i++) {
       const p = portals[i];
-      const pr = Math.max(18, p.r || 34);
-      if (p.x + pr + 36 < vL || p.x - pr - 36 > vR || p.y + pr + 36 < vT || p.y - pr - 36 > vB) continue;
+      const pr = Math.max(18, p.r || 36);
+      if (p.x + pr + 42 < vL || p.x - pr - 42 > vR || p.y + pr + 42 < vT || p.y - pr - 42 > vB) continue;
       const partner = portals[i === 0 ? 1 : 0];
-      const cooling = portalPairCd > 0;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.globalAlpha = cooling ? 0.35 : 0.85;
-      ctx.fillStyle = '#140c24';
-      ctx.beginPath(); ctx.arc(0, 0, pr, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = cooling ? 0.22 : 0.34;
-      ctx.fillStyle = p.color;
-      ctx.beginPath(); ctx.arc(0, 0, Math.max(6, pr * (0.72 + Math.sin(p.pulse) * 0.08)), 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = cooling ? 0.42 : 0.95;
-      ctx.strokeStyle = p.color;
-      ctx.lineWidth = 2.8;
-      ctx.save();
-      ctx.rotate(p.pulse * (cooling ? 0.25 : 0.75));
-      ctx.setLineDash([9, 6]);
-      ctx.beginPath(); ctx.arc(0, 0, pr, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.restore();
-      if (!cooling) {
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.arc(0, 0, Math.max(4, pr * 0.26), 0, Math.PI * 2); ctx.fill();
-      } else {
-        const cdProg = Math.max(0, Math.min(1, 1 - portalPairCd / 4.5));
-        ctx.globalAlpha = 0.9;
-        ctx.strokeStyle = '#ffd166';
-        ctx.lineWidth = 3.5;
-        ctx.beginPath(); ctx.arc(0, 0, pr + 5, -Math.PI / 2, -Math.PI / 2 + cdProg * Math.PI * 2); ctx.stroke();
-      }
-      if (partner) {
-        const linkA = Math.atan2(partner.y - p.y, partner.x - p.x);
+      drawSinglePortal(p, partner, portalPairCd > 0, portalPairCd);
+    }
+
+    // 工程流感应地雷渲染（八角装甲雷体 + 脉冲索敌感应线 + 呼吸指示灯）
+    if (typeof mines !== 'undefined' && mines.length > 0) {
+      for (let i = 0; i < mines.length; i++) {
+        const m = mines[i];
+        if (m.x + 60 < vL || m.x - 60 > vR || m.y + 60 < vT || m.y - 60 > vB) continue;
         ctx.save();
-        ctx.rotate(linkA);
-        ctx.globalAlpha = cooling ? 0.35 : 0.9;
-        ctx.fillStyle = partner.color || '#ffd166';
-        ctx.beginPath(); ctx.moveTo(pr + 12, 0); ctx.lineTo(pr + 4, -5); ctx.lineTo(pr + 4, 5); ctx.closePath(); ctx.fill();
+        ctx.translate(m.x, m.y);
+        if (m.armT <= 0) {
+          ctx.strokeStyle = 'rgba(76, 201, 240, 0.26)';
+          ctx.lineWidth = 1.6;
+          ctx.setLineDash([7, 6]);
+          ctx.beginPath(); ctx.arc(0, 0, m.triggerR || 54, 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.fillStyle = '#1e293b';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        for (let k = 0; k < 8; k++) {
+          const a = (k * Math.PI) / 4 + Math.PI / 8;
+          if (k === 0) ctx.moveTo(Math.cos(a) * 11, Math.sin(a) * 11);
+          else ctx.lineTo(Math.cos(a) * 11, Math.sin(a) * 11);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        const blink = Math.sin(m.pulse || 0) > 0;
+        ctx.fillStyle = m.armT > 0 ? '#94a3b8' : (blink ? '#ff2a55' : '#4cc9f0');
+        ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       }
-      ctx.globalAlpha = 1;
-      ctx.font = '800 12px -apple-system, sans-serif';
-      ctx.textAlign = 'center';
-      const pTxt = cooling ? `⏳ 充能 ${portalPairCd.toFixed(1)}s` : `🌀 传送门 ${p.label}`;
-      ctx.fillStyle = 'rgba(14, 10, 24, 0.78)';
-      ctx.beginPath(); ctx.roundRect(-48, -pr - 24, 96, 17, 6); ctx.fill();
-      ctx.fillStyle = cooling ? '#cbd5e1' : '#f8f5ff';
-      ctx.fillText(pTxt, 0, -pr - 11);
-      ctx.restore();
     }
 
     // 幽光菌林专属异象：治愈孢子灵泉区域渲染
@@ -610,6 +810,28 @@ function draw() {
           ctx.lineTo(Math.cos(a + 0.45) * 3.2, Math.sin(a + 0.45) * 3.2);
         }
         ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.restore();
+      } else if (b.isGrenade) {
+        ctx.save();
+        ctx.translate(b.x, b.y); ctx.rotate(b.spin || 0);
+        ctx.fillStyle = '#334155'; ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1.8;
+        ctx.beginPath(); ctx.roundRect(-6.5, -5, 13, 10, 3); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#f97316';
+        ctx.fillRect(-2, -5, 4, 10);
+        ctx.restore();
+      } else if (b.isWaveArc) {
+        ctx.save();
+        ctx.translate(b.x, b.y); ctx.rotate(b.angle);
+        ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 4.2;
+        ctx.beginPath(); ctx.arc(-6, 0, 14, -0.75, 0.75); ctx.stroke();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.8;
+        ctx.beginPath(); ctx.arc(-5, 0, 14, -0.58, 0.58); ctx.stroke();
+        ctx.restore();
+      } else if (b.isDart) {
+        ctx.save();
+        ctx.translate(b.x, b.y); ctx.rotate(b.angle);
+        ctx.fillStyle = '#a3e635'; ctx.strokeStyle = '#14281d'; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, -3); ctx.lineTo(-3, 0); ctx.lineTo(-6, 3); ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.restore();
       } else if (b.isRocket) {
         ctx.save();
