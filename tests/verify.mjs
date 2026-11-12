@@ -429,7 +429,13 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   }
 
   vm.runInContext('setCodexTab("world");', s);
-  assert.strictEqual(els.codexGrid.children.length, 8, 'World & Relics tab must render 5 scenes + 3 special relics');
+  assert.strictEqual(els.codexGrid.children.length, 13, 'World & Relics tab must render 5 scenes + 5 terrains + 3 special relics');
+  vm.runInContext('setCodexFilter("scene");', s);
+  assert.strictEqual(els.codexGrid.children.length, 5, 'World scene filter must render 5 scenes');
+  vm.runInContext('setCodexFilter("terrain");', s);
+  assert.strictEqual(els.codexGrid.children.length, 5, 'World terrain filter must render 5 interactive terrains/portals');
+  vm.runInContext('setCodexFilter("relic");', s);
+  assert.strictEqual(els.codexGrid.children.length, 3, 'World relic filter must render 3 special relics');
 
   s.window.dispatch('keydown', { key: 'Escape' });
   assert.strictEqual(els.codexModal.classList.contains('hidden'), true, 'Escape key must close #codexModal first');
@@ -774,7 +780,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   // 11a. Log Header + Entries + Export Filename must include Date & Code Version
   const curVer = vm.runInContext('APP_VERSION', s);
-  assert.strictEqual(curVer, 'v1.1.3', 'APP_VERSION must be v1.1.3');
+  assert.strictEqual(curVer, 'v1.1.4', 'APP_VERSION must be v1.1.4');
   const logTxt = vm.runInContext('getLogText()', s);
   assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
   assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
@@ -913,4 +919,78 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 12 spawn pacing, ranged cap & shake verification');
 }
 
-console.log(`ALL 12 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+// 13. v1.1.4 Interactive Biome Terrains (Lava, Swamp, Chasm, Ice Sheet, Twin Portals) & Persistent Callouts/Banners
+{
+  const { sandbox: s, stats } = createEnv(false, 1440, 900, 2);
+  vm.runInContext('selectedDiff = 2; startGame("allrounder");', s);
+
+  const terrainCheck = vm.runInContext(`(() => {
+    const kindsSeen = new Set();
+    for (let idx = 0; idx < SCENES.length; idx++) {
+      selectedScene = SCENES[idx].id;
+      wave = 4;
+      beginWave();
+      for (const tr of terrains) kindsSeen.add(tr.kind);
+      cam.x = terrains[0] ? terrains[0].x : WORLD.w * 0.5;
+      cam.y = terrains[0] ? terrains[0].y : WORLD.h * 0.5;
+      update(0.05);
+      draw();
+    }
+
+    // Force deterministic wasteland setup on Wave 3 (guaranteed Twin Portals)
+    selectedScene = 'wasteland'; wave = 3;
+    beginWave();
+    const hasPortals = portals.length === 2;
+    const p0 = portals[0], p1 = portals[1];
+    player.x = p0.x; player.y = p0.y;
+    update(0.05);
+    const warpedToB = Math.hypot(player.x - p1.x, player.y - p1.y) < 10 && portalPairCd > 4.0 && player.invuln >= 0.45;
+
+    // Lava ignites enemies; Ice boosts player speed; Chasm pushes entities out
+    terrains = [
+      { kind: 'lava', x: 500, y: 500, r: 70, pulse: 0, seed: 1 },
+      { kind: 'ice_sheet', x: 800, y: 500, r: 80, pulse: 0, seed: 2 },
+      { kind: 'chasm', x: 1100, y: 500, x1: 1020, y1: 500, x2: 1180, y2: 500, ang: 0, halfLen: 80, r: 30, seed: 3 }
+    ];
+    const dummy = createEnemy(500, 500, 'grunt');
+    player.x = 800; player.y = 500;
+    update(0.05);
+    const lavaIgnited = dummy.burnT > 0 && dummy.burnDmg > 0;
+    const iceBoost = player.terrainSpdMul > 1.25;
+
+    player.x = 1100; player.y = 500;
+    pushOutOfChasms(player);
+    const pushedFromChasm = Math.abs(player.y - 500) >= 30 + player.r - 0.5;
+
+    // Persistent callout & banner eviction protection under heavy bullet damage spam
+    texts = []; banners = [];
+    addText(player.x, player.y - 40, '✨ 关键奇遇提示!', '#ffd166', 18);
+    const initDur = texts[0].t;
+    for (let k = 0; k < 130; k++) addText(player.x, player.y, '24', '#fff', 14);
+    const survivedSpam = texts.some(t => t.txt.includes('关键奇遇提示'));
+    announce('🌀 顶部持久战术播报测试', '#e0aaff', 3.5);
+    const bannerDur = banners[0] ? banners[0].t : 0;
+    draw();
+
+    return {
+      kinds: Array.from(kindsSeen).sort(),
+      hasPortals, warpedToB, lavaIgnited, iceBoost, pushedFromChasm,
+      initDur, survivedSpam, bannerDur
+    };
+  })()`, s);
+
+  assert.deepStrictEqual(terrainCheck.kinds, ['chasm', 'ice_sheet', 'lava', 'swamp'], 'All 4 interactive terrain kinds must spawn across the 5 biomes');
+  assert.strictEqual(terrainCheck.hasPortals, true, 'Twin Void Portals must spawn on Wave 3 Wasteland');
+  assert.strictEqual(terrainCheck.warpedToB, true, 'Stepping into Portal A must warp player to Portal B with invuln & cooldown');
+  assert.strictEqual(terrainCheck.lavaIgnited, true, 'Lava pool must ignite enemies stepping inside');
+  assert.strictEqual(terrainCheck.iceBoost, true, 'Ice sheet must grant +28% skating speed boost');
+  assert.strictEqual(terrainCheck.pushedFromChasm, true, 'Chasm ravine must physically block ground entities from crossing');
+  assert(terrainCheck.initDur >= 1.8, `Important overhead callout must last >= 1.8s (got ${terrainCheck.initDur}s)`);
+  assert.strictEqual(terrainCheck.survivedSpam, true, 'Important overhead callout must NOT be evicted by 130 numeric damage hits');
+  assert(terrainCheck.bannerDur >= 3.4, 'HUD event banner must stay visible >= 3.4s');
+  assert.strictEqual(stats.radialGradients, 0, 'Terrain & banner rendering must create ZERO per-frame radial gradients');
+  assert.strictEqual(stats.shadowBlurs, 0, 'Terrain & banner rendering must set ZERO shadowBlur');
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 13 interactive terrains & banners verification');
+}
+
+console.log(`ALL 13 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);

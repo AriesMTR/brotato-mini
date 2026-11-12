@@ -1,12 +1,37 @@
-// 战斗数值结算、连锁闪电、范围爆炸、护甲闪避与战利品掉落
-function addText(x, y, txt, color = '#fff', size = 16) {
-  const cap = isTouch ? 45 : 75;
-  if (texts.length >= cap) texts.shift();
+// 战斗数值结算、连锁闪电、范围爆炸、护甲闪避、战利品掉落与双轨清晰提示系统
+function addText(x, y, txt, color = '#fff', size = 16, customDur = 0) {
+  const s = String(txt);
+  const isNumericHit = customDur <= 0 && /^[+-]?\d+!?$/.test(s);
+  const important = !isNumericHit;
+  const dur = customDur > 0 ? customDur : (important ? 1.85 : 0.64);
+  const cap = isTouch ? 58 : 95;
+  if (texts.length >= cap) {
+    // 优先淘汰普通伤害数字，绝不让高频弹幕把角色头顶的关键状态/奇遇提示挤掉
+    let dropIdx = texts.findIndex(t => !t.important);
+    if (dropIdx === -1) dropIdx = 0;
+    texts.splice(dropIdx, 1);
+  }
   texts.push({
-    x: x + (Math.random() - 0.5) * 16, y,
-    vx: (Math.random() - 0.5) * 44, vy: -112 - Math.random() * 36,
-    txt: String(txt), color, size, t: 0.62, maxT: 0.62
+    x: x + (Math.random() - 0.5) * (important ? 10 : 16), y,
+    vx: (Math.random() - 0.5) * (important ? 12 : 44),
+    vy: important ? (-30 - Math.random() * 8) : (-112 - Math.random() * 36),
+    txt: s, color, size, t: dur, maxT: dur, important
   });
+}
+
+// 屏幕上方战术事件持久横幅播报（停留 3.2~4.2 秒，清晰易读不挡操作）
+function announce(txt, color = '#ffd166', dur = 3.4) {
+  if (typeof banners === 'undefined') return;
+  const s = String(txt);
+  const existing = banners.find(b => b.txt === s);
+  if (existing) {
+    existing.t = Math.max(existing.t, dur);
+    existing.maxT = Math.max(existing.maxT, dur);
+    existing.color = color;
+    return;
+  }
+  if (banners.length >= 2) banners.shift();
+  banners.push({ txt: s, color, t: dur, maxT: dur });
 }
 
 function addBurst(x, y, color, n = 6, speed = 135) {
@@ -281,14 +306,17 @@ function killEnemyRewards(e) {
     if (e.variant === 'crimson_lord') {
       player.hp = player.maxHp;
       drops.push({ x: e.x, y: e.y, kind: 'crate', isBoss: true, bob: 0 });
-      addText(e.x, e.y - e.r - 22, '🩸 鲜血赐福：满血恢复 + 🎁×1！', '#ff4d6d', 18);
+      addText(e.x, e.y - e.r - 22, '🩸 鲜血赐福：满血恢复 + 🎁×1！', '#ff4d6d', 18, 2.5);
+      announce('🩸 击败猩红血主！已恢复满生命并掉落首领秘宝箱', '#ff758f', 3.8);
     } else if (e.variant === 'golden_golem') {
       drops.push({ x: e.x, y: e.y, kind: 'crate', isBoss: true, bob: 0 });
-      addText(e.x, e.y - e.r - 22, '🪙 黄金秘宝崩裂：巨量晶石 + 🎁×1！', '#ffd166', 18);
+      addText(e.x, e.y - e.r - 22, '🪙 黄金秘宝崩裂：巨量晶石 + 🎁×1！', '#ffd166', 18, 2.5);
+      announce('🪙 击败黄金巨神！爆出海量晶石与首领秘宝箱', '#ffd166', 3.8);
     } else {
       player.dmgMul += 0.12;
       drops.push({ x: e.x, y: e.y, kind: 'crate', isBoss: true, bob: 0 });
-      addText(e.x, e.y - e.r - 22, '🌌 虚空赐福：全伤永久+12% + 🎁×1！', '#c77dff', 18);
+      addText(e.x, e.y - e.r - 22, '🌌 虚空赐福：全伤永久+12% + 🎁×1！', '#c77dff', 18, 2.5);
+      announce('🌌 击败深渊噬界者！全体伤害永久 +12% 并掉首领秘宝箱', '#e0aaff', 3.8);
     }
     logInfo('SPECIAL_BOSS', `击杀特殊首领 ${e.bossTitle || e.variant}`);
   } else {

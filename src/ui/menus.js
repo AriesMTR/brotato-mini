@@ -177,7 +177,8 @@ let state = 'menu', wave = 1, waveTime = 20, waveMaxTime = 20, lastUrgentSec = -
 let endlessMode = false, overtime = false, overtimeMeteorT = 1.6, hordeWave = false;
 let cam = { x: WORLD.w / 2, y: WORLD.h / 2 };
 let player, enemies = [], bullets = [], eBullets = [], hazards = [], drops = [], spawns = [], turrets = [], rings = [], trees = [];
-let relics = [], sporeZones = [], relicSpawnT = -1, activeSceneEvent = null, sceneEventT = 0, sandGustT = 0, sceneMobEnabled = false;
+let relics = [], sporeZones = [], terrains = [], portals = [], portalPairCd = 0, banners = [];
+let relicSpawnT = -1, activeSceneEvent = null, sceneEventT = 0, sandGustT = 0, sceneMobEnabled = false;
 let lastBossVariant = '', lastMiniBossVariant = '';
 let texts = [], particles = [], sparks = [], lightnings = [], slashes = [], beams = [], stains = [], shells = [];
 let pendingLevels = 0, pendingCrates = 0, treeSpawnT = 3.2, shopOffers = [];
@@ -271,6 +272,7 @@ function startGame(cls) {
     burnChance: 0, chillChance: 0, blastChance: 0, explosionScale: 1,
     interest: 0, teslaCount: 0, teslaCd: 1.0, healDropBonus: 0, chillSlowT: 0, inSpore: false,
     invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, recentCrateIds: [],
+    lavaExposure: 0, lavaTick: 0, terrainHintT: 0, terrainSpdMul: 1,
     lv: 1, xp: 0, xpNeed: 10, mats: diff.matBonus, kills: 0, invuln: 0, walkT: 0, dustT: 0, moving: false,
     weapons: [], items: {}
   };

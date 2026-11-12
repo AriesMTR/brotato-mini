@@ -189,40 +189,70 @@ function renderCodex() {
       gridEl.appendChild(card);
     });
   } else if (codexTab === 'world') {
-    bannerEl.innerHTML = `<span>🌍 第 3 波起：各生态战场有概率触发<b>专属环境异象</b>或<b>专属怪物</b>；地图还可能小概率刷出<b>奇遇召唤圣物</b>！</span>`;
-    SCENES.forEach(sc => {
-      const card = document.createElement('div');
-      card.className = 'codex-card t2';
-      card.innerHTML = `
-        <div class="codex-card-top">
-          <div class="item-emblem t2">${sc.icon}</div>
-          <div class="card-meta">
-            <div class="codex-card-title">${sc.name}</div>
-            <div class="card-badges">
-              <span class="tag t2">${sc.eventIcon} 异象: ${sc.eventName}</span>
-              <span class="tag">专属怪: ${sc.exclMobName}</span>
+    buildFilterBar([
+      { id: 'all', label: '全部奇观' },
+      { id: 'scene', label: '🗺️ 五大生态' },
+      { id: 'terrain', label: '🌋 地形机关' },
+      { id: 'relic', label: '🔮 奇遇圣物' }
+    ]);
+    bannerEl.innerHTML = `<span>🌍 各生态拥有独特<b>交互地形（岩浆/毒沼/裂谷/冰湖/传送门）</b>，第 3 波起还会概率触发<b>环境异象</b>与<b>奇遇召唤圣物</b>！</span>`;
+    if (codexFilter === 'all' || codexFilter === 'scene') {
+      SCENES.forEach(sc => {
+        const card = document.createElement('div');
+        card.className = 'codex-card t2';
+        card.innerHTML = `
+          <div class="codex-card-top">
+            <div class="item-emblem t2">${sc.icon}</div>
+            <div class="card-meta">
+              <div class="codex-card-title">${sc.name}</div>
+              <div class="card-badges">
+                <span class="tag t2">${sc.eventIcon} 异象: ${sc.eventName}</span>
+                <span class="tag">专属怪: ${sc.exclMobName}</span>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="codex-card-desc">${sc.eventDesc}<br><b>专属生态怪：</b>${sc.exclMobName}（第 3 波起随波次概率刷出，非强制出现）</div>`;
-      gridEl.appendChild(card);
-    });
-    SPECIAL_RELICS.forEach(rel => {
-      const card = document.createElement('div');
-      card.className = 'codex-card t4';
-      card.innerHTML = `
-        <div class="codex-card-top">
-          <div class="item-emblem t4">${rel.icon}</div>
-          <div class="card-meta">
-            <div class="codex-card-title">【奇遇圣物】${rel.name}</div>
-            <div class="card-badges">
-              <span class="tag t4">小概率刷出</span>
-              <span class="tag tag-merge">召唤 ${rel.bossIcon} ${rel.bossName}</span>
+          <div class="stat-chips"><span class="stat-chip">地形：${sc.terrainSummary || ''}</span></div>
+          <div class="codex-card-desc">${sc.eventDesc}<br><b>专属生态怪：</b>${sc.exclMobName}（第 3 波起随波次概率刷出，非强制出现）</div>`;
+        gridEl.appendChild(card);
+      });
+    }
+    if ((codexFilter === 'all' || codexFilter === 'terrain') && typeof TERRAIN_CODEX !== 'undefined') {
+      TERRAIN_CODEX.forEach(tr => {
+        const card = document.createElement('div');
+        card.className = 'codex-card t3';
+        card.innerHTML = `
+          <div class="codex-card-top">
+            <div class="item-emblem t3">${tr.icon}</div>
+            <div class="card-meta">
+              <div class="codex-card-title">【地形】${tr.name}</div>
+              <div class="card-badges">
+                <span class="tag t3">${tr.badge}</span>
+                <span class="tag">${tr.scenes}</span>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="codex-card-desc">第 3 波起小概率在地图上现世（屏幕边缘会有方向指引）。<b>踏入圣物法阵驻留 1.1 秒</b>即可解封召唤特殊首领进入 Boss 战（回合时间自动延长 +25s）！<br><b>${rel.rewardDesc}</b></div>`;
-      gridEl.appendChild(card);
-    });
+          <div class="codex-card-desc">${tr.desc}</div>`;
+        gridEl.appendChild(card);
+      });
+    }
+    if (codexFilter === 'all' || codexFilter === 'relic') {
+      SPECIAL_RELICS.forEach(rel => {
+        const card = document.createElement('div');
+        card.className = 'codex-card t4';
+        card.innerHTML = `
+          <div class="codex-card-top">
+            <div class="item-emblem t4">${rel.icon}</div>
+            <div class="card-meta">
+              <div class="codex-card-title">【奇遇圣物】${rel.name}</div>
+              <div class="card-badges">
+                <span class="tag t4">小概率刷出</span>
+                <span class="tag tag-merge">召唤 ${rel.bossIcon} ${rel.bossName}</span>
+              </div>
+            </div>
+          </div>
+          <div class="codex-card-desc">第 3 波起小概率在地图上现世（屏幕边缘会有方向指引）。<b>踏入圣物法阵驻留 1.1 秒</b>即可解封召唤特殊首领进入 Boss 战（回合时间自动延长 +25s）！<br><b>${rel.rewardDesc}</b></div>`;
+        gridEl.appendChild(card);
+      });
+    }
   }
 }

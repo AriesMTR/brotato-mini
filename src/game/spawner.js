@@ -1,11 +1,151 @@
-// 异星晶树机制（原版《土豆兄弟》标志性战场资源点：砍倒爆出晶石、血包果实或战利品宝箱！）
+// 异星晶树机制与交互式战场地形引擎（岩浆池、毒泥沼、断层沟壑、寒霜冰湖、双生虚空传送门）
+function pointSegClosest(px, py, x1, y1, x2, y2) {
+  const vx = x2 - x1, vy = y2 - y1;
+  const lenSq = vx * vx + vy * vy || 1;
+  const t = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / lenSq));
+  const cx = x1 + vx * t, cy = y1 + vy * t;
+  const dx = px - cx, dy = py - cy;
+  return { cx, cy, dx, dy, dSq: dx * dx + dy * dy };
+}
+
+function isBlockedByTerrain(x, y, pad = 28) {
+  if (typeof terrains !== 'undefined') {
+    for (let i = 0; i < terrains.length; i++) {
+      const tr = terrains[i];
+      if (tr.kind === 'chasm') {
+        const seg = pointSegClosest(x, y, tr.x1, tr.y1, tr.x2, tr.y2);
+        const minR = (tr.r || 32) + pad;
+        if (seg.dSq < minR * minR) return true;
+      } else if (tr.kind === 'lava') {
+        const minR = (tr.r || 68) + pad * 0.7;
+        if ((x - tr.x) * (x - tr.x) + (y - tr.y) * (y - tr.y) < minR * minR) return true;
+      }
+    }
+  }
+  if (typeof portals !== 'undefined') {
+    for (let i = 0; i < portals.length; i++) {
+      const p = portals[i];
+      const minR = (p.r || 34) + pad;
+      if ((x - p.x) * (x - p.x) + (y - p.y) * (y - p.y) < minR * minR) return true;
+    }
+  }
+  return false;
+}
+
+function pushOutOfChasms(ent) {
+  if (!ent || typeof terrains === 'undefined' || !terrains.length) return;
+  for (let i = 0; i < terrains.length; i++) {
+    const tr = terrains[i];
+    if (tr.kind !== 'chasm') continue;
+    const seg = pointSegClosest(ent.x, ent.y, tr.x1, tr.y1, tr.x2, tr.y2);
+    const minD = (tr.r || 32) + (ent.r || 16);
+    if (seg.dSq < minD * minD) {
+      const d = Math.sqrt(seg.dSq) || 0.01;
+      const nx = d > 0.05 ? seg.dx / d : 0;
+      const ny = d > 0.05 ? seg.dy / d : -1;
+      ent.x = seg.cx + nx * minD;
+      ent.y = seg.cy + ny * minD;
+    }
+  }
+}
+
+function spawnArenaTerrains() {
+  terrains = [];
+  portals = [];
+  portalPairCd = 0;
+  const cx = WORLD.w * 0.5, cy = WORLD.h * 0.5;
+  const scId = (curScene && curScene.id) || 'wasteland';
+  const placed = [];
+
+  const pickSpot = (minCenter = 240, wallPad = 195, minSep = 220) => {
+    for (let tries = 0; tries < 24; tries++) {
+      const x = wallPad + Math.random() * Math.max(120, WORLD.w - wallPad * 2);
+      const y = wallPad + Math.random() * Math.max(120, WORLD.h - wallPad * 2);
+      if (Math.hypot(x - cx, y - cy) < minCenter) continue;
+      if (placed.some(p => Math.hypot(x - p.x, y - p.y) < minSep)) continue;
+      placed.push({ x, y });
+      return { x, y };
+    }
+    return null;
+  };
+
+  const addChasm = () => {
+    const sp = pickSpot(255, 220, 260);
+    if (!sp) return;
+    const ang = Math.random() * Math.PI;
+    const halfLen = 78 + Math.random() * 28;
+    terrains.push({
+      kind: 'chasm',
+      x: sp.x, y: sp.y,
+      x1: sp.x - Math.cos(ang) * halfLen, y1: sp.y - Math.sin(ang) * halfLen,
+      x2: sp.x + Math.cos(ang) * halfLen, y2: sp.y + Math.sin(ang) * halfLen,
+      ang, halfLen, r: 30, seed: Math.random() * 100
+    });
+  };
+
+  const addPool = (kind, baseR) => {
+    const sp = pickSpot(235, 190, 230);
+    if (!sp) return;
+    terrains.push({
+      kind, x: sp.x, y: sp.y,
+      r: baseR + Math.round(Math.random() * 16),
+      pulse: Math.random() * 6.28, seed: Math.random() * 100
+    });
+  };
+
+  if (scId === 'foundry') {
+    addPool('lava', 68);
+    addPool('lava', 64);
+    if (wave >= 4) addPool('lava', 60);
+    addChasm();
+  } else if (scId === 'desert') {
+    addChasm();
+    addChasm();
+    addPool('lava', 62);
+  } else if (scId === 'glacier') {
+    addPool('ice_sheet', 86);
+    addPool('ice_sheet', 80);
+    addChasm();
+  } else if (scId === 'fungal') {
+    addPool('swamp', 78);
+    addPool('swamp', 72);
+    if (wave >= 4) addPool('swamp', 68);
+  } else {
+    // wasteland
+    addChasm();
+    addPool('swamp', 74);
+    addPool('swamp', 68);
+  }
+
+  // 第 2 波起生成 A ↔ B 双生虚空传送门（紫晶废土与荧光菌丛必出，其余生态 78% 概率出现）
+  const forcePortal = scId === 'wasteland' || scId === 'fungal';
+  if (wave >= 2 && (forcePortal || Math.random() < 0.78)) {
+    const diag = Math.random() < 0.5 ? 1 : -1;
+    const ox = Math.min(460, WORLD.w * 0.25) + (Math.random() - 0.5) * 90;
+    const oy = Math.min(300, WORLD.h * 0.23) + (Math.random() - 0.5) * 70;
+    let p1x = cx - ox, p1y = cy - oy * diag;
+    let p2x = cx + ox, p2y = cy + oy * diag;
+    // 确保传送门不压在裂谷或岩浆上
+    for (let k = 0; k < 10 && isBlockedByTerrain(p1x, p1y, 48); k++) { p1x += 45; p1y += 32 * diag; }
+    for (let k = 0; k < 10 && isBlockedByTerrain(p2x, p2y, 48); k++) { p2x -= 45; p2y -= 32 * diag; }
+    p1x = Math.max(150, Math.min(WORLD.w - 150, p1x));
+    p1y = Math.max(150, Math.min(WORLD.h - 150, p1y));
+    p2x = Math.max(150, Math.min(WORLD.w - 150, p2x));
+    p2y = Math.max(150, Math.min(WORLD.h - 150, p2y));
+    portals.push(
+      { id: 0, label: 'A', x: p1x, y: p1y, r: 34, pulse: 0, color: '#c77dff' },
+      { id: 1, label: 'B', x: p2x, y: p2y, r: 34, pulse: Math.PI, color: '#4cc9f0' }
+    );
+  }
+}
+
 function spawnTree() {
   if (trees.length >= 4) return;
   let tx = WORLD.w * 0.5, ty = WORLD.h * 0.5;
-  for (let tries = 0; tries < 10; tries++) {
+  for (let tries = 0; tries < 14; tries++) {
     tx = 115 + Math.random() * Math.max(120, WORLD.w - 230);
     ty = 115 + Math.random() * Math.max(120, WORLD.h - 230);
-    if (!player || Math.hypot(tx - player.x, ty - player.y) > 155) break;
+    if ((!player || Math.hypot(tx - player.x, ty - player.y) > 155) && !isBlockedByTerrain(tx, ty, 32)) break;
   }
   const thp = Math.round((16 + wave * 7) * diff.hpMul);
   trees.push({ x: tx, y: ty, r: 21, hp: thp, maxHp: thp, hitFlash: 0, sway: Math.random() * 6.28 });
@@ -57,18 +197,19 @@ function spawnSpecialRelic(forceId = null) {
   if (relics.length >= 1) return null;
   const def = forceId ? (SPECIAL_RELICS.find(r => r.id === forceId) || SPECIAL_RELICS[0]) : SPECIAL_RELICS[Math.floor(Math.random() * SPECIAL_RELICS.length)];
   let rx = WORLD.w * 0.5, ry = WORLD.h * 0.5;
-  for (let tries = 0; tries < 12; tries++) {
+  for (let tries = 0; tries < 16; tries++) {
     const ang = Math.random() * Math.PI * 2;
     const dist = 230 + Math.random() * 160;
     rx = Math.max(120, Math.min(WORLD.w - 120, (player ? player.x : WORLD.w * 0.5) + Math.cos(ang) * dist));
     ry = Math.max(120, Math.min(WORLD.h - 120, (player ? player.y : WORLD.h * 0.5) + Math.sin(ang) * dist));
-    if (!player || Math.hypot(rx - player.x, ry - player.y) > 175) break;
+    if ((!player || Math.hypot(rx - player.x, ry - player.y) > 175) && !isBlockedByTerrain(rx, ry, 52)) break;
   }
   const rel = { x: rx, y: ry, r: 44, def, charge: 0, need: 1.1, pulse: 0 };
   relics.push(rel);
   if (rings.length < 40) rings.push({ x: rx, y: ry, r: 85, color: def.color, t: 0.45, maxT: 0.45 });
   beep(740, 0.12, 'triangle', 0.06);
-  if (player) addText(player.x, player.y - 68, `✨ 奇遇现世：${def.icon}${def.name}！靠近可召唤特殊首领！`, '#ffd166', 18);
+  if (player) addText(player.x, player.y - 54, `✨ 奇遇现世：${def.icon}${def.name}！`, '#ffd166', 18, 2.6);
+  announce(`✨ 地图刷新奇遇【${def.icon}${def.name}】！跟随边缘箭头站入可召唤首领`, '#ffd166', 4.2);
   logInfo('RELIC', `刷新地图奇遇圣物 ${def.name}(${def.id}) at (${Math.round(rx)},${Math.round(ry)})`);
   return rel;
 }
@@ -87,8 +228,9 @@ function summonSpecialBoss(rel) {
   const bw = document.getElementById('bossBarWrap');
   if (bw) bw.classList.remove('hidden');
   if (player) {
-    addText(player.x, player.y - 64, `${def.bossIcon} 特殊Boss【${def.bossName}】降临！回合 +25s！`, '#ffd166', 20);
+    addText(player.x, player.y - 54, `${def.bossIcon} 特殊首领【${def.bossName}】降临！`, '#ffd166', 20, 2.6);
   }
+  announce(`${def.bossIcon} 特殊首领【${def.bossName}】已唤醒！本波时间延长 +25s`, '#ffd166', 4.0);
   logInfo('SPECIAL_BOSS', `召唤特殊首领 ${def.bossName}(${def.bossId}) · 延长回合至 ${Math.ceil(waveTime)}s`);
 }
 
@@ -117,14 +259,18 @@ function beginWave() {
   hudAcc = 1;
   player.x = WORLD.w / 2; player.y = WORLD.h / 2;
   player.chillSlowT = 0; player.inSpore = false;
+  player.lavaExposure = 0; player.lavaTick = 0; player.terrainHintT = 0; player.terrainSpdMul = 1;
   cam.x = player.x; cam.y = player.y;
   clampCam();
   player.hp = player.maxHp;
   player.shield = player.maxShield;
   player.shieldRegenT = 7;
   enemies = []; bullets = []; eBullets = []; hazards = []; drops = []; spawns = []; turrets = []; rings = []; trees = [];
-  relics = []; sporeZones = []; sandGustT = 0;
+  relics = []; sporeZones = []; banners = []; sandGustT = 0;
   texts = []; particles = []; sparks = []; lightnings = []; slashes = []; beams = []; stains = []; shells = [];
+
+  // 生成当前生态专属交互地形（岩浆池 / 毒泥沼 / 断层沟壑 / 极滑冰湖 / 双生传送门）
+  spawnArenaTerrains();
 
   const tc = document.getElementById('timerCapsule');
   if (tc) { tc.classList.remove('warn', 'urgent'); }
@@ -152,8 +298,10 @@ function beginWave() {
   const relicChance = (wave >= 3 && !isBossWave) ? Math.min(0.36, 0.20 + (player.luck || 0) * 0.0025) : 0;
   relicSpawnT = Math.random() < relicChance ? (3.5 + Math.random() * 3.5) : -1;
 
-  logInfo('WAVE', `进入第 ${wave} 波 (${waveTime}s) · 场景=${curScene.name}(${curScene.id}) · 专属怪=${sceneMobEnabled} · 异象=${activeSceneEvent || '无'} · 地图=${WORLD.w}x${WORLD.h}`);
-  addText(player.x, player.y - 86, `${curScene.icon} ${curScene.name}${activeSceneEvent ? ' · ' + curScene.eventIcon + curScene.eventName : ''}`, curScene.accent2, 16);
+  const portalNote = portals.length >= 2 ? ' · 🌀双生传送门已开启' : '';
+  const waveIntro = `${curScene.icon} 第 ${wave} 波：${curScene.name}${activeSceneEvent ? ' · ' + curScene.eventIcon + curScene.eventName : ''}${portalNote}`;
+  logInfo('WAVE', `进入第 ${wave} 波 (${waveTime}s) · 场景=${curScene.name}(${curScene.id}) · 地形=${terrains.length}处+传送门=${portals.length} · 专属怪=${sceneMobEnabled} · 异象=${activeSceneEvent || '无'} · 地图=${WORLD.w}x${WORLD.h}`);
+  announce(waveIntro, curScene.accent2 || '#ffd166', 3.6);
 
   // 部署自动防御炮台（机械师天赋 + 便携炮塔道具 + 扳手武器）
   const wrenches = player.weapons.filter(w => w.id === 'wrench');
@@ -180,10 +328,10 @@ function beginWave() {
       const b2 = BOSS_DEFS[v2];
       spawnWarning(WORLD.w / 2 - bossSpread, bossY, 'boss', v1);
       spawnWarning(WORLD.w / 2 + bossSpread, bossY, 'boss', v2);
-      addText(player.x, player.y - 54, `👑 双王降临：${b1.name} & ${b2.name}！`, '#ff3b6b', 20);
+      announce(`👑 终局双王降临：${b1.name} & ${b2.name}！`, '#ff4d6d', 4.2);
     } else {
       spawnWarning(WORLD.w / 2, bossY, 'boss', v1);
-      addText(player.x, player.y - 54, `${b1.icon} ${b1.name}降临！`, '#ff3b6b', 21);
+      announce(`👑 终局主宰【${b1.icon}${b1.name}】降临！`, '#ff4d6d', 4.2);
     }
   } else if (isEliteWave) {
     const m1 = pickMiniBossVariant();
@@ -194,13 +342,13 @@ function beginWave() {
       const mb2 = MINI_BOSS_DEFS[m2];
       spawnWarning(WORLD.w / 2 - bossSpread * 0.88, bossY, 'mini_boss', m1);
       spawnWarning(WORLD.w / 2 + bossSpread * 0.88, bossY, 'mini_boss', m2);
-      addText(player.x, player.y - 52, `⚔️ 双统领夹击：${mb1.name} & ${mb2.name}！`, '#f72585', 19);
+      announce(`⚔️ 双精英统领夹击：${mb1.name} & ${mb2.name}！`, '#f72585', 3.8);
     } else {
       spawnWarning(WORLD.w / 2, bossY, 'mini_boss', m1);
-      addText(player.x, player.y - 52, `${mb1.icon} ${mb1.name}来袭！`, '#f72585', 20);
+      announce(`⚔️ 精英统领【${mb1.icon}${mb1.name}】来袭！`, '#f72585', 3.8);
     }
   } else if (hordeWave) {
-    addText(player.x, player.y - 52, '⚠️ 高密虫潮突袭波！', '#ff9f1c', 20);
+    announce('⚠️ 高密虫潮突袭波！注意拉扯走位', '#ff9f1c', 3.5);
   }
 
   document.getElementById('shopMenu').classList.add('hidden');
@@ -215,7 +363,14 @@ function beginWave() {
 }
 
 function spawnWarning(x, y, type, variant = '') {
-  spawns.push({ x, y, type, variant, t: 0.90, maxT: 0.90 });
+  let sx = x, sy = y;
+  if (type !== 'boss' && type !== 'mini_boss' && type !== 'special_boss' && typeof terrains !== 'undefined') {
+    const dummy = { x: sx, y: sy, r: 18 };
+    pushOutOfChasms(dummy);
+    sx = Math.max(60, Math.min(WORLD.w - 60, dummy.x));
+    sy = Math.max(60, Math.min(WORLD.h - 60, dummy.y));
+  }
+  spawns.push({ x: sx, y: sy, type, variant, t: 0.90, maxT: 0.90 });
 }
 
 const RANGED_ENEMY_TYPES = new Set(['shooter', 'sniper_bug', 'mortar', 'spinner', 'rad_scorpion', 'frost_wisp', 'spore_mother']);
