@@ -15,7 +15,7 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: fal
 let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.08, userZoomed = false;
 let isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let bootReady = false;
-const APP_VERSION = 'v1.1.2';
+const APP_VERSION = 'v1.1.3';
 const APP_BUILD_DATE = '2026-11-12';
 const FLOOR_PAD = 160;
 const WORLD = { w: 2200, h: 1500, pad: 90 };
