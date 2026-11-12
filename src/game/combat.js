@@ -125,6 +125,10 @@ function getEffectiveAtkSpd() {
 function getEffectiveCrit() { return (player ? player.crit : 0) + getSetBonuses().crit; }
 function getElemMul() { return 1 + (player ? player.elemBonus : 0) + getSetBonuses().elem; }
 function getBlastScale() { return (player ? player.explosionScale : 1) + getSetBonuses().blast; }
+function getEffectiveSpdMul() {
+  if (!player) return 1;
+  return player.noSlow ? Math.max(1.0, player.spdMul) : Math.max(0.72, player.spdMul);
+}
 
 function primeBomber(e) {
   if (!e || e.primed) return;
@@ -262,29 +266,40 @@ function killEnemyRewards(e) {
 
   dropCrystals(e.x, e.y, e.mat);
 
+  // 【噬魂死神镰】击杀敌人概率降下噬魂雷击
+  if (player.soulBolt && enemies.length > 0 && Math.random() < 0.18) {
+    const alive = enemies.filter(o => o !== e && o.hp > 0 && !o.primed);
+    if (alive.length > 0) {
+      const te = alive[Math.floor(Math.random() * alive.length)];
+      const sbDmg = (18 + wave * 3.5) * getEffectiveDmgMul();
+      if (lightnings.length < 35) lightnings.push({ pts: [{ x: e.x, y: e.y }, { x: te.x, y: te.y }], color: '#c77dff', t: 0.16, maxT: 0.16 });
+      hurtEnemy(te, sbDmg, false, null, true, { noProc: true });
+    }
+  }
+
   if (e.type === 'special_boss') {
     beep(840, 0.16, 'triangle', 0.07);
     if (e.variant === 'crimson_lord') {
       player.hp = player.maxHp;
-      drops.push({ x: e.x, y: e.y, kind: 'crate', bob: 0 });
+      drops.push({ x: e.x, y: e.y, kind: 'crate', isBoss: true, bob: 0 });
       addText(e.x, e.y - e.r - 22, '🩸 鲜血赐福：满血恢复 + 🎁×1！', '#ff4d6d', 18);
     } else if (e.variant === 'golden_golem') {
-      drops.push({ x: e.x, y: e.y, kind: 'crate', bob: 0 });
+      drops.push({ x: e.x, y: e.y, kind: 'crate', isBoss: true, bob: 0 });
       addText(e.x, e.y - e.r - 22, '🪙 黄金秘宝崩裂：巨量晶石 + 🎁×1！', '#ffd166', 18);
     } else {
       player.dmgMul += 0.12;
-      drops.push({ x: e.x, y: e.y, kind: 'crate', bob: 0 });
+      drops.push({ x: e.x, y: e.y, kind: 'crate', isBoss: true, bob: 0 });
       addText(e.x, e.y - e.r - 22, '🌌 虚空赐福：全伤永久+12% + 🎁×1！', '#c77dff', 18);
     }
     logInfo('SPECIAL_BOSS', `击杀特殊首领 ${e.bossTitle || e.variant}`);
   } else {
-    const luck = player.luck || 0;
+    const luck = Math.min(90, Math.max(0, player.luck || 0));
     const cratesOnMap = drops.filter(d => d.kind === 'crate').length;
-    const maxWaveCrates = 1 + (luck >= 45 ? 1 : 0);
-    if ((e.type === 'boss' || e.type === 'mini_boss') && cratesOnMap < 5) {
-      drops.push({ x: e.x, y: e.y, kind: 'crate', bob: 0 });
-      addText(e.x, e.y - e.r - 16, '🎁 战利品箱!', '#ffd166', 16);
-    } else if (e.elite && waveCratesDropped < maxWaveCrates && cratesOnMap < 3 && Math.random() < Math.min(0.22, 0.08 + luck * 0.0022)) {
+    const maxWaveCrates = 1 + (luck >= 60 ? 1 : 0);
+    if ((e.type === 'boss' || e.type === 'mini_boss') && cratesOnMap < 4) {
+      drops.push({ x: e.x, y: e.y, kind: 'crate', isBoss: true, bob: 0 });
+      addText(e.x, e.y - e.r - 16, '🎁 首领秘宝箱!', '#ffd166', 16);
+    } else if (e.elite && waveCratesDropped < maxWaveCrates && cratesOnMap < 2 && Math.random() < Math.min(0.16, 0.06 + luck * 0.0014)) {
       waveCratesDropped++;
       drops.push({ x: e.x, y: e.y, kind: 'crate', bob: 0 });
       addText(e.x, e.y - e.r - 16, '🎁 战利品箱!', '#ffd166', 16);
@@ -334,9 +349,10 @@ function hurtPlayer(rawDmg) {
   if (!Number.isFinite(rawDmg) || rawDmg <= 0) return;
   inHurtPlayer = true;
   try {
-    if (Math.random() < Math.min(0.80, player.dodge || 0)) {
+    const invScale = 1 + Math.min(0.60, player.invulnBonus || 0);
+    if (Math.random() < Math.min(player.dodgeCap || 0.80, player.dodge || 0)) {
       addText(player.x, player.y - 28, '闪避!', '#4cc9f0', 18);
-      player.invuln = 0.16;
+      player.invuln = 0.16 * invScale;
       if (player.thorns > 0) triggerThornsNova();
       if (player.cls === 'ghost') {
         triggerExplosion(player.x, player.y, 135 * getBlastScale(), (18 + player.lv * 4) * getEffectiveDmgMul() * getElemMul(), false, 0, '#72efdd', false);
@@ -345,7 +361,7 @@ function hurtPlayer(rawDmg) {
     }
 
     let dmg = Math.max(1, Math.round(rawDmg * (1 - getArmorMitigation())));
-    player.shieldRegenT = 7.0;
+    player.shieldRegenT = player.fastShield ? 4.5 : 7.0;
 
     // 能量护盾优先吸收伤害
     if (player.shield > 0) {
@@ -357,7 +373,7 @@ function hurtPlayer(rawDmg) {
       addSparks(player.x, player.y, Math.random() * 6.28, '#72efdd', 5);
       beep(540, 0.06, 'sine', 0.05);
       if (dmg <= 0) {
-        player.invuln = 0.30;
+        player.invuln = 0.30 * invScale;
         addText(player.x, player.y - 28, `护盾 -${absorbed}`, '#72efdd', 16);
         if (player.thorns > 0) triggerThornsNova();
         triggerBullNova();
@@ -366,7 +382,7 @@ function hurtPlayer(rawDmg) {
     }
 
     player.hp -= dmg;
-    player.invuln = 0.42;
+    player.invuln = 0.42 * invScale;
     shake = 10;
     beep(115, 0.15, 'sawtooth', 0.08);
     addBurst(player.x, player.y, '#ff4d6d', 10, 175);

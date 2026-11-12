@@ -7,10 +7,16 @@ const gameLogs = [];
 let logErrCount = 0, logSpikeCount = 0, lastErrSig = '', lastErrTime = 0;
 let fpsVal = 60, fpsFrames = 0, fpsAcc = 0, maxFrameMsWindow = 0, perfLogAcc = 0;
 
+function formatLogTimestamp(d = new Date()) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 function pushLog(level, tag, msg) {
   const rel = ((performance.now() - bootPerf) / 1000).toFixed(2);
-  const nowStr = new Date().toTimeString().slice(0, 8);
-  const entry = `[${nowStr} +${rel}s] [${level}] [${tag}] ${msg}`;
+  const nowStr = formatLogTimestamp(new Date());
+  const ver = typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'unknown';
+  const entry = `[${nowStr} +${rel}s] [${ver}] [${level}] [${tag}] ${msg}`;
   if (gameLogs.length >= LOG_MAX) gameLogs.shift();
   gameLogs.push(entry);
   const modal = document.getElementById('logModal');
@@ -43,9 +49,16 @@ if (window.addEventListener) {
 
 function getLogText() {
   const ua = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : 'unknown';
+  const ver = typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'unknown';
+  const bDate = typeof APP_BUILD_DATE !== 'undefined' ? APP_BUILD_DATE : 'unknown';
+  const originUrl = (typeof location !== 'undefined' && location.href) ? location.href : 'unknown';
+  const now = new Date();
   const header = [
-    '=== MINI BROTATO HD DIAGNOSTIC LOG ===',
-    `ExportedAt: ${new Date().toISOString()}`,
+    `=== MINI BROTATO HD DIAGNOSTIC LOG (${ver}) ===`,
+    `Version: ${ver} (BuildDate: ${bDate})`,
+    `BootedAt: ${formatLogTimestamp(new Date(bootTs))}`,
+    `ExportedAt: ${formatLogTimestamp(now)} (${now.toISOString()})`,
+    `Origin: ${originUrl}`,
     `UA: ${ua}`,
     `Viewport: ${viewW}x${viewH} (dpr=${dpr}, uiMode=${typeof uiMode !== 'undefined' ? uiMode : 'init'}, isTouch=${isTouch})`,
     `World: ${WORLD.w}x${WORLD.h} (floorCanvas=${floorCanvas ? floorCanvas.width + 'x' + floorCanvas.height : 'none'}, scale=${curFloorScale})`,
@@ -61,7 +74,10 @@ function getLogText() {
 function refreshLogModalUI() {
   const sum = document.getElementById('logSummary');
   if (sum) {
+    const ver = typeof APP_VERSION !== 'undefined' ? APP_VERSION : '-';
+    const bDate = typeof APP_BUILD_DATE !== 'undefined' ? APP_BUILD_DATE : '-';
     sum.innerHTML =
+      `<span>版本: <b>${ver} (${bDate})</b></span>` +
       `<span>FPS: <b>${fpsVal}</b></span>` +
       `<span>模式: <b>${typeof uiMode !== 'undefined' ? uiMode : '-'}</b></span>` +
       `<span>地图: <b>${WORLD.w}×${WORLD.h}</b></span>` +
@@ -129,18 +145,20 @@ function fallbackCopy(txt, cb) {
 function downloadLogs() {
   try {
     const txt = getLogText();
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const ver = typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'v0';
+    const stamp = formatLogTimestamp(new Date()).replace(' ', '_').replace(/:/g, '-');
+    const fname = `brotato_mini_${ver}_log_${stamp}.txt`;
     if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
       const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `brotato_mini_log_${stamp}.txt`;
+      a.download = fname;
       document.body.appendChild(a);
       if (a.click) a.click();
       if (a.remove) a.remove();
       if (typeof setTimeout !== 'undefined') setTimeout(() => URL.revokeObjectURL(url), 1500);
-      logInfo('LOG', `已导出日志文件 brotato_mini_log_${stamp}.txt`);
+      logInfo('LOG', `已导出日志文件 ${fname}`);
     } else {
       copyLogs();
     }

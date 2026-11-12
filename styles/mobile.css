@@ -212,11 +212,20 @@ body.m-ui #lvlCards .card-actions .btn {
   border-radius: 9px; justify-content: center; border-width: 1.5px 1.5px 3px 1.5px; margin: 0;
 }
 
-/* 战利品箱单屏居中 */
-body.m-ui #crateMenu h2 { font-size: 19px; }
-body.m-ui #crateMenu .card { min-height: 0; padding: 12px; gap: 9px; }
-body.m-ui #crateMenu .card-head { padding-right: 0; }
-body.m-ui .crate-btns .btn { height: 44px; min-height: 44px; font-size: 14.5px; padding: 0 12px; border-radius: 10px; }
+/* 战利品箱二选一单屏居中（竖屏紧凑双层，横屏并排双列，绝不溢出滚动） */
+body.m-ui #crateMenu h2 { font-size: 18px; }
+body.m-ui #crateMenu .sub { font-size: 12px; line-height: 1.3; }
+body.m-ui .crate-card-wrap { gap: 8px; max-width: 440px; grid-template-columns: 1fr; }
+body.m-ui #crateMenu .card { min-height: 0; padding: 10px 11px; gap: 7px; border-radius: 13px; }
+body.m-ui #crateMenu .card-head { padding-right: 0; gap: 8px; }
+body.m-ui #crateMenu .item-emblem { width: 38px; height: 38px; font-size: 20px; border-radius: 10px; }
+body.m-ui #crateMenu .card-title { font-size: 14.5px; }
+body.m-ui #crateMenu .card-desc { font-size: 12px; line-height: 1.35; }
+body.m-ui .crate-btns { gap: 7px; margin-top: 2px; }
+body.m-ui .crate-btns .btn {
+  height: 38px; min-height: 38px; font-size: 13px; padding: 0 8px;
+  border-radius: 9px; border-width: 1.5px 1.5px 3px 1.5px; margin: 0;
+}
 
 /* 单行 6 槽随身军械库（超 6 把时横向轻滑，绝不纵向换行撑破单屏） */
 body.m-ui .shop-bottom {
@@ -388,6 +397,10 @@ body.m-landscape #shopCards {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 6px;
+}
+body.m-landscape .crate-card-wrap {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-width: 680px;
 }
 body.m-landscape #shopCards .card:not(.sold-out) { padding: 7px 8px 4px 9px; gap: 7px; }
 body.m-landscape #shopCards .card-side { width: 104px; gap: 4px; }

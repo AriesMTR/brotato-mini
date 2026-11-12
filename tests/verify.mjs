@@ -225,7 +225,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 {
   const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
   assert.strictEqual(vm.runInContext('Object.keys(WEAPONS).length', s), 22, 'Should have 22 distinct weapons');
-  assert.strictEqual(vm.runInContext('ITEMS.length', s), 36, 'Should have 36 passive items');
+  assert.strictEqual(vm.runInContext('ITEMS.length', s), 44, 'Should have 44 passive items');
   assert.strictEqual(vm.runInContext('UPGRADES.length', s), 12, 'Should have 12 level-up stat choices');
   assert.strictEqual(vm.runInContext('WORLD.w', s), 2200, 'Desktop WORLD.w should be 2200');
   assert.strictEqual(vm.runInContext('WORLD.h', s), 1500, 'Desktop WORLD.h should be 1500');
@@ -414,9 +414,9 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert(els.codexGrid.children.length >= 4 && els.codexGrid.children.length < 22, 'Weapon set filter must filter weapon cards');
 
   vm.runInContext('setCodexTab("items");', s);
-  assert.strictEqual(els.codexGrid.children.length, 36, 'Items tab must render all 36 items');
+  assert.strictEqual(els.codexGrid.children.length, 44, 'Items tab must render all 44 items');
   vm.runInContext('setCodexFilter("4");', s);
-  assert(els.codexGrid.children.length > 0 && els.codexGrid.children.length < 36, 'Tier 4 filter must filter item cards');
+  assert(els.codexGrid.children.length >= 7 && els.codexGrid.children.length < 44, 'Tier 4 filter must filter item cards (7 unique legendaries)');
 
   vm.runInContext('setCodexTab("heroes");', s);
   assert.strictEqual(els.codexGrid.children.length, 8, 'Heroes tab must render all 8 potato classes');
@@ -767,4 +767,91 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert(aStats.oscStarted >= 1, "AudioBank.playSfx must fall back cleanly to procedural beep when external audio file is not registered");
 }
 
-console.log(`ALL 10 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+// 11. v1.1.1 Loot Variety, Strict T4 Drop Caps, Move-Speed Floor & Versioned Date Diagnostic Logs
+{
+  const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
+  vm.runInContext('startGame("engineer");', s);
+
+  // 11a. Log Header + Entries + Export Filename must include Date & Code Version (v1.1.1)
+  const logTxt = vm.runInContext('getLogText()', s);
+  assert(logTxt.includes('Version: v1.1.1 (BuildDate: 2026-11-12)'), 'Diagnostic log header must include Version & BuildDate');
+  assert(/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \+\d+\.\d+s\] \[v1\.1\.1\]/.test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
+  vm.runInContext('downloadLogs();', s);
+  assert(stats.downloads.length >= 1 && stats.downloads[0].download.includes('v1.1.1') && /\d{4}-\d{2}-\d{2}/.test(stats.downloads[0].download), 'Exported log filename must embed code version and date');
+
+  // 11b. Strict High-Tier Probability Caps even at Wave 18 + 500 Luck (never flooding 100% T4!)
+  const rates = vm.runInContext(`(() => {
+    let crateT4 = 0, bossT4 = 0, shopT4 = 0;
+    const N = 3000;
+    for (let i = 0; i < N; i++) {
+      if (rollCrateTier(18, 500, false) === 4) crateT4++;
+      if (rollCrateTier(18, 500, true) === 4) bossT4++;
+      if (rollShopTier(18, 500) === 4) shopT4++;
+    }
+    return { crateRate: crateT4 / N, bossRate: bossT4 / N, shopRate: shopT4 / N };
+  })()`, s);
+  assert(rates.crateRate <= 0.125, `Normal crate T4 rate must be strictly capped ~10% (got ${(rates.crateRate * 100).toFixed(1)}%)`);
+  assert(rates.bossRate <= 0.175, `Boss crate T4 rate must be strictly capped ~14% (got ${(rates.bossRate * 100).toFixed(1)}%)`);
+  assert(rates.shopRate <= 0.105, `Shop T4 rate must be strictly capped ~8% (got ${(rates.shopRate * 100).toFixed(1)}%)`);
+
+  // 11c. Unique (`maxCount: 1`) & Limited (`maxCount: 2`) Items Never Repeat After Reaching Cap
+  const neverRepeated = vm.runInContext(`(() => {
+    wave = 12; player.luck = 100;
+    player.items.anvil = 1;
+    player.items.cornucopia = 1;
+    player.items.reactor = 2;
+    for (let i = 0; i < 200; i++) {
+      const it = pickWeightedItem(4, new Set(), true);
+      if (!it || it.id === 'anvil' || it.id === 'cornucopia' || it.id === 'reactor') return false;
+      shopOffers = [];
+      rollOffers();
+      for (const o of shopOffers) {
+        if (o.kind === 'item' && (o.item.id === 'anvil' || o.item.id === 'cornucopia' || o.item.id === 'reactor')) return false;
+      }
+    }
+    return true;
+  })()`, s);
+  assert.strictEqual(neverRepeated, true, 'Capped T4 items already owned must NEVER appear again in crates or shop');
+
+  // 11d. 2-Option Crate Pod & Per-Wave Crate Queue Hard Cap (<= 3, excess auto-converts to crystals + HP)
+  vm.runInContext(`
+    pendingCrates = 0;
+    const matsBefore = player.mats;
+    for (let k = 0; k < 6; k++) {
+      drops.push({ x: player.x, y: player.y, kind: 'crate', isBoss: k === 0, bob: 0 });
+    }
+    update(0.05);
+    globalThis.excessConverted = (pendingCrates === 3) && (player.mats > matsBefore);
+    showCrateMenu();
+  `, s);
+  assert.strictEqual(vm.runInContext('excessConverted', s), true, 'Picking up >3 crates in a single wave must cap pendingCrates at 3 and convert excess to crystals');
+  assert.strictEqual(els.crateBox.children.length, 2, 'Crate modal must offer 2 distinct tactical supply choices');
+
+  // 11e. Movement Speed Penalty Floor (>= 72% even under heavy items + chill) & Hermes Wings Slow Immunity
+  const spdCheck = vm.runInContext(`(() => {
+    startGame('engineer');
+    const bell = ITEMS.find(i => i.id === 'bell');
+    const snail = ITEMS.find(i => i.id === 'snail');
+    const anvil = ITEMS.find(i => i.id === 'anvil');
+    for (let k = 0; k < 15; k++) { bell.apply(player); snail.apply(player); anvil.apply(player); }
+    const baseEff = getEffectiveSpdMul();
+    player.chillSlowT = 1.2;
+    keys['d'] = true;
+    const x0 = player.x;
+    update(0.20);
+    keys['d'] = false;
+    const movedFloor = player.x - x0;
+    const minExpected = player.spd * 0.72 * 0.20 - 0.5;
+
+    // Now equip Hermes Wings -> immune to slow & >= 122% speed!
+    const wings = ITEMS.find(i => i.id === 'hermes_wings');
+    wings.apply(player);
+    return { baseEff, movedFloor, minExpected, wingsEff: getEffectiveSpdMul(), noSlow: player.noSlow };
+  })()`, s);
+  assert(spdCheck.baseEff >= 0.72, `Player effective speed multiplier must never drop below 72% (got ${spdCheck.baseEff})`);
+  assert(spdCheck.movedFloor >= spdCheck.minExpected, `Actual movement even while chilled must stay >= 72% base speed`);
+  assert(spdCheck.noSlow && spdCheck.wingsEff >= 1.2, 'Hermes Wings must grant slow immunity and >= 120% move speed');
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 11 loot, speed & logging verification');
+}
+
+console.log(`ALL 11 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);

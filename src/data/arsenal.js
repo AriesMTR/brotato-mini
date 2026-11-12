@@ -58,51 +58,67 @@ const WEAPONS = {
   rocket:    { name: '火箭筒', icon: '🚀', set: 'heavy',     melee: false, dmg: 32,   cd: 1.50, range: 425, spd: 455, isRocket: true, blastR: 98, cost: 25, desc: '发射拖烟重型火箭，命中引发范围轰炸与焦痕' }
 };
 
-// 36 件《土豆兄弟》标志性被动装备（严控闪避 80% 上限与幸运膨胀，强化正负词条取舍）
+// 44 件《土豆兄弟》标志性被动装备（引入唯一/叠加上限 maxCount、移速下限保护 72%、严控高级装膨胀并丰富机动与流派选择）
 const ITEMS = [
   // --- T1 普通装备 ---
   { id: 'worm',       name: '外星蠕虫',   icon: '🪱', cost: 14, tier: 1, desc: '最大生命 +6，生命再生 +1.2/秒',                  apply: p => { p.maxHp += 6; p.hp += 6; if (!p.noRegen) p.regen += 1.2; } },
   { id: 'glasses',    name: '瞄准眼镜',   icon: '👓', cost: 13, tier: 1, desc: '攻击范围 +45，暴击率 +4%',                       apply: p => { p.rangeBonus += 45; p.crit += 0.04; } },
   { id: 'coffee',     name: '浓缩咖啡',   icon: '☕', cost: 14, tier: 1, desc: '攻击速度 +11%，全体伤害 -2%',                    apply: p => { p.atkSpd += 0.11; p.dmgMul -= 0.02; } },
-  { id: 'bell',       name: '重型哑铃',   icon: '🏋️', cost: 16, tier: 1, desc: '全体伤害 +16%，移速 -3%',                        apply: p => { p.dmgMul += 0.16; p.spdMul -= 0.03; } },
-  { id: 'fertilizer', name: '基因化肥',   icon: '🌱', cost: 14, tier: 1, desc: '收获 +8（每波结算发晶石且每波递增8%），全伤 -4%',  apply: p => { p.harvestFlat += 8; p.dmgMul -= 0.04; } },
+  { id: 'bell',       name: '重型哑铃',   icon: '🏋️', cost: 16, tier: 1, maxCount: 5, desc: '全体伤害 +16%，移速 -2%（最多叠 5 件）', apply: p => { p.dmgMul += 0.16; p.spdMul = Math.max(0.72, p.spdMul - 0.02); } },
+  { id: 'fertilizer', name: '基因化肥',   icon: '🌱', cost: 14, tier: 1, maxCount: 5, desc: '收获 +8（波末发晶石且递增8%），全伤 -4%', apply: p => { p.harvestFlat += 8; p.dmgMul -= 0.04; } },
   { id: 'hedgehog',   name: '刺猬甲刺',   icon: '🦔', cost: 15, tier: 1, desc: '近战加成 +12%，全体伤害 +6%，护甲 +1，闪避 -4%',  apply: p => { p.meleeBonus += 0.12; p.dmgMul += 0.06; p.armor += 1; p.dodge = Math.max(0, p.dodge - 0.04); } },
-  { id: 'coupon',     name: '会员折扣卡', icon: '🏷️', cost: 16, tier: 1, desc: '商店商品价格永久 -7%（最多叠 4 张），幸运 +3',    apply: p => { p.shopDiscount = Math.min(0.28, p.shopDiscount + 0.07); p.luck += 3; } },
-  { id: 'recycler',   name: '刷新回收仪', icon: '♻️', cost: 15, tier: 1, desc: '每波进入商店赠送 1 次免费刷新！收获 +3',         apply: p => { p.freeRerolls += 1; p.harvestFlat += 3; } },
-  { id: 'lumber',     name: '伐木工披肩', icon: '🪓', cost: 15, tier: 1, desc: '每波战场额外生长 +1 棵异星晶树，幸运 +4',        apply: p => { p.bonusTrees += 1; p.luck += 4; } },
-  { id: 'magnet',     name: '超导磁铁',   icon: '🧲', cost: 14, tier: 1, desc: '拾取磁吸范围 +70，晶石爆率 +10%',                apply: p => { p.magnet += 70; p.harvest += 0.10; } },
+  { id: 'coupon',     name: '会员折扣卡', icon: '🏷️', cost: 16, tier: 1, maxCount: 4, desc: '商店商品价格永久 -7%（最多叠 4 张），幸运 +3', apply: p => { p.shopDiscount = Math.min(0.28, p.shopDiscount + 0.07); p.luck += 3; } },
+  { id: 'recycler',   name: '刷新回收仪', icon: '♻️', cost: 15, tier: 1, maxCount: 3, desc: '每波进入商店赠送 1 次免费刷新！收获 +3',      apply: p => { p.freeRerolls += 1; p.harvestFlat += 3; } },
+  { id: 'lumber',     name: '伐木工披肩', icon: '🪓', cost: 15, tier: 1, maxCount: 3, desc: '每波战场额外生长 +1 棵异星晶树，幸运 +4',     apply: p => { p.bonusTrees += 1; p.luck += 4; } },
+  { id: 'magnet',     name: '超导磁铁',   icon: '🧲', cost: 14, tier: 1, maxCount: 4, desc: '拾取磁吸范围 +70，晶石爆率 +10%',             apply: p => { p.magnet += 70; p.harvest += 0.10; } },
   { id: 'plate',      name: '合金护板',   icon: '🪨', cost: 15, tier: 1, desc: '护甲 +3（减免受击伤害），最大生命 +3',            apply: p => { p.armor += 3; p.maxHp += 3; p.hp += 3; } },
-  { id: 'clover',     name: '幸运四叶草', icon: '🍀', cost: 14, tier: 1, desc: '幸运 +7（提升高级装/血包/宝箱率），闪避 +2%',     apply: p => { p.luck += 7; p.healDropBonus += 0.018; p.dodge = Math.min(p.dodgeCap, p.dodge + 0.02); } },
-  { id: 'boots',      name: '战术军靴',   icon: '🥾', cost: 15, tier: 1, desc: '移动速度 +8%，闪避率 +4%（上限80%）',             apply: p => { p.spdMul += 0.08; p.dodge = Math.min(p.dodgeCap, p.dodge + 0.04); } },
+  { id: 'clover',     name: '幸运四叶草', icon: '🍀', cost: 14, tier: 1, maxCount: 5, desc: '幸运 +7（提升高级装/血包/宝箱率），闪避 +2%',  apply: p => { p.luck += 7; p.healDropBonus += 0.018; p.dodge = Math.min(p.dodgeCap, p.dodge + 0.02); } },
+  { id: 'boots',      name: '战术军靴',   icon: '🥾', cost: 15, tier: 1, desc: '移动速度 +10%，闪避率 +4%（上限80%）',            apply: p => { p.spdMul += 0.10; p.dodge = Math.min(p.dodgeCap, p.dodge + 0.04); } },
 
   // --- T2 精良装备 ---
   { id: 'scope',      name: '战术瞄具',   icon: '🎯', cost: 24, tier: 2, desc: '攻击范围 +60，暴击率 +10%，攻速 -4%',            apply: p => { p.rangeBonus += 60; p.crit += 0.10; p.atkSpd -= 0.04; } },
   { id: 'butterfly',  name: '幻影蝴蝶',   icon: '🦋', cost: 25, tier: 2, desc: '闪避率 +6%，元素伤害 +16%，攻击范围 -20',        apply: p => { p.dodge = Math.min(p.dodgeCap, p.dodge + 0.06); p.elemBonus += 0.16; p.rangeBonus -= 20; } },
-  { id: 'snail',      name: '重甲蜗牛',   icon: '🐌', cost: 25, tier: 2, desc: '全场敌人移速永久 -6%（最多叠3层），自身移速 -3%', apply: p => { p.enemySlow = Math.min(0.18, p.enemySlow + 0.06); p.spdMul -= 0.03; } },
-  { id: 'thorns',     name: '荆棘铁甲',   icon: '🌵', cost: 26, tier: 2, desc: '护甲 +4；受击或闪避时向四周迸射护甲加成尖刺新星', apply: p => { p.armor += 4; p.thorns += 1; } },
-  { id: 'cyberball',  name: '幸运弹珠',   icon: '🎱', cost: 26, tier: 2, desc: '幸运 +6；拾取晶石有概率触发雷弹轰击场上随机敌人', apply: p => { p.luck += 6; p.cyberball += 1; } },
+  { id: 'snail',      name: '重甲蜗牛',   icon: '🐌', cost: 25, tier: 2, maxCount: 3, desc: '全场敌人移速永久 -6%（最多叠 3 只），自身移速 -2%', apply: p => { p.enemySlow = Math.min(0.18, p.enemySlow + 0.06); p.spdMul = Math.max(0.72, p.spdMul - 0.02); } },
+  { id: 'jetpack',    name: '喷气推进包', icon: '🚀', cost: 26, tier: 2, maxCount: 3, desc: '移动速度 +12%，闪避率 +5%（上限80%），护甲 -1', apply: p => { p.spdMul += 0.12; p.dodge = Math.min(p.dodgeCap, p.dodge + 0.05); p.armor -= 1; } },
+  { id: 'thorns',     name: '荆棘铁甲',   icon: '🌵', cost: 26, tier: 2, maxCount: 3, desc: '护甲 +4；受击或闪避时向四周迸射护甲加成尖刺新星', apply: p => { p.armor += 4; p.thorns += 1; } },
+  { id: 'cyberball',  name: '幸运弹珠',   icon: '🎱', cost: 26, tier: 2, maxCount: 3, desc: '幸运 +6；拾取晶石有概率触发雷弹轰击场上随机敌人', apply: p => { p.luck += 6; p.cyberball += 1; } },
   { id: 'bat',        name: '吸血蝠翼',   icon: '🦇', cost: 26, tier: 2, desc: '生命窃取 +7%，最大生命 +4，收获 -3',             apply: p => { p.lifesteal += 0.07; p.maxHp += 4; p.hp += 4; p.harvestFlat = Math.max(0, p.harvestFlat - 3); } },
   { id: 'medkit',     name: '纳米血包',   icon: '❤️‍🩹', cost: 26, tier: 2, desc: '生命再生 +2.6/秒，最大生命 +5',                  apply: p => { if (!p.noRegen) p.regen += 2.6; p.maxHp += 5; p.hp += 5; } },
-  { id: 'turret',     name: '便携炮塔',   icon: '🛰️', cost: 29, tier: 2, desc: '每波额外空投 1 座自动防御炮台',                   apply: p => { p.bonusTurrets += 1; } },
+  { id: 'turret',     name: '便携炮塔',   icon: '🛰️', cost: 29, tier: 2, maxCount: 4, desc: '每波额外空投 1 座自动防御炮台',                apply: p => { p.bonusTurrets += 1; } },
   { id: 'adren',      name: '肾上腺素',   icon: '💉', cost: 28, tier: 2, desc: '闪避率 +6%（上限80%），攻击速度 +12%',            apply: p => { p.dodge = Math.min(p.dodgeCap, p.dodge + 0.06); p.atkSpd += 0.12; } },
-  { id: 'napalm',     name: '凝固汽油桶', icon: '🔥', cost: 27, tier: 2, desc: '所有攻击 35% 概率引燃敌人，元素伤害 +16%',        apply: p => { p.burnChance += 0.35; p.elemBonus += 0.16; } },
-  { id: 'cryo',       name: '液氮冷却罐', icon: '❄️', cost: 25, tier: 2, desc: '攻击 40% 概率冰缓敌人减速，暴击率 +6%',          apply: p => { p.chillChance += 0.40; p.crit += 0.06; } },
-  { id: 'barrier',    name: '偏导力场仪', icon: '🛡️', cost: 28, tier: 2, desc: '能量护盾上限 +10（每7秒自动回充），护甲 +2',      apply: p => { p.maxShield += 10; p.shield += 10; p.armor += 2; } },
-  { id: 'crown',      name: '黄金理财冠', icon: '👑', cost: 28, tier: 2, desc: '每波结算额外获得当前存留晶石 +12% 利息，收获 +5', apply: p => { p.interest += 0.12; p.harvestFlat += 5; } },
+  { id: 'napalm',     name: '凝固汽油桶', icon: '🔥', cost: 27, tier: 2, maxCount: 3, desc: '所有攻击 35% 概率引燃敌人，元素伤害 +16%',     apply: p => { p.burnChance += 0.35; p.elemBonus += 0.16; } },
+  { id: 'cryo',       name: '液氮冷却罐', icon: '❄️', cost: 25, tier: 2, maxCount: 3, desc: '攻击 40% 概率冰缓敌人减速，暴击率 +6%',       apply: p => { p.chillChance += 0.40; p.crit += 0.06; } },
+  { id: 'barrier',    name: '偏导力场仪', icon: '🛡️', cost: 28, tier: 2, desc: '能量护盾上限 +10（自动回充），护甲 +2',          apply: p => { p.maxShield += 10; p.shield += 10; p.armor += 2; } },
+  { id: 'crown',      name: '黄金理财冠', icon: '👑', cost: 28, tier: 2, maxCount: 2, desc: '每波结算额外获得存留晶石 +12% 利息，收获 +5', apply: p => { p.interest += 0.12; p.harvestFlat += 5; } },
 
   // --- T3 史诗装备 ---
-  { id: 'bandana',      name: '穿甲头巾', icon: '🧣', cost: 40, tier: 3, desc: '所有远程子弹穿透 +1，全体伤害 +10%',             apply: p => { p.pierceBonus += 1; p.dmgMul += 0.10; } },
-  { id: 'prism',        name: '跳弹棱镜', icon: '🔷', cost: 41, tier: 3, desc: '所有远程子弹弹射次数 +1，攻击范围 +40',           apply: p => { p.bounceBonus += 1; p.rangeBonus += 40; } },
-  { id: 'tentacle',     name: '暴击触手', icon: '🦑', cost: 41, tier: 3, desc: '暴击率 +10%；攻击暴击时 22% 概率直接回复 1 生命', apply: p => { p.crit += 0.10; p.critHeal += 0.22; } },
-  { id: 'sniper_cloak', name: '鹰眼披风', icon: '🦅', cost: 42, tier: 3, desc: '攻击范围 +90，暴击 +8%；每 15 点范围额外转化 +1%全伤', apply: p => { p.rangeBonus += 90; p.crit += 0.08; p.rangeToDmg = true; } },
-  { id: 'tesla',        name: '特斯拉线圈', icon: '⚡', cost: 44, tier: 3, desc: '每 1.7 秒自动释放连锁电弧劈向周围怪物',         apply: p => { p.teslaCount += 1; } },
-  { id: 'warhead',      name: '高爆弹头', icon: '🧨', cost: 43, tier: 3, desc: '攻击 22% 概率引发爆破，爆炸范围与伤害 +20%',      apply: p => { p.blastChance += 0.22; p.explosionScale += 0.20; } },
-  { id: 'berserk',      name: '狂战双刃斧', icon: '🩸', cost: 39, tier: 3, desc: '全体伤害 +26%，攻速 +11%，但护甲 -3',           apply: p => { p.dmgMul += 0.26; p.atkSpd += 0.11; p.armor -= 3; } },
+  { id: 'bandana',       name: '穿甲头巾',   icon: '🧣', cost: 40, tier: 3, maxCount: 2, desc: '所有远程子弹穿透 +1，全体伤害 +10%',             apply: p => { p.pierceBonus += 1; p.dmgMul += 0.10; } },
+  { id: 'prism',         name: '跳弹棱镜',   icon: '🔷', cost: 41, tier: 3, maxCount: 2, desc: '所有远程子弹弹射次数 +1，攻击范围 +40',           apply: p => { p.bounceBonus += 1; p.rangeBonus += 40; } },
+  { id: 'tentacle',      name: '暴击触手',   icon: '🦑', cost: 41, tier: 3, maxCount: 2, desc: '暴击率 +10%；攻击暴击时 22% 概率直接回复 1 生命', apply: p => { p.crit += 0.10; p.critHeal += 0.22; } },
+  { id: 'sniper_cloak',  name: '鹰眼披风',   icon: '🦅', cost: 42, tier: 3, maxCount: 1, desc: '【唯一】攻击范围 +90，暴击 +8%；每 15 范围转化 +1%全伤', apply: p => { p.rangeBonus += 90; p.crit += 0.08; p.rangeToDmg = true; } },
+  { id: 'tesla',         name: '特斯拉线圈', icon: '⚡', cost: 44, tier: 3, maxCount: 3, desc: '每 1.7 秒自动释放连锁电弧劈向周围怪物',         apply: p => { p.teslaCount += 1; } },
+  { id: 'warhead',       name: '高爆弹头',   icon: '🧨', cost: 43, tier: 3, maxCount: 2, desc: '攻击 22% 概率引发爆破，爆炸范围与伤害 +20%',      apply: p => { p.blastChance += 0.22; p.explosionScale += 0.20; } },
+  { id: 'berserk',       name: '狂战双刃斧', icon: '🩸', cost: 39, tier: 3, maxCount: 2, desc: '全体伤害 +26%，攻速 +11%，但护甲 -3',           apply: p => { p.dmgMul += 0.26; p.atkSpd += 0.11; p.armor -= 3; } },
+  { id: 'blood_chalice', name: '猩红圣餐杯', icon: '🍷', cost: 42, tier: 3, maxCount: 2, desc: '生命窃取 +9%，最大生命 +8，血包治疗量 +2',       apply: p => { p.lifesteal += 0.09; p.maxHp += 8; p.hp += 8; p.healBonus += 2; } },
+  { id: 'chrono_watch',  name: '时停怀表',   icon: '⏱️', cost: 43, tier: 3, maxCount: 2, desc: '攻击速度 +14%，移速 +8%，受击无敌时间延长 +30%', apply: p => { p.atkSpd += 0.14; p.spdMul += 0.08; p.invulnBonus = (p.invulnBonus || 0) + 0.30; } },
+  { id: 'overclock_core',name: '超频能量核', icon: '🔋', cost: 43, tier: 3, maxCount: 2, desc: '元素与工程伤害 +24%，攻击范围 +45，护甲 -2',     apply: p => { p.elemBonus += 0.24; p.rangeBonus += 45; p.armor -= 2; } },
 
-  // --- T4 传说装备 ---
-  { id: 'reactor',    name: '聚变反应堆', icon: '☀️', cost: 65, tier: 4, desc: '【传说】全伤 +24%，攻速 +16%，护盾 +14，再生 +2/s', apply: p => { p.dmgMul += 0.24; p.atkSpd += 0.16; p.maxShield += 14; p.shield += 14; if (!p.noRegen) p.regen += 2; } },
-  { id: 'anvil',      name: '铁匠神砧',   icon: '⚒️', cost: 66, tier: 4, desc: '【传说】每波进商店自动免费升阶 1 把随机武器！护甲 +4，移速 -5%', apply: p => { p.hasAnvil = true; p.armor += 4; p.spdMul -= 0.05; } },
-  { id: 'cornucopia', name: '丰饶圣杯',   icon: '🏺', cost: 62, tier: 4, desc: '【传说】收获 +20，幸运 +12，血包治疗量 +3，拾取范围 +60', apply: p => { p.harvestFlat += 20; p.luck += 12; p.healBonus += 3; p.magnet += 60; } }
+  // --- T4 传说装备（严格低爆率且设唯一/上限，杜绝后期重复刷屏与失衡） ---
+  { id: 'reactor',        name: '聚变反应堆',   icon: '☀️', cost: 68, tier: 4, maxCount: 2, desc: '【传说】全伤 +24%，攻速 +16%，护盾 +14，再生 +2/s', apply: p => { p.dmgMul += 0.24; p.atkSpd += 0.16; p.maxShield += 14; p.shield += 14; if (!p.noRegen) p.regen += 2; } },
+  { id: 'anvil',          name: '铁匠神砧',     icon: '⚒️', cost: 70, tier: 4, maxCount: 1, desc: '【传说·唯一】每波进店免费升阶 1 把随机武器！护甲 +4，移速 -3%', apply: p => { p.hasAnvil = true; p.armor += 4; p.spdMul = Math.max(0.72, p.spdMul - 0.03); } },
+  { id: 'cornucopia',     name: '丰饶圣杯',     icon: '🏺', cost: 66, tier: 4, maxCount: 1, desc: '【传说·唯一】收获 +20，幸运 +12，血包治疗 +3，拾取范围 +60', apply: p => { p.harvestFlat += 20; p.luck += 12; p.healBonus += 3; p.magnet += 60; } },
+  { id: 'soul_harvester', name: '噬魂死神镰',   icon: '💀', cost: 72, tier: 4, maxCount: 1, desc: '【传说·唯一】全伤 +28%，暴击 +12%；击杀敌人 18% 概率迸射索敌魂雷', apply: p => { p.dmgMul += 0.28; p.crit += 0.12; p.soulBolt = true; } },
+  { id: 'aegis_core',     name: '不朽神盾核',   icon: '💠', cost: 68, tier: 4, maxCount: 1, desc: '【传说·唯一】能量护盾 +22，护甲 +5，护盾破碎回充速度加快 35%', apply: p => { p.maxShield += 22; p.shield += 22; p.armor += 5; p.fastShield = true; } },
+  { id: 'hermes_wings',   name: '赫尔墨斯飞翼', icon: '🪽', cost: 68, tier: 4, maxCount: 1, desc: '【传说·唯一】移速 +22%，闪避上限升至 85%（闪避+8%），免疫移速惩罚与冰缓', apply: p => { p.noSlow = true; p.dodgeCap = Math.max(p.dodgeCap, 0.85); p.dodge = Math.min(p.dodgeCap, p.dodge + 0.08); p.spdMul = Math.max(1.0, p.spdMul) + 0.22; } },
+  { id: 'star_crown',     name: '星界帝王冠',   icon: '🌟', cost: 70, tier: 4, maxCount: 1, desc: '【传说·唯一】全伤 +18%，攻击速度 +12%，拾取范围 +100，幸运 +10', apply: p => { p.dmgMul += 0.18; p.atkSpd += 0.12; p.magnet += 100; p.luck += 10; } }
+];
+
+// 异星战利品箱专属即时补给核心（丰富开箱池，提供属性原液/急救满血/高纯晶簇等多元收益）
+const CRATE_SUPPLIES = [
+  { id: 'sup_titan', name: '泰坦活性原液', icon: '🧬', tier: 2, cost: 28, desc: '最大生命永久 +9，并立即恢复全部损失生命值！', apply: p => { p.maxHp += 9; p.hp = p.maxHp; } },
+  { id: 'sup_hyper', name: '超导机动核心', icon: '⚡', tier: 2, cost: 28, desc: '攻击速度永久 +10%，移动速度永久 +9%', apply: p => { p.atkSpd += 0.10; p.spdMul += 0.09; } },
+  { id: 'sup_aegis', name: '重装纳米镀层', icon: '🛡️', tier: 2, cost: 28, desc: '护甲永久 +3，能量护盾上限 +8', apply: p => { p.armor += 3; p.maxShield += 8; p.shield += 8; } },
+  { id: 'sup_gems',  name: '高纯紫晶母矿', icon: '💎', tier: 3, cost: 40, desc: '立即提炼一笔丰厚晶石资金，且幸运永久 +6', apply: (p, w) => { const gain = Math.round(28 + w * 7); p.mats += gain; p.luck += 6; } }
 ];
 
 const UPGRADES = [
@@ -112,7 +128,7 @@ const UPGRADES = [
   { name: '极速扳机', icon: '⚡', desc: '攻击速度 +11%',                   apply: p => { p.atkSpd += 0.11; } },
   { name: '鹰眼扩距', icon: '📏', desc: '攻击范围 +50，暴击率 +4%',         apply: p => { p.rangeBonus += 50; p.crit += 0.04; } },
   { name: '钢铁甲壳', icon: '🪨', desc: '护甲 +3（稳定减伤）',             apply: p => { p.armor += 3; } },
-  { name: '氮气推进', icon: '👟', desc: '移动速度 +7%',                    apply: p => { p.spdMul += 0.07; } },
+  { name: '氮气推进', icon: '👟', desc: '移动速度 +9%',                    apply: p => { p.spdMul += 0.09; } },
   { name: '弱点洞悉', icon: '🎯', desc: '暴击率 +8%',                      apply: p => { p.crit += 0.08; } },
   { name: '暗影闪避', icon: '💨', desc: '闪避率 +5%（上限80%）',           apply: p => { p.dodge = Math.min(p.dodgeCap, p.dodge + 0.05); } },
   { name: '元素过载', icon: '🔥', desc: '元素与爆炸伤害 +18%，暴击 +4%',   apply: p => { p.elemBonus += 0.18; p.crit += 0.04; } },

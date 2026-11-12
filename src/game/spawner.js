@@ -24,11 +24,11 @@ function hurtTree(tr, rawDmg) {
     beep(580, 0.08, 'triangle', 0.05);
     addBurst(tr.x, tr.y - 6, '#5ef29b', 10, 145);
     dropCrystals(tr.x, tr.y, 2 + Math.floor(wave * 0.45));
-    const luck = (player && player.luck) || 0;
+    const luck = Math.min(90, Math.max(0, (player && player.luck) || 0));
     const cratesOnMap = drops.filter(d => d.kind === 'crate').length;
-    const maxWaveCrates = 1 + (luck >= 45 ? 1 : 0);
-    const crateChance = Math.min(0.20, 0.06 + luck * 0.0022);
-    if (waveCratesDropped < maxWaveCrates && cratesOnMap < 3 && Math.random() < crateChance) {
+    const maxWaveCrates = 1 + (luck >= 60 ? 1 : 0);
+    const crateChance = Math.min(0.16, 0.05 + luck * 0.0014);
+    if (waveCratesDropped < maxWaveCrates && cratesOnMap < 2 && Math.random() < crateChance) {
       waveCratesDropped++;
       drops.push({ x: tr.x, y: tr.y, kind: 'crate', bob: 0 });
       addText(tr.x, tr.y - 34, '🎁 战利品箱!', '#ffd166', 16);
