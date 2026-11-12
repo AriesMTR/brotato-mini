@@ -3,12 +3,18 @@ const FALLBACK_BOSS_DEFS = {
   butcher: { id: 'butcher', icon: '👑', name: '深渊屠夫虫王', epithet: '腐血母巢暴君', color: '#e63946', spd: 90, desc: '深渊母巢暴君' },
   frost_queen: { id: 'frost_queen', icon: '❄️', name: '极寒霜晶女皇', epithet: '永冻凛冬神姬', color: '#00bbf9', spd: 84, desc: '冰封王座主宰' },
   mech_colossus: { id: 'mech_colossus', icon: '⚙️', name: '熔核机械巨像', epithet: '歼星重装泰坦', color: '#f77f00', spd: 78, desc: '重装泰坦兵器' },
-  void_weaver: { id: 'void_weaver', icon: '👁️', name: '虚空织网主宰', epithet: '次元裂隙古神', color: '#9d4edd', spd: 86, desc: '异次元古神' }
+  void_weaver: { id: 'void_weaver', icon: '👁️', name: '虚空织网主宰', epithet: '次元裂隙古神', color: '#9d4edd', spd: 86, desc: '异次元古神' },
+  plague_empress: { id: 'plague_empress', icon: '🦋', name: '碧落腐生毒皇', epithet: '万蛊花嫁神妃', color: '#52b788', spd: 85, desc: '万蛊妖蝶女皇' },
+  solar_seraph: { id: 'solar_seraph', icon: '☀️', name: '炽阳裁决圣女', epithet: '破晓圣焰炽天使', color: '#ff9f1c', spd: 88, desc: '破晓裁决炽天使' }
 };
 const FALLBACK_MINI_BOSS_DEFS = {
   vanguard: { id: 'vanguard', icon: '⚔️', name: '狂厄裂地统领', epithet: '重甲裂地战狂', color: '#f72585', spd: 86, desc: '重甲先锋统领' },
   pyro_lord: { id: 'pyro_lord', icon: '🔥', name: '炽焰重炮统领', epithet: '熔火轰炸督军', color: '#fb5607', spd: 80, desc: '熔火狂热统领' },
-  shadow_stalker: { id: 'shadow_stalker', icon: '⚡', name: '幽影雷刃统领', epithet: '暗雷瞬刃死神', color: '#7209b7', spd: 96, desc: '极速刺客统领' }
+  shadow_stalker: { id: 'shadow_stalker', icon: '⚡', name: '幽影雷刃统领', epithet: '暗雷瞬刃死神', color: '#7209b7', spd: 96, desc: '极速刺客统领' },
+  venom_matriarch: { id: 'venom_matriarch', icon: '🐍', name: '碧鳞剧毒统领', epithet: '翠影蛇姬督军', color: '#80ed99', spd: 84, desc: '剧毒蛇姬统领' },
+  glacial_valkyrie: { id: 'glacial_valkyrie', icon: '🧊', name: '凛霜圣枪统领', epithet: '极北冰骑战姬', color: '#48cae4', spd: 92, desc: '极北冰骑统领' },
+  iron_warden: { id: 'iron_warden', icon: '🛡️', name: '曜铁圣盾统领', epithet: '黑金重盾战姬', color: '#eab308', spd: 76, desc: '黑金重装统领' },
+  storm_siren: { id: 'storm_siren', icon: '🌪️', name: '苍雷风暴统领', epithet: '雷鸣律动歌姬', color: '#38bdf8', spd: 90, desc: '苍雷风暴统领' }
 };
 const FALLBACK_SPECIAL_RELICS = [
   { id: 'blood_altar', icon: '🩸', name: '绯红血契祭坛', color: '#ff2a55', bossId: 'crimson_lord', bossIcon: '🦇', bossName: '猩红鲜血伯爵', epithet: '永夜血族真祖', bossColor: '#d90429' },
@@ -651,7 +657,7 @@ function beginWave(retryMeta = null) {
     const m1 = (savedIds && miniBossDefs[savedIds[0]]) ? savedIds[0] : pickMiniBossVariant();
     lastMiniBossVariant = m1;
     const mb1 = miniBossDefs[m1] || FALLBACK_MINI_BOSS_DEFS.vanguard;
-    if ((diff.dualElite && wave >= 9) || (selectedDiff >= 5 && wave >= 5)) {
+    if (diff.dualElite && wave >= 9) {
       const m2 = (savedIds && savedIds[1] && miniBossDefs[savedIds[1]]) ? savedIds[1] : pickMiniBossVariant(m1);
       const mb2 = miniBossDefs[m2] || FALLBACK_MINI_BOSS_DEFS.pyro_lord;
       if (typeof waveCheckpoint !== 'undefined' && waveCheckpoint) waveCheckpoint.waveBossIds = [m1, m2];
@@ -788,11 +794,12 @@ function spawnHazard(x, y, r, dmg, delay = 1.22, extra = {}) {
 // 全异星怪物、4 大新增特异兵种、5 大场景专属怪、随机精英统领、4 大主宰 Boss 与 3 大奇遇首领生成
 // （全面拉开不同怪物在体型 r、血量 hp、移速 spd 与伤害 dmg 上的生态差异，增强首领压迫感并兼顾近战博弈）
 function createEnemy(x, y, type, variant = '') {
-  const endlessMul = wave > MAX_WAVE ? Math.pow(1.25, wave - MAX_WAVE) : 1;
+  const endlessMul = wave > MAX_WAVE ? Math.pow(1.22, wave - MAX_WAVE) : 1;
   const wIdx = Math.max(0, wave - 1);
-  const s = (1 + wIdx * 0.38 + Math.pow(wIdx, 1.68) * 0.145) * endlessMul * diff.hpMul;
-  const dm = (1 + wIdx * 0.16 + Math.max(0, wave - 6) * 0.08) * (wave > MAX_WAVE ? Math.pow(1.12, wave - MAX_WAVE) : 1) * diff.dmgMul;
-  const sm = (1 + Math.min(0.22, wIdx * 0.016)) * diff.spdMul;
+  // 平滑前中后期血量与伤害膨胀曲线：前期节奏舒缓不卡手，中后期与终局稳步加压拉满虫潮与首领压迫感
+  const s = (1 + wIdx * 0.20 + Math.pow(Math.max(0, wIdx - 2), 1.82) * 0.16) * endlessMul * diff.hpMul;
+  const dm = (1 + wIdx * 0.135 + Math.max(0, wave - 6) * 0.065) * (wave > MAX_WAVE ? Math.pow(1.10, wave - MAX_WAVE) : 1) * diff.dmgMul;
+  const sm = (1 + Math.min(0.18, wIdx * 0.014)) * diff.spdMul;
   const base = {
     x, y, hitFlash: 0, phase: Math.random() * 6.28, vx: 0, vy: 0, faceA: 0,
     burnT: 0, burnTick: 0, burnDmg: 0, chillT: 0, freezeT: 0,
@@ -800,10 +807,11 @@ function createEnemy(x, y, type, variant = '') {
   };
 
   if (type === 'swarmer') {
-    const swCnt = wave >= 8 ? 4 : (wave >= 5 ? 3 : 2);
+    const softCap = isTouch ? 64 : 80;
+    const swCnt = Math.max(1, Math.min(wave >= 6 ? 3 : 2, softCap - (enemies.length + Math.max(0, spawns.length - 1))));
     for (let k = 0; k < swCnt; k++) {
       const ox = x + (Math.random() - 0.5) * 40, oy = y + (Math.random() - 0.5) * 40;
-      enemies.push({ ...base, x: ox, y: oy, r: 9, hp: 5.0 * s, maxHp: 5.0 * s, spd: (146 + wave * 2.2) * sm, dmg: Math.max(2, Math.round(2.2 * dm)), color: '#ffbe0b', type, mat: k === 0 ? 1 : (Math.random() < 0.45 ? 1 : 0) });
+      enemies.push({ ...base, x: ox, y: oy, r: 9, hp: 5.0 * s, maxHp: 5.0 * s, spd: (146 + wave * 2.0) * sm, dmg: Math.max(2, Math.round(2.2 * dm)), color: '#ffbe0b', type, mat: k === 0 ? 1 : (Math.random() < 0.55 ? 1 : 0) });
     }
     addBurst(x, y, '#ff4d6d', 5, 85);
     return;
@@ -817,31 +825,32 @@ function createEnemy(x, y, type, variant = '') {
   if (type === 'boss') {
     const bKey = (variant && bossDefs[variant]) ? variant : pickBossVariant();
     const bDef = bossDefs[bKey] || FALLBACK_BOSS_DEFS.butcher;
-    const twinScale = (diff.doubleBoss || (endlessMode && wave >= 18)) ? 0.78 : 1;
-    const bhp = Math.round((7400 + Math.max(0, wave - MAX_WAVE) * 3200) * endlessMul * diff.hpMul * twinScale);
+    const twinScale = (diff.doubleBoss || (endlessMode && wave >= 18)) ? 0.68 : 1;
+    const bhp = Math.round((13200 + Math.max(0, wave - MAX_WAVE) * 3600) * endlessMul * diff.hpMul * twinScale);
     ent = {
-      ...base, r: 48, hp: bhp, maxHp: bhp, spd: bDef.spd * sm, dmg: Math.round(11.5 * dm),
+      ...base, r: 48, hp: bhp, maxHp: bhp, spd: bDef.spd * sm, dmg: Math.round(12.8 * dm),
       color: bDef.color, type: 'boss', variant: bKey, bossTitle: `${bDef.icon} ${bDef.name}`,
-      dashT: 2.5, sumT: 5.6, meteorT: 4.0, skillT: 2.2, terrainCd: 5.8, ringCd: 4.8,
+      dashT: 2.5, sumT: 5.8, meteorT: 4.1, skillT: 2.2, terrainCd: 6.0, ringCd: 4.9,
       burstLeft: 0, burstCd: 0, canPhase2: Math.random() < mythicRate, mythicPhase2: false, mat: 48
     };
   } else if (type === 'mini_boss') {
     const mKey = (variant && miniBossDefs[variant]) ? variant : pickMiniBossVariant();
     const mDef = miniBossDefs[mKey] || FALLBACK_MINI_BOSS_DEFS.vanguard;
-    const mhp = Math.round((740 + wave * 205 + Math.pow(wave, 2.16) * 15) * endlessMul * diff.hpMul);
+    const twinMiniScale = (diff.dualElite && wave >= 9) ? 0.70 : 1;
+    const mhp = Math.round((520 + wave * 115 + Math.pow(Math.max(0, wave - 3), 2.25) * 42) * endlessMul * diff.hpMul * twinMiniScale);
     ent = {
-      ...base, r: 36, hp: mhp, maxHp: mhp, spd: mDef.spd * sm, dmg: Math.round(8.6 * dm),
+      ...base, r: 36, hp: mhp, maxHp: mhp, spd: mDef.spd * sm, dmg: Math.round(8.8 * dm),
       color: mDef.color, type: 'mini_boss', variant: mKey, bossTitle: `${mDef.icon} ${mDef.name}`,
       dashT: 2.3, meteorT: 4.6, skillT: 2.1, ringCd: 5.4, mat: 24
     };
   } else if (type === 'special_boss') {
     const relDef = specialRelics.find(r => r.bossId === variant) || specialRelics[0];
-    const shp = Math.round((1260 + wave * 365 + Math.pow(wave, 2.24) * 24) * endlessMul * diff.hpMul);
+    const shp = Math.round((960 + wave * 240 + Math.pow(wave, 1.92) * 14) * endlessMul * diff.hpMul);
     const sSpd = relDef.bossId === 'crimson_lord' ? 98 : (relDef.bossId === 'golden_golem' ? 74 : 86);
     ent = {
-      ...base, r: 43, hp: shp, maxHp: shp, spd: sSpd * sm, dmg: Math.round(9.6 * dm),
+      ...base, r: 43, hp: shp, maxHp: shp, spd: sSpd * sm, dmg: Math.round(9.0 * dm),
       color: relDef.bossColor, type: 'special_boss', variant: relDef.bossId, bossTitle: `${relDef.bossIcon} ${relDef.bossName}`,
-      dashT: 2.1, skillT: 2.0, meteorT: 4.0, sumT: 5.6, terrainCd: 6.2, ringCd: 4.9,
+      dashT: 2.1, skillT: 2.0, meteorT: 4.0, sumT: 5.8, terrainCd: 6.2, ringCd: 4.9,
       goldStage: 4, canPhase2: Math.random() < mythicRate, mythicPhase2: false,
       mat: relDef.bossId === 'golden_golem' ? 48 : (relDef.bossId === 'crimson_lord' ? 30 : 26)
     };
@@ -893,11 +902,11 @@ function createEnemy(x, y, type, variant = '') {
   const eChance = (diff.eliteRate || 0.05) + Math.min(0.10, (wave - 3) * 0.01);
   if (canElite && Math.random() < eChance) {
     ent.elite = true;
-    ent.r = Math.round(ent.r * 1.22);
-    ent.hp = Math.round(ent.hp * 2.45);
+    ent.r = Math.round(ent.r * 1.20);
+    ent.hp = Math.round(ent.hp * 2.15);
     ent.maxHp = ent.hp;
-    ent.spd *= 1.06;
-    ent.dmg = Math.round(ent.dmg * 1.28);
+    ent.spd *= 1.05;
+    ent.dmg = Math.round(ent.dmg * 1.22);
     ent.mat = Math.max(2, Math.round(ent.mat * 2));
   }
 

@@ -22,7 +22,7 @@ function finishWave() {
   for (let i = 0; i < drops.length; i++) {
     if (drops[i].kind === 'mat') leftoverMats += (drops[i].val || 1);
   }
-  const matRate = 0.94 / (1 + Math.max(0, wave - 1) * 0.19);
+  const matRate = typeof getWaveMatRate === 'function' ? getWaveMatRate(wave) : (0.96 / (1 + Math.min(5, Math.max(0, wave - 1)) * 0.12 + Math.max(0, wave - 6) * 0.05));
   // 自动回收地上 50% 未拾取晶石 + 适度通关津贴 + 【收获】成长分红 + 【理财冠】利息
   const leftover = Math.round(leftoverMats * matRate * 0.50);
   const interestCap = 24 + wave * 9;
@@ -405,10 +405,10 @@ function showLevelUp() {
   });
 }
 
-// 商店波次通胀系数（严密对齐 20s→60s 波次晶石收益曲线，稳定每波可购 2.5~3.5 件装备）
+// 商店波次通胀系数（严密对齐精简后期怪量后的单波晶石收益，保证 D0~D5 每波稳定购置与合成装备）
 function getShopScale() {
-  const endlessMul = wave > MAX_WAVE ? Math.pow(1.18, wave - MAX_WAVE) : 1;
-  return (1 + (wave - 1) * 0.22 + Math.pow(Math.max(0, wave - 1), 1.32) * 0.045) * endlessMul * (diff.shopTax || 1);
+  const endlessMul = wave > MAX_WAVE ? Math.pow(1.16, wave - MAX_WAVE) : 1;
+  return (1 + (wave - 1) * 0.18 + Math.pow(Math.max(0, wave - 1), 1.22) * 0.028) * endlessMul * (diff.shopTax || 1);
 }
 
 function rollOffers() {
@@ -560,8 +560,9 @@ function renderShop() {
       const rngBonus = tpl.rangeScale ? Math.max(0, totalRange) * tpl.rangeScale : 0;
       const hpBonus = tpl.hpScale ? Math.max(0, player.maxHp) * tpl.hpScale : 0;
       const armBonus = tpl.armorScale ? Math.max(0, getTotalArmor()) * tpl.armorScale : 0;
-      const dmg = Math.round((tpl.dmg + aspdBonus + rngBonus + hpBonus + armBonus) * (1 + (o.tier - 1) * 0.55) * (getEffectiveDmgMul() + (tpl.melee ? player.meleeBonus : 0)) * scale);
-      const effRange = Math.max(68, tpl.range + (tpl.melee ? Math.round(totalRange * 0.55 + (player.meleeSweepBonus || 0) * 18) : totalRange) + (o.tier - 1) * 16);
+      const stickBonus = o.id === 'stick' ? Math.max(0, (getSetBonuses().sticks || 0)) * 3.0 : 0;
+      const dmg = Math.round(((tpl.dmg + aspdBonus + rngBonus + hpBonus + armBonus) * (1 + (o.tier - 1) * 0.55) + stickBonus) * (getEffectiveDmgMul() + (tpl.melee ? player.meleeBonus : 0)) * scale);
+      const effRange = Math.max(tpl.melee ? 92 : 68, tpl.range + (tpl.melee ? Math.round(totalRange * 0.78 + (player.meleeSweepBonus || 0) * 22) : totalRange) + (o.tier - 1) * (tpl.melee ? 20 : 16));
       const ok = player.mats >= o.cost && canBuyWeapon(o.id, o.tier);
       const hasMergePair = o.tier < 4 && player.weapons.some(w => w.id === o.id && w.tier === o.tier);
       const pelletsTxt = tpl.pellets ? `×${tpl.pellets}` : '';

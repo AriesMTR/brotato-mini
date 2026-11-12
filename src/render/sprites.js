@@ -379,18 +379,6 @@ function drawEnemySprite(e) {
     ctx.beginPath(); ctx.arc(e.x, e.y + 4, r * 1.42, 0, Math.PI * 2); ctx.stroke();
   }
 
-  if ((e.type === 'charger' || e.type === 'boss' || e.type === 'mini_boss') && e.dashT > 0 && e.dashT <= 0.48 && e.lockedAim !== undefined) {
-    ctx.save();
-    ctx.strokeStyle = 'rgba(255, 59, 107, 0.58)';
-    ctx.lineWidth = e.type === 'boss' ? 14 : 7;
-    ctx.setLineDash([12, 8]);
-    ctx.beginPath();
-    ctx.moveTo(e.x, e.y);
-    ctx.lineTo(e.x + Math.cos(e.lockedAim) * 265, e.y + Math.sin(e.lockedAim) * 265);
-    ctx.stroke();
-    ctx.restore();
-  }
-
   ctx.fillStyle = 'rgba(0,0,0,0.38)';
   ctx.beginPath(); ctx.ellipse(e.x, e.y + r * 0.92, r * 0.9, r * 0.36, 0, 0, Math.PI * 2); ctx.fill();
 
@@ -804,6 +792,42 @@ function drawEnemySprite(e) {
     ctx.strokeStyle = '#72efdd'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(0, 0, r * 0.62, e.phase * 0.5, e.phase * 0.5 + Math.PI * 1.4); ctx.stroke();
     ctx.strokeStyle = strokeCol;
+  } else if (e.type === 'boss' && e.variant === 'plague_empress') {
+    // 最终 Boss：碧落腐生毒皇（四翼翡翠毒蝶华服 + 金丝花蕊触角 + 碧玉毒皇躯干）
+    const flap = Math.sin(e.phase * 1.5) * 0.16;
+    for (const s of [-1, 1]) {
+      ctx.save(); ctx.rotate(s * flap);
+      ctx.fillStyle = flash ? '#fff' : '#2d6a4f';
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.15);
+      ctx.quadraticCurveTo(s * r * 1.68, -r * 1.15, s * r * 1.45, -r * 0.05);
+      ctx.quadraticCurveTo(s * r * 1.52, r * 0.95, 0, r * 0.45);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath(); ctx.arc(s * r * 1.02, -r * 0.36, 4.8, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.86, r * 1.04, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  } else if (e.type === 'boss' && e.variant === 'solar_seraph') {
+    // 最终 Boss：炽阳裁决圣女（六翼破晓圣焰羽刃 + 背后旋转日曜圣环 + 绯金圣女躯干）
+    ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 3.0;
+    ctx.beginPath(); ctx.arc(0, -r * 0.25, r * 1.16, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = strokeCol; ctx.lineWidth = 2.6;
+    ctx.fillStyle = flash ? '#fff' : '#ffd166';
+    for (const s of [-1, 1]) {
+      for (let w = 0; w < 3; w++) {
+        ctx.beginPath();
+        ctx.moveTo(s * r * 0.45, -r * 0.25 + w * 9);
+        ctx.lineTo(s * (r * 1.58 - w * 7), -r * 0.92 + w * 22);
+        ctx.lineTo(s * (r * 1.12 - w * 5), -r * 0.32 + w * 22);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 1.12); ctx.lineTo(r * 0.92, 0); ctx.lineTo(0, r * 1.08); ctx.lineTo(-r * 0.92, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
   } else if (e.type === 'mini_boss' && e.variant === 'pyro_lord') {
     // 炽焰重炮统领（双肩烈焰榴弹炮管 + 重装熔火铁躯）
     ctx.fillStyle = '#370617';
@@ -827,6 +851,66 @@ function drawEnemySprite(e) {
     ctx.beginPath();
     ctx.moveTo(0, -r * 1.12); ctx.lineTo(r * 0.92, 0); ctx.lineTo(0, r * 1.05); ctx.lineTo(-r * 0.92, 0);
     ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (e.type === 'mini_boss' && e.variant === 'venom_matriarch') {
+    // 碧鳞剧毒统领（眼镜王蛇碧玉颈扇 + 双弯金环毒牙 + 翠鳞躯干）
+    ctx.fillStyle = flash ? '#fff' : '#1b4332';
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.08, r * 1.32, r * 0.88, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffd166';
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(s * r * 0.36, r * 0.55); ctx.lineTo(s * r * 0.56, r * 1.24); ctx.lineTo(s * r * 0.16, r * 0.78);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.92, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  } else if (e.type === 'mini_boss' && e.variant === 'glacial_valkyrie') {
+    // 凛霜圣枪统领（苍蓝女武神翼冠 + 前突冰晶骑士圣枪 + 棱晶胸甲）
+    ctx.fillStyle = flash ? '#fff' : '#caf0f8';
+    ctx.beginPath();
+    ctx.moveTo(-6, r * 0.45); ctx.lineTo(0, r * 1.48); ctx.lineTo(6, r * 0.45);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    for (const s of [-1, 1]) {
+      ctx.fillStyle = '#0077b6';
+      ctx.beginPath();
+      ctx.moveTo(s * r * 0.55, -r * 0.35); ctx.lineTo(s * r * 1.38, -r * 0.95); ctx.lineTo(s * r * 0.98, r * 0.15);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 1.06); ctx.lineTo(r * 0.94, 0); ctx.lineTo(0, r * 1.02); ctx.lineTo(-r * 0.94, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (e.type === 'mini_boss' && e.variant === 'iron_warden') {
+    // 曜铁圣盾统领（左右双面黑金重装塔盾 + 黄金盾徽重甲躯干）
+    ctx.fillStyle = flash ? '#fff' : '#1e293b';
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.roundRect(s * r * 0.95 - 7, -r * 0.72, 14, r * 1.48, 4);
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.roundRect(-r * 0.88, -r * 0.90, r * 1.76, r * 1.80, 9); ctx.fill(); ctx.stroke();
+    if (!flash) {
+      ctx.fillStyle = '#1e293b';
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.42); ctx.lineTo(r * 0.36, 0); ctx.lineTo(0, r * 0.48); ctx.lineTo(-r * 0.36, 0);
+      ctx.closePath(); ctx.fill();
+    }
+  } else if (e.type === 'mini_boss' && e.variant === 'storm_siren') {
+    // 苍雷风暴统领（双马尾闪电音翼 + 旋转雷鸣星环 + 靛青歌姬甲壳）
+    const sw = Math.sin(e.phase * 1.7) * 5;
+    ctx.fillStyle = flash ? '#fff' : '#0284c7';
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(s * r * 0.62, -r * 0.35);
+      ctx.lineTo(s * (r * 1.48), -r * 0.85 + sw);
+      ctx.lineTo(s * (r * 1.25), r * 0.65 - sw);
+      ctx.lineTo(s * r * 0.52, r * 0.25);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.92, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   } else if (e.type === 'special_boss') {
     // 三大奇遇召唤隐藏首领专属造型
     if (e.variant === 'crimson_lord') {
@@ -1379,21 +1463,23 @@ function drawBossPortrait(variant, cx, cy, scale, isMythic) {
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
 
-  const ringCol = isMythic
-    ? '#ffd166'
-    : (variant === 'frost_queen'
-      ? '#72efdd'
-      : (variant === 'mech_colossus'
-        ? '#ff9f1c'
-        : (variant === 'void_weaver' || variant === 'abyss_devourer'
-          ? '#c77dff'
-          : (variant === 'golden_golem'
-            ? '#ffd166'
-            : (variant === 'vanguard'
-              ? '#f72585'
-              : (variant === 'pyro_lord'
-                ? '#fb5607'
-                : (variant === 'shadow_stalker' ? '#06d6a0' : '#ff3b6b')))))));
+  const RING_COLORS = {
+    frost_queen: '#72efdd',
+    mech_colossus: '#ff9f1c',
+    void_weaver: '#c77dff',
+    abyss_devourer: '#c77dff',
+    golden_golem: '#ffd166',
+    vanguard: '#f72585',
+    pyro_lord: '#fb5607',
+    shadow_stalker: '#06d6a0',
+    plague_empress: '#52b788',
+    solar_seraph: '#ffd166',
+    venom_matriarch: '#80ed99',
+    glacial_valkyrie: '#48cae4',
+    iron_warden: '#eab308',
+    storm_siren: '#38bdf8'
+  };
+  const ringCol = isMythic ? '#ffd166' : (RING_COLORS[variant] || '#ff3b6b');
 
   // 神话二阶段背后的六翼金红神辉与旋转圣印（零渐变纯几何绘制）
   if (isMythic) {

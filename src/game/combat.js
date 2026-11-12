@@ -215,6 +215,11 @@ function getEffectiveSpdMul() {
   if (!player) return 1;
   return player.noSlow ? Math.max(1.0, player.spdMul) : Math.max(0.72, player.spdMul);
 }
+// 对齐中后期 <=80 同屏怪上限后的单怪晶石购买力曲线
+function getWaveMatRate(w) {
+  const wv = Math.max(1, w || 1);
+  return 0.92 / (1 + Math.min(5, Math.max(0, wv - 1)) * 0.14 + Math.max(0, wv - 6) * 0.075);
+}
 
 // 冰冻与剧毒元素状态施加函数
 function applyFreeze(e, dur = 1.2) {
@@ -328,7 +333,7 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
   }
 
   // 远近战公平性与三系元素联动增伤：
-  // 1) 近战武器对首领/统领自带 +22% 破甲加成，杜绝近战打首领吃亏
+  // 1) 近战武器对首领/统领自带 +28% 破甲加成，杜绝近战打首领吃亏
   const isBossTarget = e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss';
   if (opts.isMelee && isBossTarget) rawDmg *= 1.22;
   // 2) 首领大招后的【破绽暴露】窗口期承受额外高额伤害（近战 +25%，远程 +15%）
@@ -615,23 +620,25 @@ function hurtPlayer(rawDmg) {
       return;
     }
 
-    // 近战流派贴身抗首领保护：持 >=2 把近战武器（或拳手/蛮牛/装备破城肩甲）且首领在近身范围时，额外获得最高 36% 贴身减伤！
+    // 近战流派全程随身招架减伤 + 贴身抗首领保护：
+    // 每把近战武器提供 2.5% 常驻招架减伤（最高 15%）；且首领在近身范围时额外获得最高 34% 贴身减伤！
     let closeGuard = 0;
     const meleeCnt = getSetBonuses().meleeCnt || 0;
+    const meleeParry = Math.min(0.15, meleeCnt * 0.025);
     if (meleeCnt >= 2 || player.cls === 'brawler' || player.cls === 'bull' || (player.meleeBossGuard || 0) > 0) {
       let bossNear = false;
       for (let bi = 0; bi < enemies.length; bi++) {
         const be = enemies[bi];
         if (be && be.hp > 0 && (be.type === 'boss' || be.type === 'special_boss' || be.type === 'mini_boss')) {
           const bdx = be.x - player.x, bdy = be.y - player.y;
-          if (bdx * bdx + bdy * bdy < 165 * 165) { bossNear = true; break; }
+          if (bdx * bdx + bdy * bdy < 210 * 210) { bossNear = true; break; }
         }
       }
       if (bossNear) {
-        closeGuard = Math.min(0.36, (meleeCnt >= 2 || player.cls === 'brawler' || player.cls === 'bull' ? 0.16 : 0) + (player.meleeBossGuard || 0));
+        closeGuard = Math.min(0.32, (meleeCnt >= 2 || player.cls === 'brawler' || player.cls === 'bull' ? 0.10 : 0) + (player.meleeBossGuard || 0));
       }
     }
-    let dmg = Math.max(1, Math.round(rawDmg * (1 - getArmorMitigation()) * (1 - closeGuard)));
+    let dmg = Math.max(1, Math.round(rawDmg * (1 - getArmorMitigation()) * (1 - meleeParry) * (1 - closeGuard)));
     player.shieldRegenT = player.fastShield ? 4.5 : 7.0;
 
     // 能量护盾优先吸收伤害

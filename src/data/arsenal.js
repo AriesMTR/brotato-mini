@@ -1,22 +1,22 @@
 // 6 档危险等级配置（平滑前中后期与各难度梯度，高难同步提升虫群规模与血量压迫感）
 const MAX_WAVE = 12;
 const DIFFS = [
-  { id: 0, badge: '🟢 D0 休闲', name: '新手休闲', hpMul: 0.88, dmgMul: 0.85, spdMul: 0.90, spawnMul: 0.92, eliteRate: 0.02, shopTax: 0.94, matBonus: 12, midElite: false, dualElite: false, doubleBoss: false, desc: '怪血量 -12% · 怪量 -8% · 商店 94 折 · 开局赠 12 晶石，稳步熟悉构筑' },
-  { id: 1, badge: '🟡 D1 标准', name: '标准挑战', hpMul: 1.12, dmgMul: 1.06, spdMul: 0.95, spawnMul: 1.08, eliteRate: 0.05, shopTax: 1.00, matBonus: 0,  midElite: true,  dualElite: false, doubleBoss: false, desc: '均衡标准局：怪血量 +12% · 虫潮 +8% · 第 5/9 波刷新先锋统领与精英怪' },
-  { id: 2, badge: '🟠 D2 老兵', name: '老兵危机', hpMul: 1.38, dmgMul: 1.22, spdMul: 0.99, spawnMul: 1.22, eliteRate: 0.08, shopTax: 1.05, matBonus: 0,  midElite: true,  dualElite: false, doubleBoss: false, desc: '怪血量 +38% · 虫潮 +22% · 伤害 +22% · 考验走位拉扯与羁绊构筑' },
-  { id: 3, badge: '🔴 D3 狂厄', name: '狂厄异变', hpMul: 1.70, dmgMul: 1.40, spdMul: 1.02, spawnMul: 1.36, eliteRate: 0.11, shopTax: 1.10, matBonus: 0,  midElite: true,  dualElite: true,  doubleBoss: false, desc: '怪血量 +70% · 虫潮 +36% · 特种怪提前解锁，第 9 波双统领夹击！' },
-  { id: 4, badge: '🟣 D4 深渊', name: '深渊死神', hpMul: 2.10, dmgMul: 1.60, spdMul: 1.05, spawnMul: 1.52, eliteRate: 0.15, shopTax: 1.15, matBonus: 0,  midElite: true,  dualElite: true,  doubleBoss: true,  desc: '怪血量 +110% · 虫潮 +52% · 高频精英 · 第 12 波双生主宰同台降临！' },
-  { id: 5, badge: '💀 D5 绝境', name: '绝境神罚', hpMul: 2.60, dmgMul: 1.82, spdMul: 1.08, spawnMul: 1.70, eliteRate: 0.20, shopTax: 1.20, matBonus: 0,  midElite: true,  dualElite: true,  doubleBoss: true,  desc: '【最高难度】怪血量 +160% · 虫潮 +70% · 物价 +20% · 双狂暴虫王！' }
+  { id: 0, badge: '🟢 D0 休闲', name: '新手休闲', hpMul: 0.88, dmgMul: 0.86, spdMul: 0.92, spawnMul: 0.90, eliteRate: 0.03, shopTax: 0.92, matBonus: 15, midElite: false, dualElite: false, doubleBoss: false, desc: '怪血量 -12% · 怪量 -10% · 商店 92 折 · 开局赠 15 晶石，轻松上手构筑' },
+  { id: 1, badge: '🟡 D1 标准', name: '标准挑战', hpMul: 1.14, dmgMul: 1.15, spdMul: 0.98, spawnMul: 1.05, eliteRate: 0.05, shopTax: 1.00, matBonus: 4,  midElite: true,  dualElite: false, doubleBoss: false, desc: '标准基准局：怪血 +14% · 伤害 +15% · 第 5/9 波刷新先锋统领' },
+  { id: 2, badge: '🟠 D2 老兵', name: '老兵危机', hpMul: 1.35, dmgMul: 1.32, spdMul: 1.01, spawnMul: 1.13, eliteRate: 0.08, shopTax: 1.04, matBonus: 0,  midElite: true,  dualElite: false, doubleBoss: false, desc: '怪血量 +35% · 伤害 +32% · 怪量 +13% · 考验走位拉扯与羁绊合成节奏' },
+  { id: 3, badge: '🔴 D3 狂厄', name: '狂厄异变', hpMul: 1.56, dmgMul: 1.48, spdMul: 1.04, spawnMul: 1.20, eliteRate: 0.11, shopTax: 1.08, matBonus: 0,  midElite: true,  dualElite: true,  doubleBoss: false, desc: '怪血量 +56% · 伤害 +48% · 特种怪提前解锁，第 9 波双统领同台夹击！' },
+  { id: 4, badge: '🟣 D4 深渊', name: '深渊死神', hpMul: 1.78, dmgMul: 1.63, spdMul: 1.07, spawnMul: 1.27, eliteRate: 0.14, shopTax: 1.11, matBonus: 0,  midElite: true,  dualElite: true,  doubleBoss: true,  desc: '怪血量 +78% · 伤害 +63% · 第 9 波双统领 + 第 12 波双生主宰同台决战！' },
+  { id: 5, badge: '💀 D5 绝境', name: '绝境神罚', hpMul: 2.04, dmgMul: 1.78, spdMul: 1.10, spawnMul: 1.34, eliteRate: 0.18, shopTax: 1.14, matBonus: 0,  midElite: true,  dualElite: true,  doubleBoss: true,  desc: '【最高难度】怪血量 +104% · 伤害 +78% · 物价 +14% · 终局双主宰极限试炼！' }
 ];
 let selectedDiff = 1;
 
 // 8 位特色土豆角色（结构化起手装备与正负词条展示）
 const CLASSES = [
   { id: 'allrounder', icon: '🧣', name: '全能战士', tag: '均衡', loadout: '🔫 手枪 + 🪵 树枝', perks: '<b>生命+6 · 全伤+8% · 收获+4</b><br>远近兼备，最稳开荒推荐' },
-  { id: 'ranger',     icon: '🤠', name: '废土游侠', tag: '远程', loadout: '💨 冲锋枪 ×1',       perks: '<b>攻击范围+65 · 攻速+18% · 暴击+10%</b><br><em>生命-4</em> · 超远距枪林弹雨风筝' },
-  { id: 'brawler',    icon: '🥊', name: '狂暴拳手', tag: '近战', loadout: '🪵 树枝 ×2',         perks: '<b>生命+14 · 再生+2.2/s · 近战+20%</b><br><em>攻击范围-30</em> · 贴脸横扫硬刚虫群' },
-  { id: 'engineer',   icon: '🔧', name: '机械师',   tag: '炮台', loadout: '🔧 扳手 + 🔫 手枪', perks: '<b>开局自带 2 座炮台 · 再生+1.2/s</b><br>每把扳手额外部署 1 座高能炮台' },
-  { id: 'vampire',    icon: '🧛', name: '嗜血公爵', tag: '吸血', loadout: '🗡️ 匕首 ×2',         perks: '<b>生命窃取+16% · 残血攻速暴涨</b><br><em>自然再生归零</em> · 刀刀吸血续航' },
+  { id: 'ranger',     icon: '🤠', name: '废土游侠', tag: '远程', loadout: '💨 冲锋枪 + 🪃 弹弓', perks: '<b>范围+65 · 攻速+20% · 暴击+12% · 闪避+6% · 移速+8%</b><br>超远距穿甲弹雨与弹射风筝' },
+  { id: 'brawler',    icon: '🥊', name: '狂暴拳手', tag: '近战', loadout: '🪵 树枝 ×2',         perks: '<b>生命+8 · 护甲+1 · 再生+1.1/s · 近战+12%</b><br><em>攻击范围-10</em> · 贴脸横扫硬刚虫群' },
+  { id: 'engineer',   icon: '🔧', name: '机械师',   tag: '炮台', loadout: '🔧 扳手 + 🔫 手枪', perks: '<b>开局自带 2 座炮台 · 护甲+2 · 工程+15% · 再生+1.8/s</b><br>每把扳手额外部署 1 座高能炮台' },
+  { id: 'vampire',    icon: '🧛', name: '嗜血公爵', tag: '吸血', loadout: '🗡️ 匕首 ×2',         perks: '<b>生命窃取+13% · 闪避+6% · 残血攻速暴涨</b><br><em>自然再生归零</em> · 刀刀吸血续航' },
   { id: 'multitasker',icon: '🐙', name: '多臂怪杰', tag: '12槽', loadout: '🪵 树枝×2 + 🔫 手枪',perks: '<b>武器槽上限翻倍至 12 把！</b><br><em>每把武器全伤-4%</em> · 火力铺满屏' },
   { id: 'bull',       icon: '🐂', name: '蛮牛铁卫', tag: '肉弹', loadout: '💥 肉身冲撞震荡波',  perks: '<b>生命+30 · 再生+4.5/s · 护甲+3</b><br><em>禁持武器</em> · 撞怪/受击引爆烈焰环' },
   { id: 'ghost',      icon: '👻', name: '幽灵刺客', tag: '闪避', loadout: '🗡️ 匕首 + 💠 手里剑',perks: '<b>闪避+28%(全局上限80%) · 幸运+8</b><br><em>生命-6</em> · 闪避触发雷暴反杀' }
@@ -32,51 +32,51 @@ const SET_DEFS = {
   tech:      { label: '⚙️工程', steps: [2, 3, 5], desc: '2/3/5把: 炮台攻速与伤害 +22%/+48%/+80%' }
 };
 
-// 32 把《土豆兄弟》经典特色武器（6 大套装全流派均衡覆盖：原始5 / 精准6 / 枪械5 / 重装5 / 元素6 / 工程5）
+// 32 把《土豆兄弟》经典特色武器（远近战强度深度平衡：近战高单发/广域顺劈/随身招架减伤+斩弹，远程稳健风筝穿透弹射）
 const WEAPONS = {
   // --- 🌿 原始套装 (5 把：近战钝击/突刺 + 远程弹石/淬毒吹箭) ---
-  stick:     { name: '树枝',     icon: '🪵', set: 'primitive', melee: true,  dmg: 12,   cd: 0.68, range: 105, cost: 12, mode: 'blunt', arcColor: '#a3e635', desc: '横扫重拍，每多拿一把树枝基础伤害 +3' },
-  rock:      { name: '巨石',     icon: '🪨', set: 'primitive', melee: true,  dmg: 20,   cd: 1.04, range: 96,  cost: 14, knockMult: 1.9, mode: 'blunt', arcColor: '#cbd5e1', desc: '沉重钝击，每装备 1 块巨石被动提供 +1护甲 与 +3生命' },
-  spear:     { name: '长矛',     icon: '🔱', set: 'primitive', melee: true,  dmg: 16,   cd: 0.85, range: 172, cost: 16, mode: 'spear', arcColor: '#e9c46a', desc: '超长距离直线突刺，贯穿路径上所有怪物' },
-  slingshot: { name: '弹弓',     icon: '🪃', set: 'primitive', melee: false, dmg: 10.5, cd: 0.64, range: 320, spd: 610, bounce: 3, isPebble: true, cost: 15, desc: '经典原始远程！发射弹力圆石在怪物间连续弹射 3 次' },
-  blowgun:   { name: '吹毒箭筒', icon: '🎋', set: 'primitive', melee: false, dmg: 11.5, cd: 0.46, range: 335, spd: 690, pierce: 1, poisonHit: 1.0, hpScale: 0.08, isDart: true, cost: 15, desc: '原始部族淬毒吹箭！自带 1 穿透且命中必叠【剧毒】，额外受最大生命加成伤害' },
+  stick:     { name: '树枝',     icon: '🪵', set: 'primitive', melee: true,  dmg: 12.0, cd: 0.69, range: 118, cost: 12, mode: 'blunt', arcColor: '#a3e635', desc: '横扫重拍，每多拿一把树枝基础伤害 +3（近战自带招架减伤与近身斩弹）' },
+  rock:      { name: '巨石',     icon: '🪨', set: 'primitive', melee: true,  dmg: 20,   cd: 0.96, range: 114, cost: 14, knockMult: 2.0, mode: 'blunt', arcColor: '#cbd5e1', desc: '沉重钝击，每装备 1 块巨石被动提供 +1护甲 与 +3生命' },
+  spear:     { name: '长矛',     icon: '🔱', set: 'primitive', melee: true,  dmg: 17.8, cd: 0.81, range: 192, cost: 16, mode: 'spear', arcColor: '#e9c46a', desc: '超长距离直线突刺，贯穿路径上所有怪物' },
+  slingshot: { name: '弹弓',     icon: '🪃', set: 'primitive', melee: false, dmg: 15.0, cd: 0.58, range: 340, spd: 650, bounce: 2, isPebble: true, cost: 15, desc: '经典原始远程！发射弹力圆石在怪物间连续弹射 2 次' },
+  blowgun:   { name: '吹毒箭筒', icon: '🎋', set: 'primitive', melee: false, dmg: 13.2, cd: 0.44, range: 345, spd: 715, pierce: 1, poisonHit: 1.0, hpScale: 0.06, isDart: true, cost: 15, desc: '原始部族淬毒吹箭！自带 1 穿透且命中必叠【剧毒】，额外受最大生命加成伤害' },
 
   // --- 🎯 精准套装 (6 把：近战刺客高暴伤 + 远程穿刺弹射狙击) ---
-  knife:     { name: '匕首',     icon: '🗡️', set: 'precise',   melee: true,  dmg: 10,   cd: 0.43, range: 92,  cost: 14, critBonus: 0.16, mode: 'stab', arcColor: '#72efdd', desc: '极速寒光突刺，自带 +16% 暴击率' },
-  claws:     { name: '利爪',     icon: '🐾', set: 'precise',   melee: true,  dmg: 9.5,  cd: 0.34, range: 100, cost: 18, critBonus: 0.18, critMult: 2.1, aspdScale: true, mode: 'claw', arcColor: '#f472b6', desc: '三道撕裂爪痕，额外受攻击速度加成基础伤害' },
-  katana:    { name: '太刀',     icon: '⚔️', set: 'precise',   melee: true,  dmg: 19,   cd: 0.76, range: 132, cost: 20, critBonus: 0.14, critMult: 2.2, mode: 'crescent', arcColor: '#f8f9fa', desc: '大弧度凌厉居合斩，暴击伤害高达 220%' },
-  crossbow:  { name: '十字弩',   icon: '🏹', set: 'precise',   melee: false, dmg: 15,   cd: 0.88, range: 400, spd: 750, pierce: 1, rangeScale: 0.045, critBonus: 0.15, cost: 17, desc: '攻击范围越高伤害越高！暴击时箭矢穿透次数额外 +2' },
-  shuriken:  { name: '手里剑',   icon: '💠', set: 'precise',   melee: false, dmg: 10.5, cd: 0.50, range: 310, spd: 630, bounce: 2, critBonus: 0.12, isStar: true, poisonHit: 0.30, cost: 17, desc: '高速旋转淬毒飞镖，命中自动弹射 2 次（暴击+1次）并概率叠毒' },
-  sniper:    { name: '狙击枪',   icon: '🔭', set: 'precise',   melee: false, dmg: 38,   cd: 1.44, range: 560, isSniper: true, pierce: 3, rangeScale: 0.035, critBonus: 0.22, critMult: 2.3, cost: 23, desc: '超远程瞬发穿甲弹，享受攻击范围增伤并穿透 3 怪' },
+  knife:     { name: '匕首',     icon: '🗡️', set: 'precise',   melee: true,  dmg: 10.2, cd: 0.45, range: 112, cost: 14, critBonus: 0.18, critMult: 2.22, mode: 'stab', arcColor: '#72efdd', desc: '极速寒光突刺，自带 +18% 暴击率与 222% 暴击伤害' },
+  claws:     { name: '利爪',     icon: '🐾', set: 'precise',   melee: true,  dmg: 10.2, cd: 0.36, range: 118, cost: 18, critBonus: 0.18, critMult: 2.15, aspdScale: true, mode: 'claw', arcColor: '#f472b6', desc: '三道撕裂爪痕，额外受攻击速度加成基础伤害' },
+  katana:    { name: '太刀',     icon: '⚔️', set: 'precise',   melee: true,  dmg: 22.0, cd: 0.72, range: 156, cost: 20, critBonus: 0.16, critMult: 2.25, mode: 'crescent', arcColor: '#f8f9fa', desc: '大弧度凌厉居合斩，暴击伤害高达 225% 且挥砍可斩落近身弹幕' },
+  crossbow:  { name: '十字弩',   icon: '🏹', set: 'precise',   melee: false, dmg: 22.0, cd: 0.72, range: 415, spd: 780, pierce: 1, rangeScale: 0.05, critBonus: 0.15, cost: 17, desc: '攻击范围越高伤害越高！暴击时箭矢穿透次数额外 +2' },
+  shuriken:  { name: '手里剑',   icon: '💠', set: 'precise',   melee: false, dmg: 14.5, cd: 0.45, range: 330, spd: 660, bounce: 2, critBonus: 0.12, isStar: true, poisonHit: 0.30, cost: 17, desc: '高速旋转淬毒飞镖，命中自动弹射 2 次（暴击+1次）并概率叠毒' },
+  sniper:    { name: '狙击枪',   icon: '🔭', set: 'precise',   melee: false, dmg: 50,   cd: 1.30, range: 560, isSniper: true, pierce: 3, rangeScale: 0.04, critBonus: 0.22, critMult: 2.35, cost: 23, desc: '超远程瞬发穿甲弹，享受攻击范围增伤并穿透 3 怪' },
 
   // --- 🔫 枪械套装 (5 把：点射/左轮决斗/弹雨/霰弹/火铳爆破) ---
-  pistol:    { name: '手枪',       icon: '🔫', set: 'gun',     melee: false, dmg: 13,   cd: 0.66, range: 350, spd: 680, pierce: 1, cost: 13, desc: '均衡大口径点射，自带 1 次穿透' },
-  revolver:  { name: '左轮手枪',   icon: '🤠', set: 'gun',     melee: false, dmg: 22,   cd: 0.74, range: 375, spd: 760, pierce: 1, critBonus: 0.12, critMult: 2.15, knockMult: 1.6, sixthCrit: true, cost: 17, desc: '西部重型左轮！单发高伤强击退，每第 6 发子弹必定暴击且穿透额外 +2' },
-  smg:       { name: '冲锋枪',     icon: '💨', set: 'gun',     melee: false, dmg: 5.6,  cd: 0.17, range: 295, spd: 720, spread: 0.17, cost: 16, desc: '倾泻高密度弹雨，伴随黄铜抛壳与火舌' },
-  shotgun:   { name: '霰弹枪',     icon: '💥', set: 'gun',     melee: false, dmg: 8.4,  cd: 0.98, range: 260, spd: 640, pellets: 5, spread: 0.35, cost: 18, desc: '一次轰出 5 颗灼热霰弹丸，近身粉碎' },
-  shredder:  { name: '碎纸机火铳', icon: '🧨', set: 'gun',     melee: false, dmg: 15,   cd: 0.84, range: 365, spd: 670, pierce: 1, shredBlast: 0.58, blastR: 72, cost: 19, desc: '枪械与爆破跨界利器！贯穿弹头命中时高概率直接引爆火药冲击波' },
+  pistol:    { name: '手枪',       icon: '🔫', set: 'gun',     melee: false, dmg: 19.2, cd: 0.52, range: 365, spd: 720, pierce: 1, cost: 13, desc: '均衡大口径点射，自带 1 次穿透' },
+  revolver:  { name: '左轮手枪',   icon: '🤠', set: 'gun',     melee: false, dmg: 26.0, cd: 0.67, range: 385, spd: 785, pierce: 1, critBonus: 0.12, critMult: 2.15, knockMult: 1.6, sixthCrit: true, cost: 17, desc: '西部重型左轮！单发高伤强击退，每第 6 发子弹必定暴击且穿透额外 +2' },
+  smg:       { name: '冲锋枪',     icon: '💨', set: 'gun',     melee: false, dmg: 7.2,  cd: 0.155,range: 320, spd: 750, pierce: 1, spread: 0.15, cost: 16, desc: '倾泻高密度穿甲弹雨，自带 1 次轻穿透清理虫群' },
+  shotgun:   { name: '霰弹枪',     icon: '💥', set: 'gun',     melee: false, dmg: 11.2, cd: 0.86, range: 280, spd: 660, pellets: 5, pierce: 1, spread: 0.34, cost: 18, desc: '一次轰出 5 颗穿透灼热霰弹丸，中近距粉碎虫潮' },
+  shredder:  { name: '碎纸机火铳', icon: '🧨', set: 'gun',     melee: false, dmg: 17.5, cd: 0.76, range: 375, spd: 690, pierce: 1, shredBlast: 0.62, blastR: 76, cost: 19, desc: '枪械与爆破跨界利器！贯穿弹头命中时高概率直接引爆火药冲击波' },
 
   // --- 🛡️ 重装套装 (5 把：震地重锤/护甲盾击/弹跳榴弹/加特林/重型火箭) ---
-  hammer:           { name: '战锤',       icon: '🔨', set: 'heavy', melee: true,  dmg: 26,  cd: 1.14, range: 115, cost: 19, knockMult: 2.3, slam: true, mode: 'blunt', arcColor: '#f4a261', desc: '重击震出裂地冲击圈，强力击退成片敌人' },
-  spiked_shield:    { name: '尖刺重盾',   icon: '🛡️', set: 'heavy', melee: true,  dmg: 16,  cd: 0.86, range: 106, cost: 17, knockMult: 2.4, armorScale: 2.2, slam: true, mode: 'blunt', arcColor: '#94a3b8', desc: '攻防一体盾击震波！每拥有 1 点【护甲】直接额外提升 +2.2 基础伤害' },
-  grenade_launcher: { name: '榴弹发射器', icon: '💣', set: 'heavy', melee: false, dmg: 23,  cd: 1.18, range: 360, spd: 485, bounce: 1, isGrenade: true, blastR: 84, cost: 20, desc: '抛射弹跳高爆榴弹，弹跳 1 次并在每次落点引发范围轰炸！' },
-  minigun:          { name: '加特林',     icon: '⚙️', set: 'heavy', melee: false, dmg: 5.2, cd: 0.105,range: 340, spd: 760, pierce: 1, spread: 0.20, minTier: 2, cost: 25, desc: '重装六管火神炮，狂暴倾泻穿甲弹幕' },
-  rocket:           { name: '火箭筒',     icon: '🚀', set: 'heavy', melee: false, dmg: 32,  cd: 1.50, range: 425, spd: 455, isRocket: true, blastR: 98, cost: 25, desc: '发射拖烟重型火箭，命中引发范围轰炸与焦痕' },
+  hammer:           { name: '战锤',       icon: '🔨', set: 'heavy', melee: true,  dmg: 33,  cd: 1.06, range: 142, cost: 19, knockMult: 2.4, slam: true, mode: 'blunt', arcColor: '#f4a261', desc: '重击震出裂地冲击圈，强力击退并震伤成片敌人' },
+  spiked_shield:    { name: '尖刺重盾',   icon: '🛡️', set: 'heavy', melee: true,  dmg: 19,  cd: 0.82, range: 128, cost: 17, knockMult: 2.4, armorScale: 2.4, slam: true, mode: 'blunt', arcColor: '#94a3b8', desc: '攻防一体盾击震波！每拥有 1 点【护甲】直接额外提升 +2.4 基础伤害' },
+  grenade_launcher: { name: '榴弹发射器', icon: '💣', set: 'heavy', melee: false, dmg: 27,  cd: 1.08, range: 370, spd: 505, bounce: 1, isGrenade: true, blastR: 88, cost: 20, desc: '抛射弹跳高爆榴弹，弹跳 1 次并在每次落点引发范围轰炸！' },
+  minigun:          { name: '加特林',     icon: '⚙️', set: 'heavy', melee: false, dmg: 5.8, cd: 0.108,range: 350, spd: 780, pierce: 1, spread: 0.18, minTier: 2, cost: 25, desc: '重装六管火神炮，狂暴倾泻穿甲弹幕' },
+  rocket:           { name: '火箭筒',     icon: '🚀', set: 'heavy', melee: false, dmg: 38,  cd: 1.38, range: 435, spd: 475, isRocket: true, blastR: 102, cost: 25, desc: '发射拖烟重型火箭，命中引发范围轰炸与焦痕' },
 
   // --- 🔥 元素套装 (6 把：近战熔火雷刃 + 寒冰/激光/烈焰/雷电/电浆) ---
-  magma_blade: { name: '熔火雷刃', icon: '🌋', set: 'elemental', melee: true,  dmg: 18,  cd: 0.68, range: 126, cost: 19, critBonus: 0.12, burnSlash: true, mode: 'crescent', arcColor: '#ff9f1c', desc: '近战元素魔刃！同时享受【近战+元素】双重增伤，挥砍必灼烧且暴击劈出连锁闪电' },
-  icicle:      { name: '寒冰锥',   icon: '🧊', set: 'elemental', melee: false, dmg: 17,  cd: 0.72, range: 360, spd: 700, pierce: 2, critBonus: 0.14, critMult: 2.1, isIce: true, freezeHit: 0.28, cost: 18, desc: '射出极寒穿透冰锥，必冰缓且 28% 概率直接冰冻定身敌人' },
-  laser:       { name: '激光枪',   icon: '⚡', set: 'elemental', melee: false, dmg: 25,  cd: 1.16, range: 445, pierce: 4, isBeam: true, cost: 22, desc: '瞬发高能电浆光束，无视正面盾牌穿透 4 怪' },
-  flamer:      { name: '喷火器',   icon: '🔥', set: 'elemental', melee: false, dmg: 4.3, cd: 0.15, range: 220, spd: 390, pierce: 4, spread: 0.26, isFlame: true, cost: 20, desc: '持续喷吐穿透火流，引燃怪物造成持续灼烧' },
-  taser:       { name: '电击枪',   icon: '🌩️', set: 'elemental', melee: false, dmg: 14,  cd: 0.80, range: 290, chains: 4, isChain: true, cost: 21, desc: '释放跳跃连锁闪电劈向 4 名敌人，并附带减速' },
-  plasma:      { name: '电浆炮',   icon: '🔮', set: 'elemental', melee: false, dmg: 22,  cd: 1.26, range: 380, spd: 360, pierce: 5, isPlasma: true, blastR: 82, minTier: 2, cost: 25, desc: '发射高能穿透电浆球，飞行终点引发元素脉冲震爆' },
+  magma_blade: { name: '熔火雷刃', icon: '🌋', set: 'elemental', melee: true,  dmg: 22,  cd: 0.67, range: 150, cost: 19, critBonus: 0.14, burnSlash: true, mode: 'crescent', arcColor: '#ff9f1c', desc: '近战元素魔刃！同时享受【近战+元素】双重增伤，挥砍必灼烧且暴击劈出连锁闪电' },
+  icicle:      { name: '寒冰锥',   icon: '🧊', set: 'elemental', melee: false, dmg: 19.5,cd: 0.69, range: 370, spd: 720, pierce: 2, critBonus: 0.14, critMult: 2.1, isIce: true, freezeHit: 0.24, cost: 18, desc: '射出极寒穿透冰锥，必冰缓且 24% 概率直接冰冻定身敌人' },
+  laser:       { name: '激光枪',   icon: '⚡', set: 'elemental', melee: false, dmg: 30,  cd: 1.05, range: 455, pierce: 4, isBeam: true, cost: 22, desc: '瞬发高能电浆光束，无视正面盾牌穿透 4 怪' },
+  flamer:      { name: '喷火器',   icon: '🔥', set: 'elemental', melee: false, dmg: 5.2, cd: 0.145,range: 240, spd: 410, pierce: 4, spread: 0.26, isFlame: true, cost: 20, desc: '持续喷吐穿透火流，引燃怪物造成持续灼烧' },
+  taser:       { name: '电击枪',   icon: '🌩️', set: 'elemental', melee: false, dmg: 19.5,cd: 0.68, range: 315, chains: 4, isChain: true, cost: 21, desc: '释放跳跃连锁闪电劈向 4 名敌人，并附带减速' },
+  plasma:      { name: '电浆炮',   icon: '🔮', set: 'elemental', melee: false, dmg: 27,  cd: 1.15, range: 390, spd: 380, pierce: 5, isPlasma: true, blastR: 86, minTier: 2, cost: 25, desc: '发射高能穿透电浆球，飞行终点引发元素脉冲震爆' },
 
   // --- ⚙️ 工程套装 (5 把：机枪炮台扳手/感应地雷螺丝刀/射钉枪/激光炮台舱/磁轨炮) ---
-  wrench:      { name: '扳手',         icon: '🔧', set: 'tech', melee: true,  dmg: 13,   cd: 0.80, range: 98,  cost: 16, mode: 'blunt', arcColor: '#ffd166', desc: '钝器重击，每把扳手在场上额外部署 1 座自动机枪炮台' },
-  screwdriver: { name: '磁暴螺丝刀',   icon: '🪛', set: 'tech', melee: true,  dmg: 12.5, cd: 0.52, range: 96,  cost: 15, critBonus: 0.10, spawnsMine: true, mode: 'stab', arcColor: '#4cc9f0', desc: '极速电磁突刺，每把螺丝刀周期在战场自动布设高爆【感应地雷】！' },
-  nailgun:     { name: '高压射钉枪',   icon: '🔩', set: 'tech', melee: false, dmg: 8.2,  cd: 0.25, range: 320, spd: 740, pierce: 1, spread: 0.10, techScale: 0.55, isNail: true, cost: 16, desc: '工程高速连发钉枪！自带 1 穿透，额外享受 55%【工程伤害】联动增伤' },
-  drone_bay:   { name: '激光无人机舱', icon: '🛸', set: 'tech', melee: false, dmg: 14,   cd: 0.72, range: 350, spd: 680, bounce: 1, techScale: 0.50, deploysLaserTurret: true, cost: 21, desc: '发射弹射脉冲弹，且每装备 1 具额外部署 1 座【贯穿激光炮台】！' },
-  emp_cannon:  { name: '磁轨电磁炮',   icon: '📡', set: 'tech', melee: false, dmg: 29,   cd: 1.24, range: 460, pierce: 4, isBeam: true, isEmpBeam: true, techScale: 0.65, minTier: 2, cost: 24, desc: '重型工程磁轨炮！瞬发贯穿光束并在首目标处引爆【电磁减速脉冲】' }
+  wrench:      { name: '扳手',         icon: '🔧', set: 'tech', melee: true,  dmg: 16.5, cd: 0.78, range: 118, cost: 16, mode: 'blunt', arcColor: '#ffd166', desc: '钝器重击，每把扳手在场上额外部署 1 座自动机枪炮台' },
+  screwdriver: { name: '磁暴螺丝刀',   icon: '🪛', set: 'tech', melee: true,  dmg: 14.5, cd: 0.50, range: 114, cost: 15, critBonus: 0.12, spawnsMine: true, mode: 'stab', arcColor: '#4cc9f0', desc: '极速电磁突刺，每把螺丝刀周期在战场自动布设高爆【感应地雷】！' },
+  nailgun:     { name: '高压射钉枪',   icon: '🔩', set: 'tech', melee: false, dmg: 9.8,  cd: 0.22, range: 335, spd: 760, pierce: 1, spread: 0.10, techScale: 0.55, isNail: true, cost: 16, desc: '工程高速连发钉枪！自带 1 穿透，额外享受 55%【工程伤害】联动增伤' },
+  drone_bay:   { name: '激光无人机舱', icon: '🛸', set: 'tech', melee: false, dmg: 16.5, cd: 0.68, range: 360, spd: 700, bounce: 1, techScale: 0.50, deploysLaserTurret: true, cost: 21, desc: '发射弹射脉冲弹，且每装备 1 具额外部署 1 座【贯穿激光炮台】！' },
+  emp_cannon:  { name: '磁轨电磁炮',   icon: '📡', set: 'tech', melee: false, dmg: 34,   cd: 1.15, range: 470, pierce: 4, isBeam: true, isEmpBeam: true, techScale: 0.65, minTier: 2, cost: 24, desc: '重型工程磁轨炮！瞬发贯穿光束并在首目标处引爆【电磁减速脉冲】' }
 };
 
 // 68 件《土豆兄弟》标志性被动装备（全面覆盖工程/爆破/近战狂战/重装反伤/嗜血/元素/暴击/收获八大流派，严控上限与移速保底）

@@ -536,14 +536,51 @@ function draw() {
         ctx.stroke();
         ctx.restore();
       } else if (e.lockedAim !== undefined && !e.dashing) {
-        // 冲锋怪/首领蓄力锁定轨迹虚线
+        // 冲锋怪/统领/首领蓄力锁定预警走廊 + 蓄力推进条 + 精准落点箭头（预警多长就实打实冲多远！）
+        const warnLen = Math.max(48, e.dashWarnLen || 255);
+        const ca = Math.cos(e.lockedAim), sa = Math.sin(e.lockedAim);
+        const endX = e.x + ca * warnLen, endY = e.y + sa * warnLen;
+        const wMax = Math.max(0.1, e.dashWindupMax || 0.55);
+        const prog = Math.max(0, Math.min(1, 1 - Math.max(0, e.dashT || 0) / wMax));
+        const isIceDash = e.dashWarnColor === '#72efdd';
+        const bandW = Math.max(14, e.r * 1.12);
         ctx.save();
-        ctx.strokeStyle = 'rgba(255, 159, 28, 0.62)';
-        ctx.lineWidth = 2.4;
-        ctx.setLineDash([9, 6]);
+        ctx.lineCap = 'round';
+        // 1) 全长危险走廊底带
+        ctx.strokeStyle = isIceDash ? `rgba(76, 201, 240, ${0.13 + prog * 0.12})` : `rgba(255, 77, 109, ${0.13 + prog * 0.14})`;
+        ctx.lineWidth = bandW;
         ctx.beginPath();
         ctx.moveTo(e.x, e.y);
-        ctx.lineTo(e.x + Math.cos(e.lockedAim) * 215, e.y + Math.sin(e.lockedAim) * 215);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        // 2) 随蓄力填满的压迫感推进条
+        if (prog > 0.03) {
+          ctx.strokeStyle = isIceDash ? 'rgba(114, 239, 221, 0.34)' : 'rgba(255, 159, 28, 0.36)';
+          ctx.lineWidth = Math.max(8, bandW * 0.62);
+          ctx.beginPath();
+          ctx.moveTo(e.x, e.y);
+          ctx.lineTo(e.x + ca * warnLen * prog, e.y + sa * warnLen * prog);
+          ctx.stroke();
+        }
+        // 3) 中轴锁定虚线
+        ctx.strokeStyle = isIceDash ? 'rgba(114, 239, 221, 0.90)' : 'rgba(255, 190, 11, 0.90)';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([10, 6]);
+        ctx.beginPath();
+        ctx.moveTo(e.x, e.y);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        // 4) 终点落点准星环与锐利箭头
+        ctx.setLineDash([]);
+        ctx.strokeStyle = isIceDash ? 'rgba(114, 239, 221, 0.95)' : 'rgba(255, 77, 109, 0.95)';
+        ctx.lineWidth = 2.4;
+        const tipR = Math.max(5, Math.min(13, e.r * 0.34));
+        ctx.beginPath();
+        ctx.arc(endX, endY, tipR, 0, Math.PI * 2);
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - Math.cos(e.lockedAim - 0.52) * 14, endY - Math.sin(e.lockedAim - 0.52) * 14);
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - Math.cos(e.lockedAim + 0.52) * 14, endY - Math.sin(e.lockedAim + 0.52) * 14);
         ctx.stroke();
         ctx.restore();
       }

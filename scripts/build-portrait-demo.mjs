@@ -453,14 +453,14 @@ function buildHtml(preferredAnimeBase) {
     <div class="brand">
       <span class="brand-badge">DEV ONLY · 开发者工具</span>
       <div>
-        <h1>🎨 半身立绘与多状态实时检视台 · <span id="verBadge">v1.3.0</span></h1>
-        <small>无需进入游戏 · 直接检视 4 位剧情女主 / 10 位首领与统领 / 8 位土豆英雄 / 32 把武器 / 5 大异形地形全部状态</small>
+        <h1>🎨 半身立绘与多状态实时检视台 · <span id="verBadge">v1.3.5</span></h1>
+        <small>无需进入游戏 · 直接检视 4 位剧情女主 / 16 位首领与统领 (32套立绘) / 8 位土豆英雄 / 32 把武器 / 5 大异形地形全部状态</small>
       </div>
     </div>
     <nav class="nav-tabs" id="mainTabs">
       <button class="tab-btn active" data-tab="overview">🧩 全立绘状态总览墙</button>
       <button class="tab-btn" data-tab="heroines">✨ 4位剧情女主半身/对话态</button>
-      <button class="tab-btn" data-tab="bosses">👑 10位首领半身/狂暴/异常态</button>
+      <button class="tab-btn" data-tab="bosses">👑 16位首领半身/狂暴/异常态</button>
       <button class="tab-btn" data-tab="potatoes">🥔 8位英雄穿戴/护盾/32武器</button>
       <button class="tab-btn" data-tab="terrains">🗺️ 5大非圆异形地形网格</button>
     </nav>
@@ -491,7 +491,7 @@ function buildHtml(preferredAnimeBase) {
       <div class="grid-4" id="ovHeroineGrid"></div>
 
       <div class="section-head">
-        <h2>👑 10 位终局魔王 / 奇遇召唤霸主 / 精英统领 · 一阶夏装 &amp; 二阶段隐藏换装立绘墙</h2>
+        <h2>👑 16 位终局魔王 / 奇遇召唤霸主 / 精英统领 · 一阶夏装 &amp; 二阶段隐藏换装立绘墙 (共 32 套立绘)</h2>
         <div class="pill-bar" id="ovBossBar">
           <span class="pill on" data-bview="bust_only">🏖️ 半身立绘大图</span>
           <span class="pill" data-bview="compare">✨ 一阶 vs 二阶换装同框对比</span>
@@ -568,11 +568,11 @@ function buildHtml(preferredAnimeBase) {
       </div>
     </section>
 
-    <!-- TAB 3: 10 BOSS / COMMANDER PORTRAIT & BATTLE STATE STUDIO -->
+    <!-- TAB 3: 16 BOSS / COMMANDER PORTRAIT & BATTLE STATE STUDIO -->
     <section id="tab-bosses" class="tab-pane">
       <div class="studio-layout">
         <aside class="side-panel">
-          <h3>1. 选择首领 / 奇遇Boss / 统领 (共10位)</h3>
+          <h3>1. 选择首领 / 奇遇Boss / 统领 (共16位)</h3>
           <div class="roster-list" id="bossRoster"></div>
 
           <h3>2. 阶段与战场异常状态叠加</h3>
@@ -792,16 +792,22 @@ ${rendererTerrainCode}
     ];
 
     const ALL_BOSS_ENTRIES = [
-      { variant: 'butcher', enemyType: 'boss', cat: '终局魔王', name: '深渊屠夫虫王', epithet: '腐血母巢暴君', color: '#e63946', skills: '三段狂暴连冲 + 腐血弹幕扇射 + 虫群孵化' },
-      { variant: 'frost_queen', enemyType: 'boss', cat: '终局魔王', name: '极寒霜晶女皇', epithet: '永冻凛冬神姬', color: '#00bbf9', skills: '冰晶新星环射 + 极寒霜径封锁 + 寒冰护卫召唤' },
-      { variant: 'mech_colossus', enemyType: 'boss', cat: '终局魔王', name: '熔核机械巨像', epithet: '歼星重装泰坦', color: '#f77f00', skills: '歼星交叉激光炮 + 重装震地冲击 + 熔岩火口改写' },
-      { variant: 'void_weaver', enemyType: 'boss', cat: '终局魔王', name: '虚空织网主宰', epithet: '次元裂隙古神', color: '#9d4edd', skills: '次元瞬移突袭 + 虚空螺旋弹幕 + 裂隙触须召唤' },
-      { variant: 'crimson_lord', enemyType: 'special_boss', cat: '奇遇霸主', name: '猩红鲜血伯爵', epithet: '绯红血契祭坛召唤', color: '#d90429', skills: '鲜血蝙蝠风暴 + 猩红镰刃突刺 + 极小概率真红神话二阶段' },
-      { variant: 'golden_golem', enemyType: 'special_boss', cat: '奇遇霸主', name: '黄金晶石巨神', epithet: '黄金贪婪神像召唤', color: '#f59e0b', skills: '黄金陨石震击 + 晶石折射弹幕 + 击败必爆高阶秘宝箱' },
-      { variant: 'abyss_devourer', enemyType: 'special_boss', cat: '奇遇霸主', name: '异次元吞噬者', epithet: '虚空裂隙魔方召唤', color: '#7209b7', skills: '奇点引力牵引 + 吞星暗物质球 + 狂暴二阶段(+60s)' },
-      { variant: 'vanguard', enemyType: 'mini_boss', cat: '精英统领', name: '狂厄裂地统领', epithet: '第 5 波起登场先锋', color: '#f72585', skills: '重甲蓄力裂地猛冲 + 破阵环形震波' },
-      { variant: 'pyro_lord', enemyType: 'mini_boss', cat: '精英统领', name: '炽焰重炮统领', epithet: '第 5 波起登场重炮', color: '#fb5607', skills: '高爆熔火臼炮连射 + 十字烈焰弹幕' },
-      { variant: 'shadow_stalker', enemyType: 'mini_boss', cat: '精英统领', name: '幽影雷刃统领', epithet: '第 5 波起登场刺客', color: '#7209b7', skills: '高频雷光瞬步斩 + 三连紫电弧刃' }
+      { variant: 'butcher', enemyType: 'boss', cat: '终局魔王', name: '深渊屠夫虫王', epithet: '腐血母巢暴君', color: '#e63946', skills: '长距锁定猛冲(345px) + 腐血弹幕扇射 + 虫群孵化' },
+      { variant: 'frost_queen', enemyType: 'boss', cat: '终局魔王', name: '极寒霜晶女皇', epithet: '永冻凛冬神姬', color: '#00bbf9', skills: '寒雾走廊疾突(285px) + 冰晶新星环射 + 寒冰护卫召唤' },
+      { variant: 'mech_colossus', enemyType: 'boss', cat: '终局魔王', name: '熔核机械巨像', epithet: '歼星重装泰坦', color: '#f77f00', skills: '重型电浆连射 + 重装震地冲击 + 熔岩火口改写' },
+      { variant: 'void_weaver', enemyType: 'boss', cat: '终局魔王', name: '虚空织网主宰', epithet: '次元裂隙古神', color: '#9d4edd', skills: '次元相位折跃 + 虚空螺旋弹幕 + 断层裂谷撕裂' },
+      { variant: 'plague_empress', enemyType: 'boss', cat: '终局魔王', name: '碧落腐生毒皇', epithet: '万蛊花嫁神妃', color: '#52b788', skills: '双螺旋万蛊毒瓣弹 + 剧毒孢子花雨 + 孵化菌群眷属' },
+      { variant: 'solar_seraph', enemyType: 'boss', cat: '终局魔王', name: '炽阳裁决圣女', epithet: '破晓圣焰炽天使', color: '#ff9f1c', skills: '贯日圣枪长冲(350px) + 十方曜金圣矛环 + 熔岩火池改写' },
+      { variant: 'crimson_lord', enemyType: 'special_boss', cat: '奇遇霸主', name: '猩红鲜血伯爵', epithet: '绯红血契祭坛召唤', color: '#d90429', skills: '血影长距疾突(335px) + 弧月鲜血针幕 + 25%隐藏二阶段' },
+      { variant: 'golden_golem', enemyType: 'special_boss', cat: '奇遇霸主', name: '黄金晶石巨神', epithet: '黄金贪婪神像召唤', color: '#f59e0b', skills: '黄金陨石震击 + 晶石折射弹幕 + 受击狂掉晶石' },
+      { variant: 'abyss_devourer', enemyType: 'special_boss', cat: '奇遇霸主', name: '异次元吞噬者', epithet: '虚空裂隙魔方召唤', color: '#7209b7', skills: '双螺旋奇点弹幕 + 暗物质坍缩阵 + 击败永久+12%全伤' },
+      { variant: 'vanguard', enemyType: 'mini_boss', cat: '精英统领', name: '狂厄裂地统领', epithet: '第 5/9 波登场先锋', color: '#f72585', skills: '重甲长距猛冲(310px) + 破阵环形弹幕 + 定点陨石' },
+      { variant: 'pyro_lord', enemyType: 'mini_boss', cat: '精英统领', name: '炽焰重炮统领', epithet: '第 5/9 波登场重炮', color: '#fb5607', skills: '五联扇形烈焰弹 + 双生火焰轰炸红圈' },
+      { variant: 'shadow_stalker', enemyType: 'mini_boss', cat: '精英统领', name: '幽影雷刃统领', epithet: '第 5/9 波登场刺客', color: '#7209b7', skills: '高频长距瞬步斩(300px) + 八向电磁飞针环' },
+      { variant: 'venom_matriarch', enemyType: 'mini_boss', cat: '精英统领', name: '碧鳞剧毒统领', epithet: '第 5/9 波登场蛇姬', color: '#80ed99', skills: '三联碧鳞毒牙弹 + 双生毒沼轰炸圈 + 召唤软泥怪' },
+      { variant: 'glacial_valkyrie', enemyType: 'mini_boss', cat: '精英统领', name: '凛霜圣枪统领', epithet: '第 5/9 波登场冰骑', color: '#48cae4', skills: '寒霜枪骑长冲(305px) + 落点六棱冰晶减速弹环' },
+      { variant: 'iron_warden', enemyType: 'mini_boss', cat: '精英统领', name: '曜铁圣盾统领', epithet: '第 5/9 波登场重盾', color: '#eab308', skills: '双旋曜金圆刃飞盘 + 黑金重锤裂地轰炸圈' },
+      { variant: 'storm_siren', enemyType: 'mini_boss', cat: '精英统领', name: '苍雷风暴统领', epithet: '第 5/9 波登场歌姬', color: '#38bdf8', skills: '雷光长距疾闪(295px) + 扇形电磁音刃 + 三联落雷阵' }
     ];
 
     const GEAR_TOGGLES = [
@@ -840,7 +846,7 @@ ${rendererTerrainCode}
         if (candidateIdx >= ANIME_BASE_CANDIDATES.length) {
           const banner = document.getElementById('assetStatusBanner');
           banner.classList.add('warn');
-          banner.firstElementChild.textContent = '⚠️ 未在相对路径下检测到 anime_character_art 原画目录（游戏内 10 首领 / 8 英雄 / 32 武器 / 5 地形矢量立绘均已 100% 离线就绪）。请确保在 JAX 目录或 brotato_web/tools 目录打开本页以加载女主 PNG/APNG。';
+          banner.firstElementChild.textContent = '⚠️ 未在相对路径下检测到 anime_character_art 原画目录（游戏内 16 首领 / 8 英雄 / 32 武器 / 5 地形立绘均已 100% 离线就绪）。请确保在 JAX 目录或 brotato_web/tools 目录打开本页以加载女主 PNG/APNG。';
           return;
         }
         const testBase = ANIME_BASE_CANDIDATES[candidateIdx++];
@@ -871,7 +877,7 @@ ${rendererTerrainCode}
           loadedImgCount++;
           const banner = document.getElementById('assetStatusBanner');
           banner.classList.remove('warn');
-          banner.firstElementChild.textContent = '✅ 全立绘资源就绪：10 首领/统领 + 8 土豆英雄 + 32 武器 + 5 异形地形 + 4 位剧情女主 (' + loadedImgCount + '/12 静帧 & APNG/GIF 路径: ' + base + ')';
+          banner.firstElementChild.textContent = '✅ 全立绘资源就绪：16 首领/统领 (32套立绘) + 8 土豆英雄 + 32 武器 + 5 异形地形 + 4 位剧情女主 (' + loadedImgCount + '/12 静帧 & APNG/GIF 路径: ' + base + ')';
           syncOverviewHeroines();
           renderHeroineStudioStage();
         };

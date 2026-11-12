@@ -354,16 +354,16 @@ function startGame(cls) {
     player.maxHp += 6; player.hp += 6; player.spdMul += 0.04; player.dmgMul += 0.08; player.harvestFlat += 4;
     player.weapons.push(makeWeapon('pistol', 1), makeWeapon('stick', 1));
   } else if (cls === 'ranger') {
-    player.maxHp -= 4; player.hp -= 4; player.atkSpd += 0.18; player.crit += 0.10; player.rangeBonus += 65;
-    player.weapons.push(makeWeapon('smg', 1));
+    player.spdMul += 0.08; player.dodge += 0.06; player.atkSpd += 0.20; player.crit += 0.12; player.rangeBonus += 65;
+    player.weapons.push(makeWeapon('smg', 1), makeWeapon('slingshot', 1));
   } else if (cls === 'brawler') {
-    player.maxHp += 14; player.hp += 14; player.regen += 2.2; player.meleeBonus = 0.20; player.rangeBonus -= 30;
+    player.maxHp += 8; player.hp += 8; player.armor += 1; player.regen += 1.1; player.meleeBonus = 0.12; player.rangeBonus -= 10;
     player.weapons.push(makeWeapon('stick', 1), makeWeapon('stick', 1));
   } else if (cls === 'engineer') {
-    player.regen += 1.2; player.bonusTurrets = 2;
+    player.armor += 2; player.regen += 1.8; player.techBonus = 0.15; player.bonusTurrets = 2;
     player.weapons.push(makeWeapon('wrench', 1), makeWeapon('pistol', 1));
   } else if (cls === 'vampire') {
-    player.regen = 0; player.noRegen = true; player.lifesteal = 0.16;
+    player.regen = 0; player.noRegen = true; player.lifesteal = 0.13; player.dodge = 0.06;
     player.weapons.push(makeWeapon('knife', 1), makeWeapon('knife', 1));
   } else if (cls === 'multitasker') {
     player.maxSlots = 12;

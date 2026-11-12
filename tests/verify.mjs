@@ -410,7 +410,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 // 4. Illustrated Codex (`#codexModal`) — All 5 Categories & Sub-Filters
 {
   const { sandbox: s, els } = createEnv(true, 390, 844, 3);
-  assert.strictEqual(vm.runInContext('MONSTER_CODEX.length', s), 31, 'Codex should catalog all 31 monsters, scene-exclusives, bosses & special bosses');
+  assert.strictEqual(vm.runInContext('MONSTER_CODEX.length', s), 37, 'Codex should catalog all 37 monsters, scene-exclusives, 7 commanders, 6 final bosses & 3 special bosses');
   vm.runInContext('openCodex("weapons");', s);
   assert.strictEqual(els.codexModal.classList.contains('hidden'), false, 'openCodex must show #codexModal');
   assert.strictEqual(els.codexGrid.children.length, 32, 'Weapons tab must render all 32 weapons');
@@ -426,7 +426,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert.strictEqual(els.codexGrid.children.length, 8, 'Heroes tab must render all 8 potato classes');
 
   vm.runInContext('setCodexTab("monsters");', s);
-  assert.strictEqual(els.codexGrid.children.length, 31, 'Monsters tab must render all 31 monster & boss entries');
+  assert.strictEqual(els.codexGrid.children.length, 37, 'Monsters tab must render all 37 monster & boss entries');
   for (const cat of ['normal', 'scene', 'boss', 'special']) {
     vm.runInContext(`setCodexFilter("${cat}");`, s);
     assert(els.codexGrid.children.length > 0, `Monster filter ${cat} must have entries`);
@@ -451,9 +451,9 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
   vm.runInContext('selectedDiff = 5; startGame("allrounder");', s);
 
-  // 5a. Verify all 4 Final Bosses & Twin Boss distinct variants
+  // 5a. Verify all 6 Final Bosses & Twin Boss distinct variants
   const bossIds = vm.runInContext('Object.keys(BOSS_DEFS)', s);
-  assert.strictEqual(bossIds.length, 4, 'Should define 4 distinct Final Bosses');
+  assert.strictEqual(bossIds.length, 6, 'Should define 6 distinct Final Bosses');
   vm.runInContext('wave = 12; beginWave(); for (let k = 0; k < 25; k++) update(0.05); draw();', s);
   const spawnedBossVariants = vm.runInContext('enemies.filter(e => e.type === "boss").map(e => e.variant)', s);
   assert.strictEqual(spawnedBossVariants.length, 2, 'Twin Boss difficulty on Wave 12 must spawn 2 Final Bosses');
@@ -470,9 +470,9 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     assert(els['.boss-name'].textContent.length > 2, `HUD boss name should update for ${bVar}`);
   }
 
-  // 5b. Verify all 3 Elite Commanders
+  // 5b. Verify all 7 Elite Commanders
   const miniIds = vm.runInContext('Object.keys(MINI_BOSS_DEFS)', s);
-  assert.strictEqual(miniIds.length, 3, 'Should define 3 distinct Elite Commanders');
+  assert.strictEqual(miniIds.length, 7, 'Should define 7 distinct Elite Commanders');
   for (const mVar of miniIds) {
     vm.runInContext(`{
       enemies = []; eBullets = []; hazards = [];
@@ -787,7 +787,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   // 11a. Log Header + Entries + Export Filename must include Date & Code Version
   const curVer = vm.runInContext('APP_VERSION', s);
-  assert.strictEqual(curVer, 'v1.3.4', 'APP_VERSION must be v1.3.4');
+  assert.strictEqual(curVer, 'v1.3.5', 'APP_VERSION must be v1.3.5');
   const logTxt = vm.runInContext('getLogText()', s);
   assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
   assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
@@ -1010,7 +1010,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   // 14a. Start Menu Live Version Pill + Interactive Changelog Modal
   s.document.getElementById('codexModal').classList.add('hidden');
   s.document.getElementById('logModal').classList.add('hidden');
-  assert(els.startVersionPill.textContent.includes('v1.3.4'), '#startVersionPill must display live version v1.3.4 on start screen');
+  assert(els.startVersionPill.textContent.includes('v1.3.5'), '#startVersionPill must display live version v1.3.5 on start screen');
   vm.runInContext('openChangelogModal();', s);
   assert.strictEqual(els.changelogModal.classList.contains('hidden'), false, 'openChangelogModal() must unhide #changelogModal');
   assert(els.changelogList.children.length >= 7, 'Changelog modal must render >= 7 historical version cards');
@@ -1660,9 +1660,9 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   const v134Check = vm.runInContext(`(() => {
     const expectedVariants = [
-      'butcher', 'frost_queen', 'mech_colossus', 'void_weaver',
+      'butcher', 'frost_queen', 'mech_colossus', 'void_weaver', 'plague_empress', 'solar_seraph',
       'crimson_lord', 'golden_golem', 'abyss_devourer',
-      'vanguard', 'pyro_lord', 'shadow_stalker'
+      'vanguard', 'pyro_lord', 'shadow_stalker', 'venom_matriarch', 'glacial_valkyrie', 'iron_warden', 'storm_siren'
     ];
     const allPresent = expectedVariants.every(v => {
       const spec = BOSS_PORTRAIT_DATA[v];
@@ -1699,14 +1699,134 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     return { allPresent, allCompositedAndDistinct, count: Object.keys(BOSS_PORTRAIT_DATA).length };
   })()`, s);
 
-  assert.strictEqual(v134Check.count, 10, 'BOSS_PORTRAIT_DATA must define all 10 Bosses');
-  assert.strictEqual(v134Check.allPresent, true, 'All 10 Bosses must carry distinct Phase 1 summer & Hidden Phase 2 mythic costume data URIs');
+  assert.strictEqual(v134Check.count, 16, 'BOSS_PORTRAIT_DATA must define all 16 Bosses');
+  assert.strictEqual(v134Check.allPresent, true, 'All 16 Bosses must carry distinct Phase 1 summer & Hidden Phase 2 mythic costume data URIs');
   assert.strictEqual(v134Check.allCompositedAndDistinct, true, 'getBossAnimePortrait(v, false) and getBossAnimePortrait(v, true) must return distinct 440x516 canvases');
-  assert(drawnPortraits >= 20, `Expected >= 20 anime Boss portrait drawImage calls across 10 Phase-1 + 10 Phase-2 cutscenes (got ${drawnPortraits})`);
-  assert.strictEqual(new Set(drawnImgRefs).size, 20, 'Cutscenes must render 20 distinct canvas instances (10 Phase-1 + 10 Hidden Phase-2)');
-  assert.strictEqual(stats.radialGradients, 0, 'v1.3.4 anime Boss cutscenes must create ZERO per-frame radial gradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'v1.3.4 anime Boss cutscenes must set ZERO shadowBlur');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 18 v1.3.4 verification');
+  assert(drawnPortraits >= 32, `Expected >= 32 anime Boss portrait drawImage calls across 16 Phase-1 + 16 Phase-2 cutscenes (got ${drawnPortraits})`);
+  assert.strictEqual(new Set(drawnImgRefs).size, 32, 'Cutscenes must render 32 distinct canvas instances (16 Phase-1 + 16 Hidden Phase-2)');
+  assert.strictEqual(stats.radialGradients, 0, 'v1.3.4/v1.3.5 anime Boss cutscenes must create ZERO per-frame radial gradients');
+  assert.strictEqual(stats.shadowBlurs, 0, 'v1.3.4/v1.3.5 anime Boss cutscenes must set ZERO shadowBlur');
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 18 Boss portrait verification');
 }
 
-console.log(`ALL 18 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+// 19. v1.3.5: 100% Full-Corridor Linear Dash Travel (All 10 Dashers), Melee Parry + Bullet-Slicing, Late-Game Mob Caps & D0..D5 Progression
+{
+  const { sandbox: s, stats } = createEnv(false, 1440, 900, 2);
+  const v135Res = vm.runInContext(`(() => {
+    selectedDiff = 5;
+    startGame('brawler');
+    // Wave 5 on D5 must spawn 1 Commander, whereas Wave 9 on D5 spawns Dual Commanders
+    wave = 5; beginWave(); bossCutscene = null;
+    for (let k = 0; k < 25; k++) update(0.05);
+    const w5MiniCnt = enemies.filter(e => e.type === 'mini_boss').length;
+
+    wave = 9; beginWave(); bossCutscene = null;
+    for (let k = 0; k < 25; k++) update(0.05);
+    const w9MiniCnt = enemies.filter(e => e.type === 'mini_boss').length;
+
+    // Verify all 10 linear dashers travel >= 98% of their drawn warning corridor even with blockers on path
+    wave = 10; beginWave(); bossCutscene = null;
+    terrains = []; portals = []; trees = [];
+    const dashCases = [
+      { type: 'charger', variant: '' },
+      { type: 'sand_worm', variant: '' },
+      { type: 'mini_boss', variant: 'vanguard' },
+      { type: 'mini_boss', variant: 'shadow_stalker' },
+      { type: 'mini_boss', variant: 'glacial_valkyrie' },
+      { type: 'mini_boss', variant: 'storm_siren' },
+      { type: 'boss', variant: 'butcher' },
+      { type: 'boss', variant: 'frost_queen' },
+      { type: 'boss', variant: 'solar_seraph' },
+      { type: 'special_boss', variant: 'crimson_lord' },
+      { type: 'charger', variant: '', nearWall: true }
+    ];
+    const dashRatios = [];
+    for (const c of dashCases) {
+      enemies = []; hazards = []; eBullets = []; spawns = [];
+      player.hp = 9999; player.maxHp = 9999; player.weapons = [];
+      const startX = c.nearWall ? WORLD.w - 170 : 800;
+      player.x = startX + 150; player.y = 750;
+      const e = createEnemy(startX, 750, c.type, c.variant);
+      e.hp = 999999; e.maxHp = 999999;
+      e.dashT = 0.62;
+      e.meteorT = 99; e.sumT = 99; e.ringCd = 99; e.terrainCd = 99; e.shotT = 99;
+      if (!c.nearWall) {
+        const b1 = createEnemy(startX + 90, 750, 'chaser'); b1.hp = 99999; b1.spd = 0;
+        const b2 = createEnemy(startX + 190, 750, 'brute'); b2.hp = 99999; b2.spd = 0; b2.slamCd = 99;
+      }
+      let warnLen = 0, x0 = null, y0 = null, sawDash = false, x1 = null, y1 = null;
+      for (let step = 0; step < 120; step++) {
+        player.hp = 9999;
+        if (e.lockedAim !== undefined) { player.x = startX + 150; player.y = 1050; }
+        update(0.02);
+        if (e.lockedAim !== undefined && !e.dashing && x0 === null) {
+          warnLen = e.dashWarnLen;
+          x0 = e.x; y0 = e.y;
+          draw();
+        }
+        if (e.dashing) sawDash = true;
+        if (sawDash && !e.dashing) { x1 = e.x; y1 = e.y; break; }
+      }
+      const dist = (x0 !== null && x1 !== null) ? Math.hypot(x1 - x0, y1 - y0) : 0;
+      dashRatios.push({ name: c.variant || c.type, warnLen, dist, ratio: dist / (warnLen || 1) });
+    }
+
+    // Verify Melee bullet-slicing & Melee Parry mitigation
+    enemies = []; eBullets = [];
+    player.x = 900; player.y = 750;
+    player.weapons = [makeWeapon('katana', 2), makeWeapon('katana', 2), makeWeapon('katana', 2), makeWeapon('katana', 2)];
+    player.weapons[0].cd = 0;
+    const dummy = createEnemy(985, 750, 'chaser'); dummy.hp = 9999; dummy.spd = 0;
+    eBullets.push({ x: 955, y: 750, vx: -60, vy: 0, dmg: 10, r: 6, color: '#ff4d6d' });
+    update(0.02);
+    const slicedBullet = eBullets.length === 0;
+
+    player.armor = 0; player.dodge = 0; player.invuln = 0; player.shield = 0;
+    player.hp = 100; player.maxHp = 100;
+    enemies = [];
+    hurtPlayer(40); // 4 melee weapons -> 10% parry -> 36 dmg instead of 40
+    const dmgWithParry = 100 - player.hp;
+
+    // Verify D0..D5 monotonic difficulty progression, reasonable D5 ceiling & unified <=80 cap on late + Boss waves
+    let diffMonotonic = DIFFS.length === 6 && DIFFS[5].hpMul <= 2.20 && DIFFS[5].dmgMul <= 1.80;
+    for (let i = 1; i < DIFFS.length; i++) {
+      if (!(DIFFS[i].hpMul > DIFFS[i - 1].hpMul && DIFFS[i].dmgMul > DIFFS[i - 1].dmgMul)) diffMonotonic = false;
+    }
+
+    // Verify unified <=80 active monster cap on both Wave 11 (late regular) and Wave 12 (Boss wave)
+    selectedDiff = 5;
+    wave = 11; beginWave(); bossCutscene = null;
+    player.weapons = []; player.hp = 99999; player.maxHp = 99999;
+    let peakW11 = 0;
+    for (let step = 0; step < 360; step++) {
+      player.hp = 99999; waveTime = Math.max(waveTime, 10);
+      update(0.05);
+      if (enemies.length + spawns.length > peakW11) peakW11 = enemies.length + spawns.length;
+    }
+    wave = 12; beginWave(); bossCutscene = null;
+    player.weapons = []; player.hp = 99999; player.maxHp = 99999;
+    let peakW12 = 0;
+    for (let step = 0; step < 450; step++) {
+      player.hp = 99999; waveTime = Math.max(waveTime, 10);
+      update(0.05);
+      if (enemies.length + spawns.length > peakW12) peakW12 = enemies.length + spawns.length;
+    }
+    return { w5MiniCnt, w9MiniCnt, dashRatios, slicedBullet, dmgWithParry, diffMonotonic, peakW11, peakW12 };
+  })()`, s);
+
+  assert.strictEqual(v135Res.w5MiniCnt, 1, 'Wave 5 even on D5 must spawn 1 Elite Commander');
+  assert.strictEqual(v135Res.w9MiniCnt, 2, 'Wave 9 on D5 must spawn 2 Elite Commanders');
+  for (const dr of v135Res.dashRatios) {
+    assert(dr.warnLen >= 120 && dr.ratio >= 0.98 && dr.ratio <= 1.02, `Linear dasher ${dr.name} must travel ~100% of warning corridor (got warn=${dr.warnLen}, dist=${dr.dist.toFixed(1)}, ratio=${dr.ratio.toFixed(3)})`);
+  }
+  assert.strictEqual(v135Res.slicedBullet, true, 'Melee slash must slice incoming enemy projectiles within arc');
+  assert.strictEqual(v135Res.dmgWithParry, 36, '4 melee weapons must grant 10% innate Melee Parry reduction (40 -> 36)');
+  assert.strictEqual(v135Res.diffMonotonic, true, 'D0..D5 multipliers must increase monotonically within winnable bounds');
+  assert(v135Res.peakW11 >= 72 && v135Res.peakW11 <= 80, `Wave 11 active monster density must hit ~80 cap without exceeding 80 (got ${v135Res.peakW11})`);
+  assert(v135Res.peakW12 >= 72 && v135Res.peakW12 <= 80, `Wave 12 Boss wave active monster density must match ~80 cap without exceeding 80 (got ${v135Res.peakW12})`);
+  assert.strictEqual(stats.radialGradients, 0, 'Suite 19 must create ZERO per-frame radial gradients');
+  assert.strictEqual(stats.shadowBlurs, 0, 'Suite 19 must set ZERO shadowBlur');
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 19 v1.3.5 verification');
+}
+
+console.log(`ALL 19 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
