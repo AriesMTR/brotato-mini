@@ -15,13 +15,22 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: fal
 let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.08, userZoomed = false;
 let isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let bootReady = false;
-const APP_VERSION = 'v1.3.2';
+const APP_VERSION = 'v1.3.3';
 const APP_BUILD_DATE = '2026-11-12';
 
 // 游戏内置版本更新日志数据（供开局主界面「📜 更新日志」弹窗展示）
 const CHANGELOG_HISTORY = [
   {
-    ver: 'v1.3.2', date: '2026-11-12', tag: '当前版本 · 性能深优与提示调优',
+    ver: 'v1.3.3', date: '2026-11-12', tag: '当前版本 · 首领立绘按种解锁 & 战败重开本波',
+    title: '🎬 首领登场立绘上调至 33%（按每种首领上限 1 次）与战败重开本回合机制',
+    items: [
+      '🎬 常规与奇遇首领立绘上调至 33%：第 5/9 波精英统领、第 12 波与无尽终局主宰以及奇遇召唤首领登场立绘触发率统一调整为 33%。',
+      '👑 每种首领独立上限 1 次：取消「单局全局最多 1 次」的限制，改为每种首领单局独立上限 1 次——同一首领不重复刷屏，且前期首领触发绝不再阻断后期终局/无尽新首领立绘演出。',
+      '⏪ 阵亡回合回溯机制：战败结算界面新增「⏪ 重新开始本回合」与「🔄 放弃并从头开始」双路线选择，可完整回溯至本波开战前状态重战，也可直接放弃从第 1 波重头再来。'
+    ]
+  },
+  {
+    ver: 'v1.3.2', date: '2026-11-12', tag: '性能深优与提示调优',
     title: '⚡ 隐藏二阶段觉醒上调至 25%、怪物体感轻提示快隐与底层性能/防崩深度加固',
     items: [
       '⚡ 隐藏神话二阶段概率上调至 25%：首领与奇遇首领初死时触发【隐藏神话二阶段】的概率提升至 25%（每波独立判定，同波双王防连环叠加），触发必播神话立绘特写、延长 +60 秒并掉落传说秘宝舱。',

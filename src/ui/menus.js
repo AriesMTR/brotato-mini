@@ -326,7 +326,7 @@ function syncSetHp() {
   }
 }
 
-let waveCratesDropped = 0;
+let waveCratesDropped = 0, waveCheckpoint = null;
 
 function startGame(cls) {
   beep(520, 0.08, 'triangle');
@@ -345,7 +345,7 @@ function startGame(cls) {
     meleeBossGuard: 0, meleeSweepBonus: 0, meleeShockwave: false, blastChance: 0, explosionScale: 1, napalmBlast: false, bloodNova: false,
     interest: 0, teslaCount: 0, teslaCd: 1.0, healDropBonus: 0, chillSlowT: 0, inSpore: false,
     invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, mythicCratesQueued: 0, recentCrateIds: [],
-    rarePortraitShown: false, mythicAwakenedCount: 0, waveMythicAwakened: false,
+    rarePortraitShown: false, shownBossPortraits: {}, mythicAwakenedCount: 0, waveMythicAwakened: false, retryCount: 0,
     lavaExposure: 0, lavaTick: 0, terrainHintT: 0, terrainSpdMul: 1,
     lv: 1, xp: 0, xpNeed: 10, mats: diff.matBonus, kills: 0, invuln: 0, walkT: 0, dustT: 0, moving: false,
     weapons: [], items: {}
@@ -375,7 +375,7 @@ function startGame(cls) {
     player.weapons.push(makeWeapon('knife', 1), makeWeapon('shuriken', 1));
   }
   syncSetHp();
-  wave = 1; endlessMode = false; pendingLevels = 0; pendingCrates = 0; freeRerollsLeft = 0; anvilUpgradedMsg = ''; shopOffers = [];
+  wave = 1; endlessMode = false; pendingLevels = 0; pendingCrates = 0; freeRerollsLeft = 0; anvilUpgradedMsg = ''; shopOffers = []; waveCheckpoint = null;
   logInfo('GAME', `开局 ver=${typeof APP_VERSION !== 'undefined' ? APP_VERSION : '-'}, cls=${cls}, diff=${diff.badge}, sceneMode=${selectedScene}, ui=${uiMode}, world=${WORLD.w}x${WORLD.h}`);
   document.getElementById('startMenu').classList.add('hidden');
   document.getElementById('endMenu').classList.add('hidden');
@@ -399,6 +399,7 @@ function showStart() {
   const clm = document.getElementById('changelogModal');
   if (clm) clm.classList.add('hidden');
   bossCutscene = null;
+  waveCheckpoint = null;
   document.getElementById('hud').classList.add('hidden');
   const sm = document.getElementById('startMenu');
   sm.classList.remove('hidden');
@@ -508,4 +509,110 @@ function restartRun() {
 function quitToMenu() {
   beep(320, 0.06, 'triangle', 0.04);
   showStart();
+}
+
+function clonePlayerForCheckpoint(p) {
+  if (!p) return null;
+  const copy = Object.assign({}, p);
+  copy.weapons = Array.isArray(p.weapons)
+    ? p.weapons.map(w => Object.assign({}, w, { cd: Math.random() * 0.25, thrust: 0, recoil: 0 }))
+    : [];
+  copy.items = Object.assign({}, p.items || {});
+  copy.recentCrateIds = Array.isArray(p.recentCrateIds) ? p.recentCrateIds.slice() : [];
+  copy.shownBossPortraits = Object.assign({}, p.shownBossPortraits || {});
+  copy._sbCache = null;
+  return copy;
+}
+
+function saveWaveCheckpoint(extraMeta = null) {
+  if (!player) return;
+  waveCheckpoint = Object.assign({
+    wave,
+    endlessMode,
+    selectedDiff,
+    selectedScene,
+    sceneId: curScene ? curScene.id : 'wasteland',
+    lastBossVariant,
+    lastMiniBossVariant,
+    rerollCost,
+    rerollBase,
+    rerollStep,
+    freeRerollsLeft,
+    anvilUpgradedMsg,
+    shopOffers: Array.isArray(shopOffers) ? shopOffers.map(o => o ? Object.assign({}, o) : null).filter(Boolean) : [],
+    player: clonePlayerForCheckpoint(player)
+  }, extraMeta || {});
+}
+
+function retryFailedWave() {
+  if (!waveCheckpoint || !waveCheckpoint.player) {
+    if (player && player.cls) startGame(player.cls);
+    else showStart();
+    return;
+  }
+  beep(580, 0.09, 'triangle', 0.06);
+  const mergedPortraits = Object.assign(
+    {},
+    waveCheckpoint.player.shownBossPortraits || {},
+    (player && player.shownBossPortraits) || {}
+  );
+  const nextRetryCount = Math.max(
+    (player && player.retryCount) || 0,
+    (waveCheckpoint.player && waveCheckpoint.player.retryCount) || 0
+  ) + 1;
+
+  wave = waveCheckpoint.wave;
+  endlessMode = !!waveCheckpoint.endlessMode;
+  selectedDiff = waveCheckpoint.selectedDiff;
+  diff = DIFFS[selectedDiff] || DIFFS[1] || DIFFS[0];
+  selectedScene = waveCheckpoint.selectedScene;
+  lastBossVariant = waveCheckpoint.lastBossVariant || '';
+  lastMiniBossVariant = waveCheckpoint.lastMiniBossVariant || '';
+  pendingLevels = 0;
+  pendingCrates = 0;
+  rerollCost = waveCheckpoint.rerollCost;
+  rerollBase = waveCheckpoint.rerollBase;
+  rerollStep = waveCheckpoint.rerollStep;
+  freeRerollsLeft = waveCheckpoint.freeRerollsLeft || 0;
+  anvilUpgradedMsg = waveCheckpoint.anvilUpgradedMsg || '';
+  shopOffers = Array.isArray(waveCheckpoint.shopOffers)
+    ? waveCheckpoint.shopOffers.map(o => Object.assign({}, o))
+    : [];
+
+  player = clonePlayerForCheckpoint(waveCheckpoint.player);
+  player.shownBossPortraits = mergedPortraits;
+  player.rarePortraitShown = Object.keys(mergedPortraits).length > 0;
+  player.retryCount = nextRetryCount;
+  player.invuln = 0;
+  inHurtPlayer = false;
+
+  for (const k in keys) keys[k] = false;
+  resetJoy();
+  last = performance.now();
+  document.getElementById('endMenu').classList.add('hidden');
+  document.getElementById('pauseMenu').classList.add('hidden');
+  document.getElementById('shopMenu').classList.add('hidden');
+  document.getElementById('levelMenu').classList.add('hidden');
+  const cm = document.getElementById('crateMenu');
+  if (cm) cm.classList.add('hidden');
+
+  logInfo('RETRY', `战败回溯重开第 ${wave} 波 (累计重开 ${nextRetryCount} 次) · Lv=${player.lv} · 💎=${player.mats}`);
+  beginWave({
+    isRetry: true,
+    sceneId: waveCheckpoint.sceneId,
+    waveBossIds: Array.isArray(waveCheckpoint.waveBossIds) ? waveCheckpoint.waveBossIds.slice() : null
+  });
+}
+
+function abandonAndRestart() {
+  beep(420, 0.08, 'triangle', 0.05);
+  const targetCls = player && player.cls ? player.cls : null;
+  waveCheckpoint = null;
+  for (const k in keys) keys[k] = false;
+  resetJoy();
+  last = performance.now();
+  document.getElementById('endMenu').classList.add('hidden');
+  logInfo('RESTART', `放弃当前进度并从第 1 波重头开始 · cls=${targetCls || '-'}`);
+  if (targetCls) startGame(targetCls);
+  else showStart();
 }

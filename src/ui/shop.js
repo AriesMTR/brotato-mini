@@ -744,11 +744,30 @@ function endGame(win) {
   em.classList.remove('hidden');
   em.scrollTop = 0;
   document.getElementById('endlessBtn').classList.toggle('hidden', !win);
+  const waveLabel = endlessMode ? `无尽第 ${wave} 波` : `第 ${wave} 波`;
+  const retryBtn = document.getElementById('retryWaveBtn');
+  if (retryBtn) {
+    const canRetry = !win && typeof waveCheckpoint !== 'undefined' && !!(waveCheckpoint && waveCheckpoint.player);
+    retryBtn.classList.toggle('hidden', !canRetry);
+    retryBtn.textContent = `⏪ 重新开始本回合 (${waveLabel})`;
+  }
+  const abandonBtn = document.getElementById('abandonRestartBtn');
+  if (abandonBtn) {
+    abandonBtn.classList.toggle('hidden', !!win);
+    abandonBtn.textContent = '🔄 放弃并从头开始';
+  }
+  const mainBtn = document.getElementById('endMainMenuBtn');
+  if (mainBtn) {
+    mainBtn.className = win ? 'btn btn-go' : 'btn btn-sec';
+    mainBtn.textContent = win ? '🔄 再战一局' : '🏠 返回主菜单';
+  }
   const clsObj = CLASSES.find(c => c.id === player.cls);
-  logInfo('END', `${win ? '通关胜利' : '战败结束'} · 角色=${clsObj ? clsObj.name : player.cls} · 波次=${wave} · Lv=${player.lv} · 击杀=${player.kills}`);
+  const retries = (player && player.retryCount) || 0;
+  logInfo('END', `${win ? '通关胜利' : '战败结束'} · 角色=${clsObj ? clsObj.name : player.cls} · 波次=${wave} · Lv=${player.lv} · 击杀=${player.kills} · 重开=${retries}`);
   document.getElementById('endTitle').textContent = win ? '🏆 恭喜通关 12 波！异星土豆战神！' : '💀 土豆变成热腾腾的薯泥了…';
   document.getElementById('endDesc').innerHTML =
-    `难度：<b>${diff.badge}</b> · 角色：<b>${clsObj ? clsObj.name : ''}</b> · 到达：<b>${endlessMode ? '无尽第 ' + wave + ' 波' : '第 ' + wave + ' 波'}</b> · 等级：<b>Lv.${player.lv}</b> · 击杀：<b>${player.kills}</b>`;
+    `难度：<b>${diff.badge}</b> · 角色：<b>${clsObj ? clsObj.name : ''}</b> · 到达：<b>${waveLabel}</b> · 等级：<b>Lv.${player.lv}</b> · 击杀：<b>${player.kills}</b>` +
+    (retries > 0 ? ` · 重试：<b>${retries} 次</b>` : '');
 }
 
 function continueEndless() {

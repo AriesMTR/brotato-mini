@@ -6,9 +6,9 @@ const FALLBACK_BOSS_DEFS = {
   void_weaver: { id: 'void_weaver', icon: '👁️', name: '虚空织网主宰', epithet: '次元裂隙古神', color: '#9d4edd', spd: 86, desc: '异次元古神' }
 };
 const FALLBACK_MINI_BOSS_DEFS = {
-  vanguard: { id: 'vanguard', icon: '⚔️', name: '狂厄裂地统领', color: '#f72585', spd: 86, desc: '重甲先锋统领' },
-  pyro_lord: { id: 'pyro_lord', icon: '🔥', name: '炽焰重炮统领', color: '#fb5607', spd: 80, desc: '熔火狂热统领' },
-  shadow_stalker: { id: 'shadow_stalker', icon: '⚡', name: '幽影雷刃统领', color: '#7209b7', spd: 96, desc: '极速刺客统领' }
+  vanguard: { id: 'vanguard', icon: '⚔️', name: '狂厄裂地统领', epithet: '重甲裂地战狂', color: '#f72585', spd: 86, desc: '重甲先锋统领' },
+  pyro_lord: { id: 'pyro_lord', icon: '🔥', name: '炽焰重炮统领', epithet: '熔火轰炸督军', color: '#fb5607', spd: 80, desc: '熔火狂热统领' },
+  shadow_stalker: { id: 'shadow_stalker', icon: '⚡', name: '幽影雷刃统领', epithet: '暗雷瞬刃死神', color: '#7209b7', spd: 96, desc: '极速刺客统领' }
 };
 const FALLBACK_SPECIAL_RELICS = [
   { id: 'blood_altar', icon: '🩸', name: '绯红血契祭坛', color: '#ff2a55', bossId: 'crimson_lord', bossIcon: '🦇', bossName: '猩红鲜血伯爵', epithet: '永夜血族真祖', bossColor: '#d90429' },
@@ -412,15 +412,27 @@ function spawnSpecialRelic(forceId = null) {
   return rel;
 }
 
-// 全屏首领登场 / 隐藏二阶段觉醒切入特写触发器（低频稀有展现，保障每次出现都有惊喜感与稀有仪式感）
-const RARE_PORTRAIT_RATE = 0.10;
-function shouldRollRareBossPortrait(forceCutscene = false) {
+// 全屏首领登场 / 隐藏二阶段觉醒切入特写触发器（33% 概率触发，每种首领单局独立上限 1 次，绝不阻塞后期/无尽新首领立绘）
+const RARE_PORTRAIT_RATE = 0.33;
+function shouldRollRareBossPortrait(variantKey = '', forceCutscene = false) {
+  if (typeof variantKey === 'boolean') {
+    forceCutscene = variantKey;
+    variantKey = '';
+  }
+  const vKey = String(variantKey || 'default_boss');
   if (forceCutscene) {
-    if (player) player.rarePortraitShown = true;
+    if (player) {
+      if (!player.shownBossPortraits) player.shownBossPortraits = {};
+      player.shownBossPortraits[vKey] = true;
+      player.rarePortraitShown = true;
+    }
     return true;
   }
-  if (!player || player.rarePortraitShown) return false;
+  if (!player) return false;
+  if (!player.shownBossPortraits) player.shownBossPortraits = {};
+  if (player.shownBossPortraits[vKey]) return false;
   if (Math.random() < RARE_PORTRAIT_RATE) {
+    player.shownBossPortraits[vKey] = true;
     player.rarePortraitShown = true;
     return true;
   }
@@ -483,7 +495,7 @@ function summonSpecialBoss(rel, forceCutscene = false) {
     player.invuln = Math.max(player.invuln || 0, 0.75);
     addText(player.x, player.y - 54, `${def.bossIcon} 特殊首领【${def.bossName}】降临！`, '#ffd166', 20, 2.6);
   }
-  const showRarePortrait = shouldRollRareBossPortrait(forceCutscene);
+  const showRarePortrait = shouldRollRareBossPortrait(def.bossId, forceCutscene);
   if (showRarePortrait) {
     startBossCutscene(
       'summon',
@@ -500,7 +512,7 @@ function summonSpecialBoss(rel, forceCutscene = false) {
   logInfo('SPECIAL_BOSS', `召唤特殊首领 ${def.bossName}(${def.bossId}) · 立绘特写=${showRarePortrait} · 延长回合至 ${Math.ceil(waveTime)}s`);
 }
 
-function beginWave() {
+function beginWave(retryMeta = null) {
   state = 'wave';
   inHurtPlayer = false;
   shake = 0;
@@ -510,12 +522,18 @@ function beginWave() {
   overtimeMeteorT = 1.6;
   syncSetHp();
 
+  const isRetry = !!(retryMeta && retryMeta.isRetry);
   const isBossWave = (wave === MAX_WAVE) || (endlessMode && wave > MAX_WAVE && wave % 3 === 0);
   const isEliteWave = !isBossWave && diff.midElite && (wave === 5 || wave === 9 || (endlessMode && wave > MAX_WAVE && wave % 3 === 2));
   hordeWave = !isBossWave && !isEliteWave && (wave === 4 || wave === 8 || (selectedDiff >= 4 && wave === 11) || (endlessMode && wave % 3 === 1));
 
-  // 每波轮换/锁定异星战场生态并烘焙离屏大地图贴图
-  pickSceneForWave(wave);
+  // 每波轮换/锁定异星战场生态并烘焙离屏大地图贴图（战败重开本回合时保持同一生态场景）
+  if (isRetry && retryMeta.sceneId) {
+    curScene = SCENES.find(s => s.id === retryMeta.sceneId) || SCENES[0];
+    sceneSeed = (wave * 7919 + curScene.id.charCodeAt(0) * 313 + (Date.now() & 0xffff)) >>> 0;
+  } else {
+    pickSceneForWave(wave);
+  }
   syncArenaAndZoom(true);
   // 完全同步原版《土豆兄弟》回合时长：第 1 波 20s，每波 +5s 直至 60s 封顶，最终 Boss 波 90s
   waveTime = isBossWave ? 90 : Math.min(60, 15 + wave * 5);
@@ -536,6 +554,11 @@ function beginWave() {
   enemies = []; bullets = []; eBullets = []; hazards = []; drops = []; spawns = []; turrets = []; mines = []; rings = []; trees = [];
   relics = []; sporeZones = []; banners = []; bossCutscene = null; sandGustT = 0;
   texts = []; particles = []; sparks = []; lightnings = []; slashes = []; beams = []; stains = []; shells = [];
+
+  // 保存本回合开战前快照（供阵亡后「重新开始本回合」无损回溯使用）
+  if (typeof saveWaveCheckpoint === 'function') {
+    saveWaveCheckpoint({ sceneId: curScene ? curScene.id : 'wasteland' });
+  }
 
   // 生成当前生态唯一专属异形地形（一图仅一处异形特殊地形）
   spawnArenaTerrains();
@@ -592,48 +615,69 @@ function beginWave() {
     });
   }
 
-  // 多样化随机精英统领、虫潮突袭与第 12 波随机主宰 Boss / 异名双王同台降临
+  // 多样化随机精英统领、虫潮突袭与第 12 波 / 无尽主宰 Boss 降临（常规首领同样 33% 概率播放立绘，每种首领单局上限 1 次）
   const bossDefs = getBossDefs();
   const miniBossDefs = getMiniBossDefs();
   const bossY = Math.max(190, player.y - 320);
   const bossSpread = Math.min(220, WORLD.w * 0.23);
+  const savedIds = (isRetry && Array.isArray(retryMeta.waveBossIds) && retryMeta.waveBossIds.length > 0) ? retryMeta.waveBossIds : null;
   if (isBossWave) {
-    const v1 = pickBossVariant();
+    const v1 = (savedIds && bossDefs[savedIds[0]]) ? savedIds[0] : pickBossVariant();
     lastBossVariant = v1;
     const b1 = bossDefs[v1] || FALLBACK_BOSS_DEFS.butcher;
-    const showRarePortrait = !endlessMode && shouldRollRareBossPortrait(false);
     if (diff.doubleBoss || (endlessMode && wave >= 18)) {
-      const v2 = pickBossVariant(v1);
+      const v2 = (savedIds && savedIds[1] && bossDefs[savedIds[1]]) ? savedIds[1] : pickBossVariant(v1);
       const b2 = bossDefs[v2] || FALLBACK_BOSS_DEFS.frost_queen;
+      if (typeof waveCheckpoint !== 'undefined' && waveCheckpoint) waveCheckpoint.waveBossIds = [v1, v2];
       spawnWarning(WORLD.w / 2 - bossSpread, bossY, 'boss', v1);
       spawnWarning(WORLD.w / 2 + bossSpread, bossY, 'boss', v2);
-      if (showRarePortrait) {
-        startBossCutscene('final_boss', v1, `${b1.name} & ${b2.name}`, '✨ 稀有异象 · 终局双王真身显圣！', '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
+      let shownVar = '';
+      if (shouldRollRareBossPortrait(v1, false)) shownVar = v1;
+      else if (shouldRollRareBossPortrait(v2, false)) shownVar = v2;
+      if (shownVar) {
+        const bShown = shownVar === v2 ? b2 : b1;
+        startBossCutscene('final_boss', shownVar, `${b1.name} & ${b2.name}`, `✨ 首领真身显圣 · ${bShown.epithet || '终局双王降临'}`, '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', bShown.color, '#ffd166', 1.15);
       }
       announce(`👑 终局双王降临：${b1.name} & ${b2.name}！`, '#ff4d6d', 4.2);
     } else {
+      if (typeof waveCheckpoint !== 'undefined' && waveCheckpoint) waveCheckpoint.waveBossIds = [v1];
       spawnWarning(WORLD.w / 2, bossY, 'boss', v1);
-      if (showRarePortrait) {
-        startBossCutscene('final_boss', v1, b1.name, `✨ 稀有异象 · ${b1.epithet || '终局主宰真身显圣'}`, '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
+      if (shouldRollRareBossPortrait(v1, false)) {
+        startBossCutscene('final_boss', v1, b1.name, `✨ 首领真身显圣 · ${b1.epithet || '终局主宰真身显圣'}`, '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
       }
       announce(`👑 终局主宰【${b1.icon}${b1.name}】降临！`, '#ff4d6d', 4.2);
     }
   } else if (isEliteWave) {
-    const m1 = pickMiniBossVariant();
+    const m1 = (savedIds && miniBossDefs[savedIds[0]]) ? savedIds[0] : pickMiniBossVariant();
     lastMiniBossVariant = m1;
     const mb1 = miniBossDefs[m1] || FALLBACK_MINI_BOSS_DEFS.vanguard;
     if ((diff.dualElite && wave >= 9) || (selectedDiff >= 5 && wave >= 5)) {
-      const m2 = pickMiniBossVariant(m1);
+      const m2 = (savedIds && savedIds[1] && miniBossDefs[savedIds[1]]) ? savedIds[1] : pickMiniBossVariant(m1);
       const mb2 = miniBossDefs[m2] || FALLBACK_MINI_BOSS_DEFS.pyro_lord;
+      if (typeof waveCheckpoint !== 'undefined' && waveCheckpoint) waveCheckpoint.waveBossIds = [m1, m2];
       spawnWarning(WORLD.w / 2 - bossSpread * 0.88, bossY, 'mini_boss', m1);
       spawnWarning(WORLD.w / 2 + bossSpread * 0.88, bossY, 'mini_boss', m2);
+      let shownElite = '';
+      if (shouldRollRareBossPortrait(m1, false)) shownElite = m1;
+      else if (shouldRollRareBossPortrait(m2, false)) shownElite = m2;
+      if (shownElite) {
+        const mbShown = shownElite === m2 ? mb2 : mb1;
+        startBossCutscene('elite_boss', shownElite, `${mb1.name} & ${mb2.name}`, `⚔️ 精英统领压境 · ${mbShown.epithet || '双统领夹击'}`, '💡 留意冲锋轴线与地面预警 · 击败必掉首领秘宝箱！', mbShown.color, '#ffd166', 1.08);
+      }
       announce(`⚔️ 双精英统领夹击：${mb1.name} & ${mb2.name}！`, '#f72585', 3.8);
     } else {
+      if (typeof waveCheckpoint !== 'undefined' && waveCheckpoint) waveCheckpoint.waveBossIds = [m1];
       spawnWarning(WORLD.w / 2, bossY, 'mini_boss', m1);
+      if (shouldRollRareBossPortrait(m1, false)) {
+        startBossCutscene('elite_boss', m1, mb1.name, `⚔️ 精英统领来袭 · ${mb1.epithet || '重甲先锋'}`, '💡 留意冲锋轴线与地面预警 · 击败必掉首领秘宝箱！', mb1.color, '#ffd166', 1.08);
+      }
       announce(`⚔️ 精英统领【${mb1.icon}${mb1.name}】来袭！`, '#f72585', 3.8);
     }
   } else if (hordeWave) {
     announce('⚠️ 高密虫潮突袭波！注意拉扯走位', '#ff9f1c', 3.5);
+  }
+  if (isRetry && player) {
+    addText(player.x, player.y - 46, `⏪ 已回溯至第 ${wave} 波起点！`, '#72efdd', 16, 1.9, true);
   }
 
   document.getElementById('shopMenu').classList.add('hidden');
