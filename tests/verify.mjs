@@ -225,8 +225,8 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 {
   const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
   assert.strictEqual(vm.runInContext('Object.keys(WEAPONS).length', s), 22, 'Should have 22 distinct weapons');
-  assert.strictEqual(vm.runInContext('ITEMS.length', s), 44, 'Should have 44 passive items');
-  assert.strictEqual(vm.runInContext('UPGRADES.length', s), 12, 'Should have 12 level-up stat choices');
+  assert.strictEqual(vm.runInContext('ITEMS.length', s), 52, 'Should have 52 passive items');
+  assert.strictEqual(vm.runInContext('UPGRADES.length', s), 14, 'Should have 14 level-up stat choices');
   assert.strictEqual(vm.runInContext('WORLD.w', s), 2200, 'Desktop WORLD.w should be 2200');
   assert.strictEqual(vm.runInContext('WORLD.h', s), 1500, 'Desktop WORLD.h should be 1500');
   assert.strictEqual(vm.runInContext('uiMode', s), 'desktop', 'PC browser must stay in desktop UI mode');
@@ -238,7 +238,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     assert.strictEqual(vm.runInContext('curScene.id', s), scId, `Scene ${scId} must activate`);
   }
 
-  vm.runInContext('selectedDiff = 5; startGame("allrounder"); wave = 12; beginWave();', s);
+  vm.runInContext('selectedDiff = 5; startGame("allrounder"); wave = 12; beginWave(); bossCutscene = null;', s);
   stats.radialGradients = 0;
   stats.shadowBlurs = 0;
   const allEnemyTypes = ["chaser","swarmer","shooter","mortar","charger","bomber","splitter","mini_slime","shielder","summoner","healer","brute","mini_boss","boss"];
@@ -414,9 +414,9 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert(els.codexGrid.children.length >= 4 && els.codexGrid.children.length < 22, 'Weapon set filter must filter weapon cards');
 
   vm.runInContext('setCodexTab("items");', s);
-  assert.strictEqual(els.codexGrid.children.length, 44, 'Items tab must render all 44 items');
+  assert.strictEqual(els.codexGrid.children.length, 52, 'Items tab must render all 52 items');
   vm.runInContext('setCodexFilter("4");', s);
-  assert(els.codexGrid.children.length >= 7 && els.codexGrid.children.length < 44, 'Tier 4 filter must filter item cards (7 unique legendaries)');
+  assert(els.codexGrid.children.length >= 8 && els.codexGrid.children.length < 52, 'Tier 4 filter must filter item cards (8 unique legendaries)');
 
   vm.runInContext('setCodexTab("heroes");', s);
   assert.strictEqual(els.codexGrid.children.length, 8, 'Heroes tab must render all 8 potato classes');
@@ -508,6 +508,8 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     const dmgBefore = vm.runInContext('player.dmgMul', s);
     vm.runInContext(`{
       const sb = enemies.find(e => e.type === 'special_boss');
+      sb.canPhase2 = false;
+      bossCutscene = null;
       player.x = sb.x + 220; player.y = sb.y;
       for (let step = 0; step < 45; step++) { player.invuln = 0.5; update(0.05); draw(); }
       player.hp = Math.max(1, Math.floor(player.maxHp * 0.4));
@@ -780,7 +782,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   // 11a. Log Header + Entries + Export Filename must include Date & Code Version
   const curVer = vm.runInContext('APP_VERSION', s);
-  assert.strictEqual(curVer, 'v1.1.4', 'APP_VERSION must be v1.1.4');
+  assert.strictEqual(curVer, 'v1.2.0', 'APP_VERSION must be v1.2.0');
   const logTxt = vm.runInContext('getLogText()', s);
   assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
   assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
@@ -899,10 +901,12 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   const shakeCheck = vm.runInContext(`(() => {
     startGame('allrounder');
     wave = 12; beginWave();
+    bossCutscene = null;
     shake = 0;
     player.weapons = [makeWeapon('hammer', 4), makeWeapon('rocket', 4)];
     player.weapons[0].cd = 0; player.weapons[1].cd = 0;
     const boss = createEnemy(player.x + 85, player.y, 'boss', 'butcher');
+    boss.canPhase2 = false;
     update(0.05);
     triggerExplosion(boss.x, boss.y, 120, 500, false, 0, '#ff9f1c', true);
     hurtEnemy(boss, boss.maxHp + 99999, true);
@@ -993,4 +997,179 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 13 interactive terrains & banners verification');
 }
 
-console.log(`ALL 13 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+// 14. v1.2.0 Boss Portraits & Time-Stop Cutscenes, Hidden Mythic Phase 2 (+60s & Legendary Drop), Melee Fairness, CritDmg & Tri-Elements, Start Menu Version + Changelog Modal
+{
+  const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
+
+  // 14a. Start Menu Live Version Pill + Interactive Changelog Modal
+  s.document.getElementById('codexModal').classList.add('hidden');
+  s.document.getElementById('logModal').classList.add('hidden');
+  assert(els.startVersionPill.textContent.includes('v1.2.0'), '#startVersionPill must display live version v1.2.0 on start screen');
+  vm.runInContext('openChangelogModal();', s);
+  assert.strictEqual(els.changelogModal.classList.contains('hidden'), false, 'openChangelogModal() must unhide #changelogModal');
+  assert(els.changelogList.children.length >= 6, 'Changelog modal must render >= 6 historical version cards');
+  s.window.dispatch('keydown', { key: 'Escape' });
+  assert.strictEqual(els.changelogModal.classList.contains('hidden'), true, 'Escape key must close #changelogModal');
+
+  // 14b. Crit Damage Items (`critDmg`) + Burn / Freeze / Poison Elemental System & Plague Spread
+  const elemCritCheck = vm.runInContext(`(() => {
+    startGame('brawler');
+    wave = 6; beginWave(); bossCutscene = null;
+    const baseCritMul = getEffectiveCritMult(1.95);
+    ITEMS.find(i => i.id === 'hawk_eye').apply(player);
+    ITEMS.find(i => i.id === 'crit_gauntlet').apply(player);
+    ITEMS.find(i => i.id === 'doom_edge').apply(player);
+    const boostedCritMul = getEffectiveCritMult(1.95);
+
+    // Freeze immobilizes normal enemy & Shatter Crit grants +25% bonus damage
+    enemies = [];
+    const m1 = createEnemy(600, 600, 'chaser');
+    m1.hp = 5000; m1.maxHp = 5000;
+    const hp0 = m1.hp;
+    hurtEnemy(m1, 100, true, 0, true, { noProc: true });
+    const normalCritHit = hp0 - m1.hp;
+
+    applyFreeze(m1, 1.5);
+    const xFrozen0 = m1.x;
+    update(0.10);
+    const stayedStill = Math.abs(m1.x - xFrozen0) < 0.01;
+    const hpBeforeShatter = m1.hp;
+    hurtEnemy(m1, 100, true, 0, true, { noProc: true });
+    const shatterCritHit = hpBeforeShatter - m1.hp;
+
+    // Poison stacks corrode (+3% vuln/stack) + DoT tick + Plague Flask spread on death
+    ITEMS.find(i => i.id === 'plague_flask').apply(player);
+    const pTarget = createEnemy(900, 600, 'shooter');
+    const neighbor = createEnemy(940, 600, 'stalker');
+    pTarget.hp = 1000; pTarget.maxHp = 1000;
+    applyPoison(pTarget, 5);
+    const hpBeforePoisonHit = pTarget.hp;
+    hurtEnemy(pTarget, 100, false, 0, true, { noProc: true });
+    const corrodedHit = hpBeforePoisonHit - pTarget.hp;
+    // Kill poisoned target -> spreads poison to nearby neighbor!
+    hurtEnemy(pTarget, 5000, false, 0, true, { noProc: true });
+    const spreadStacks = neighbor.poisonStacks || 0;
+
+    // Render frozen, poisoned, and burning sprites
+    neighbor.burnT = 2.0; neighbor.freezeT = 1.0;
+    cam.x = 920; cam.y = 600;
+    draw();
+
+    return { baseCritMul, boostedCritMul, stayedStill, normalCritHit, shatterCritHit, corrodedHit, spreadStacks };
+  })()`, s);
+
+  assert(elemCritCheck.boostedCritMul >= elemCritCheck.baseCritMul + 0.99, 'Crit Damage items must boost effective crit multiplier by >= +100%');
+  assert.strictEqual(elemCritCheck.stayedStill, true, 'Frozen regular monster must be completely immobilized');
+  assert(elemCritCheck.shatterCritHit > elemCritCheck.normalCritHit * 1.20, 'Critting a frozen target must trigger +25% Shatter bonus');
+  assert(elemCritCheck.corrodedHit >= 114, `5 stacks of poison must amplify damage by +15% (got ${elemCritCheck.corrodedHit})`);
+  assert(elemCritCheck.spreadStacks >= 2, 'Plague Flask must spread poison stacks to nearby enemies upon death');
+
+  // 14c. Melee vs. Ranged Boss Fairness (Donut Safe Inner Eye, Melee +22% Boss-Breaker, Exposed Window, Close-Quarters Guard)
+  const meleeFairCheck = vm.runInContext(`(() => {
+    startGame('brawler');
+    wave = 10; beginWave(); bossCutscene = null;
+    enemies = []; hazards = [];
+    const boss = createEnemy(700, 700, 'boss', 'mech_colossus');
+    boss.canPhase2 = false;
+    boss.hp = 50000; boss.maxHp = 50000;
+
+    // Ranged hit vs Melee hit on Boss
+    const h0 = boss.hp;
+    hurtEnemy(boss, 100, false, 0, true, { noProc: true });
+    const rangedDmg = h0 - boss.hp;
+    const h1 = boss.hp;
+    hurtEnemy(boss, 100, false, 0, true, { isMelee: true, noProc: true });
+    const meleeDmg = h1 - boss.hp;
+    boss.exposeT = 1.5;
+    const h2 = boss.hp;
+    hurtEnemy(boss, 100, false, 0, true, { isMelee: true, noProc: true });
+    const exposedMeleeDmg = h2 - boss.hp;
+
+    // Donut Outer-Ring Hazard: standing in melee range (74px < innerSafeR 112px, outside Boss 53px body contact) takes 0 dmg; standing far (165px) takes dmg!
+    player.dodge = 0; player.armor = 0; player.shield = 0; player.invuln = 0;
+    player.maxHp = 200; player.hp = 200;
+    player.x = boss.x + 74; player.y = boss.y;
+    spawnHazard(boss.x, boss.y, 238, 30, 0.04, { innerSafeR: 112, color: '#fb5607' });
+    cam.x = boss.x; cam.y = boss.y;
+    draw(); // Test Donut hazard rendering too!
+    update(0.05);
+    const hpAfterCloseEye = player.hp;
+
+    player.invuln = 0;
+    player.x = boss.x + 165; player.y = boss.y;
+    spawnHazard(boss.x, boss.y, 238, 30, 0.04, { innerSafeR: 112, color: '#fb5607' });
+    update(0.05);
+    const hpAfterOuterBlast = player.hp;
+
+    return { rangedDmg, meleeDmg, exposedMeleeDmg, hpAfterCloseEye, hpAfterOuterBlast };
+  })()`, s);
+
+  assert(meleeFairCheck.meleeDmg > meleeFairCheck.rangedDmg * 1.20, 'Melee hits must deal +22% Boss-Breaker damage vs Bosses');
+  assert(meleeFairCheck.exposedMeleeDmg > meleeFairCheck.meleeDmg * 1.22, 'Exposed Boss window must grant an additional +25% melee vulnerability');
+  assert.strictEqual(meleeFairCheck.hpAfterCloseEye, 200, 'Standing inside Boss Donut inner wind-eye (40px < 96px) must deal ZERO damage to melee player');
+  assert(meleeFairCheck.hpAfterOuterBlast < 200, 'Standing in Boss Donut outer blast ring (150px) must hurt distant camper');
+
+  // 14d. Full-Screen Time-Stop Cutscene + All 7 Boss Portraits + Hidden Mythic Phase 2 (+60s & Guaranteed T4 Mythic Drop)
+  const mythicCheck = vm.runInContext(`(() => {
+    startGame('allrounder');
+    wave = 8; beginWave();
+    enemies = []; relics = []; drops = []; pendingCrates = 0;
+    const rel = spawnSpecialRelic('blood_altar');
+    summonSpecialBoss(rel);
+    const summonCutsceneActive = !!(bossCutscene && bossCutscene.mode === 'summon' && bossCutscene.t > 1.0);
+    const wtFrozen0 = waveTime;
+    update(0.05); // During bossCutscene, waveTime stays frozen while boss spawn ticks!
+    const timerStayedFrozen = Math.abs(waveTime - wtFrozen0) < 0.001;
+
+    // Render all 7 Boss Portraits in both normal & Mythic Phase 2 modes
+    const allVars = ['butcher', 'frost_queen', 'mech_colossus', 'void_weaver', 'crimson_lord', 'golden_golem', 'abyss_devourer'];
+    for (const v of allVars) {
+      bossCutscene = { t: 0.9, maxT: 1.3, mode: 'summon', variant: v, title: v, subtitle: 'TEST', extraTag: 'TAG', color: '#ff3b6b', accent: '#ffd166' };
+      draw();
+      bossCutscene.mode = 'mythic_phase2';
+      draw();
+    }
+    bossCutscene = null;
+
+    // Trigger Hidden Mythic Phase 2 on Boss lethal hit!
+    enemies = []; drops = [];
+    const b = createEnemy(650, 650, 'boss', 'frost_queen');
+    b.canPhase2 = true;
+    waveTime = 18;
+    hurtEnemy(b, b.maxHp + 99999, true);
+    const awakened = !!b.mythicPhase2 && b.hp > 0 && waveTime >= 75 && !!(bossCutscene && bossCutscene.mode === 'mythic_phase2');
+    draw(); // Render Mythic cutscene + Mythic Boss sprite!
+    bossCutscene = null;
+
+    // Let Boss execute Terrain Alteration & Minion Summon during Phase 2
+    b.terrainCd = 0.02; b.sumT = 0.02;
+    const terrainsBefore = terrains.length;
+    update(0.05);
+    const alteredTerrain = terrains.length > terrainsBefore;
+
+    // Defeat Phase 2 -> drops Mythic Crate & grants permanent trophy buff
+    const dmgBeforeKill = player.dmgMul;
+    hurtEnemy(b, b.maxHp + 99999, true);
+    const droppedMythic = drops.some(d => d.kind === 'crate' && d.isMythic);
+    const gotTrophyBuff = player.dmgMul > dmgBeforeKill + 0.14 && (player.critDmg || 0) >= 0.24;
+
+    // Pick up Mythic Crate and open Crate Menu -> guaranteed Tier 4 Legendary option!
+    for (const d of drops) { d.x = player.x; d.y = player.y; }
+    update(0.05);
+    showCrateMenu();
+    return { summonCutsceneActive, timerStayedFrozen, awakened, alteredTerrain, droppedMythic, gotTrophyBuff };
+  })()`, s);
+
+  assert.strictEqual(mythicCheck.summonCutsceneActive, true, 'Summoning Special Boss must trigger full-screen time-stop cutscene');
+  assert.strictEqual(mythicCheck.timerStayedFrozen, true, 'waveTime must pause during Boss entrance cutscene');
+  assert.strictEqual(mythicCheck.awakened, true, 'Boss with canPhase2 must awaken Mythic Phase 2 on lethal hit, restoring HP, adding +60s, and playing hidden cutscene');
+  assert.strictEqual(mythicCheck.alteredTerrain, true, 'Boss must actively alter battlefield terrain during combat');
+  assert.strictEqual(mythicCheck.droppedMythic, true, 'Defeating Mythic Phase 2 Boss must drop a Mythic Legendary Crate');
+  assert.strictEqual(mythicCheck.gotTrophyBuff, true, 'Defeating Mythic Phase 2 Boss must grant permanent +15% dmg & +25% critDmg trophy');
+  assert(els.crateTitle.textContent.includes('神话'), 'Opening Mythic Crate must display Mythic title in #crateMenu');
+  assert.strictEqual(stats.radialGradients, 0, 'Boss portraits, cutscenes & elemental overlays must create ZERO per-frame radial gradients');
+  assert.strictEqual(stats.shadowBlurs, 0, 'Boss portraits, cutscenes & elemental overlays must set ZERO shadowBlur');
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 14 v1.2.0 verification');
+}
+
+console.log(`ALL 14 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);

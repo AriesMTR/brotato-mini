@@ -161,19 +161,20 @@ function showCrateMenu() {
   cm.classList.remove('hidden');
   cm.scrollTop = 0;
 
-  const isBossCrate = (player.bossCratesQueued || 0) > 0;
+  const isMythicCrate = (player.mythicCratesQueued || 0) > 0;
+  const isBossCrate = isMythicCrate || (player.bossCratesQueued || 0) > 0;
   const ct = document.getElementById('crateTitle');
   if (ct) {
-    ct.textContent = `${isBossCrate ? '👑 开启首领秘宝舱！' : '🎁 开启异星战术补给箱！'}（剩余 ${pendingCrates} 个）`;
+    ct.textContent = `${isMythicCrate ? '⚡ 开启神话二阶段秘宝舱！（必出传说）' : (isBossCrate ? '👑 开启首领秘宝舱！' : '🎁 开启异星战术补给箱！')}（剩余 ${pendingCrates} 个）`;
   }
 
   const luck = player.luck || 0;
   const excludeIds = new Set();
   const choices = [];
 
-  // 选项 1：防重复加权战利品道具
-  const t1 = rollCrateTier(wave, luck, isBossCrate);
-  const item1 = pickWeightedItem(t1, excludeIds, true);
+  // 选项 1：防重复加权战利品道具（神话二阶段宝箱保底必出 T4 传说！）
+  const t1 = isMythicCrate ? 4 : rollCrateTier(wave, luck, isBossCrate);
+  const item1 = pickWeightedItem(t1, excludeIds, !isMythicCrate);
   if (item1) {
     excludeIds.add(item1.id);
     recordCrateHistory(item1.id);
@@ -185,10 +186,33 @@ function showCrateMenu() {
     });
   }
 
-  // 选项 2：动态提供【武器空投】、【异星战术补给核】或【第二件不重复道具】，大幅丰富开箱决策
+  // 选项 2：动态提供【武器空投】、【异星战术补给核】或【第二件不重复道具】（神话宝箱提供神话龙血神髓或第二件传说！）
   const modeR = Math.random();
   let secondChoice = null;
-  if (player.maxSlots > 0 && modeR < 0.42) {
+  if (isMythicCrate) {
+    const item2 = pickWeightedItem(4, excludeIds, false);
+    if (item2 && item2.tier === 4 && Math.random() < 0.65) {
+      excludeIds.add(item2.id);
+      recordCrateHistory(item2.id);
+      secondChoice = {
+        kind: 'item',
+        item: item2,
+        tier: 4,
+        recycleVal: Math.max(18, Math.round(item2.cost * getShopScale() * 0.55))
+      };
+    } else {
+      secondChoice = {
+        kind: 'supply',
+        supply: {
+          id: 'sup_mythic_dragon', name: '神话真红神髓', icon: '🐉', tier: 4, cost: 72,
+          desc: '【二阶段神话秘宝】全体伤害永久 +22%，暴击伤害 +45%，并立即回满全部生命！',
+          apply: p => { p.dmgMul += 0.22; p.critDmg = (p.critDmg || 0) + 0.45; p.hp = p.maxHp; }
+        },
+        tier: 4,
+        recycleVal: Math.max(24, Math.round(42 * getShopScale()))
+      };
+    }
+  } else if (player.maxSlots > 0 && modeR < 0.42) {
     secondChoice = buildCrateWeaponChoice(isBossCrate);
   } else if (modeR < 0.76 && typeof CRATE_SUPPLIES !== 'undefined' && CRATE_SUPPLIES.length > 0) {
     const sup = CRATE_SUPPLIES[Math.floor(Math.random() * CRATE_SUPPLIES.length)];
@@ -216,7 +240,8 @@ function showCrateMenu() {
   if (secondChoice) choices.push(secondChoice);
 
   const consumeCrate = () => {
-    if (isBossCrate && player.bossCratesQueued > 0) player.bossCratesQueued--;
+    if (isMythicCrate && player.mythicCratesQueued > 0) player.mythicCratesQueued--;
+    else if (isBossCrate && player.bossCratesQueued > 0) player.bossCratesQueued--;
     pendingCrates--;
     advancePostWave();
   };
@@ -229,7 +254,8 @@ function showCrateMenu() {
     const el = document.createElement('div');
     el.className = `card t${c.tier}`;
     let icon = '🎁', title = '', badgesHtml = '', descHtml = '';
-    if (isBossCrate) badgesHtml += `<span class="tag tag-merge">👑 首领秘宝</span>`;
+    if (isMythicCrate) badgesHtml += `<span class="tag t4">⚡ 神话二阶段</span>`;
+    else if (isBossCrate) badgesHtml += `<span class="tag tag-merge">👑 首领秘宝</span>`;
 
     if (c.kind === 'item') {
       const it = c.item;

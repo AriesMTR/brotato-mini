@@ -1,6 +1,10 @@
 // 主菜单配置、键鼠/虚拟摇杆/双指缩放输入、运行时状态池与暂停控制
 function initMenuUI() {
   refreshUIPrefControls();
+  const vp = document.getElementById('startVersionPill');
+  if (vp && typeof APP_VERSION !== 'undefined') {
+    vp.textContent = `🥔 BROTATO MINI · 当前版本 ${APP_VERSION}`;
+  }
   const dt = document.getElementById('diffTabs');
   if (dt) {
     dt.innerHTML = '';
@@ -65,8 +69,14 @@ window.addEventListener('keydown', e => {
   if (k === 'escape') {
     const cm = document.getElementById('codexModal');
     if (cm && !cm.classList.contains('hidden')) { if (e.preventDefault) e.preventDefault(); closeCodex(); return; }
+    const clm = document.getElementById('changelogModal');
+    if (clm && !clm.classList.contains('hidden')) { if (e.preventDefault) e.preventDefault(); closeChangelogModal(); return; }
     const lm = document.getElementById('logModal');
     if (lm && !lm.classList.contains('hidden')) { if (e.preventDefault) e.preventDefault(); closeLogModal(); return; }
+  }
+  if ((k === ' ' || k === 'enter') && bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
+    bossCutscene.t = Math.min(bossCutscene.t, 0.08);
+    return;
   }
   if (k === 'escape' || k === 'p') {
     if (state === 'wave' || state === 'paused') { if (e.preventDefault) e.preventDefault(); togglePause(); return; }
@@ -101,8 +111,16 @@ if (window.addEventListener) {
 }
 
 if (cv.addEventListener) {
+  cv.addEventListener('mousedown', () => {
+    if (bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
+      bossCutscene.t = Math.min(bossCutscene.t, 0.08);
+    }
+  });
   cv.addEventListener('touchstart', e => {
     isTouch = true;
+    if (bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
+      bossCutscene.t = Math.min(bossCutscene.t, 0.08);
+    }
     if (state !== 'wave') return;
     e.preventDefault();
     if (e.touches.length >= 2) {
@@ -177,7 +195,7 @@ let state = 'menu', wave = 1, waveTime = 20, waveMaxTime = 20, lastUrgentSec = -
 let endlessMode = false, overtime = false, overtimeMeteorT = 1.6, hordeWave = false;
 let cam = { x: WORLD.w / 2, y: WORLD.h / 2 };
 let player, enemies = [], bullets = [], eBullets = [], hazards = [], drops = [], spawns = [], turrets = [], rings = [], trees = [];
-let relics = [], sporeZones = [], terrains = [], portals = [], portalPairCd = 0, banners = [];
+let relics = [], sporeZones = [], terrains = [], portals = [], portalPairCd = 0, banners = [], bossCutscene = null;
 let relicSpawnT = -1, activeSceneEvent = null, sceneEventT = 0, sandGustT = 0, sceneMobEnabled = false;
 let lastBossVariant = '', lastMiniBossVariant = '';
 let texts = [], particles = [], sparks = [], lightnings = [], slashes = [], beams = [], stains = [], shells = [];
@@ -264,14 +282,15 @@ function startGame(cls) {
     cls, x: WORLD.w / 2, y: WORLD.h / 2, r: 21, faceDir: 1, lookA: 0,
     hp: 30, maxHp: 30, _setHp: 0, regen: 0.5, regenAcc: 0, noRegen: false, lifesteal: 0,
     armor: 0, maxShield: 0, shield: 0, shieldRegenT: 0, shieldHitT: 0,
-    spd: 182, spdMul: 1, dmgMul: 1, meleeBonus: 0, elemBonus: 0, atkSpd: 0.88, crit: 0.06,
+    spd: 182, spdMul: 1, dmgMul: 1, meleeBonus: 0, elemBonus: 0, atkSpd: 0.88, crit: 0.06, critDmg: 0,
     dodge: 0, dodgeCap: 0.80, maxSlots: 6, bonusTurrets: 0, bullCd: 0,
     magnet: 130, harvest: 1, harvestFlat: 0, luck: 0, rangeBonus: 0, _displayRange: 140,
     pierceBonus: 0, bounceBonus: 0, shopDiscount: 0, freeRerolls: 0, bonusTrees: 0,
-    enemySlow: 0, thorns: 0, cyberball: 0, critHeal: 0, rangeToDmg: false, hasAnvil: false, healBonus: 0,
-    burnChance: 0, chillChance: 0, blastChance: 0, explosionScale: 1,
+    enemySlow: 0, thorns: 0, cyberball: 0, critHeal: 0, critMeleeHeal: false, rangeToDmg: false, hasAnvil: false, healBonus: 0,
+    burnChance: 0, chillChance: 0, freezeChance: 0, poisonChance: 0, maxPoisonStacks: 8, plagueSpread: false,
+    meleeBossGuard: 0, blastChance: 0, explosionScale: 1,
     interest: 0, teslaCount: 0, teslaCd: 1.0, healDropBonus: 0, chillSlowT: 0, inSpore: false,
-    invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, recentCrateIds: [],
+    invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, mythicCratesQueued: 0, recentCrateIds: [],
     lavaExposure: 0, lavaTick: 0, terrainHintT: 0, terrainSpdMul: 1,
     lv: 1, xp: 0, xpNeed: 10, mats: diff.matBonus, kills: 0, invuln: 0, walkT: 0, dustT: 0, moving: false,
     weapons: [], items: {}
@@ -322,6 +341,9 @@ function showStart() {
   if (cm) cm.classList.add('hidden');
   const cdx = document.getElementById('codexModal');
   if (cdx) cdx.classList.add('hidden');
+  const clm = document.getElementById('changelogModal');
+  if (clm) clm.classList.add('hidden');
+  bossCutscene = null;
   document.getElementById('hud').classList.add('hidden');
   const sm = document.getElementById('startMenu');
   sm.classList.remove('hidden');
@@ -336,6 +358,7 @@ function renderBuildSummary(statsId, setsId) {
   const dmgPct = Math.round(getEffectiveDmgMul() * 100);
   const aspdPct = Math.round((player.atkSpd + setB.aspd) * 100);
   const critPct = Math.round(getEffectiveCrit() * 100);
+  const critDmgPct = Math.round((1.95 + (player.critDmg || 0)) * 100);
   const rng = getTotalRangeBonus();
   const rngTxt = rng >= 0 ? `+${rng}` : `${rng}`;
   const harv = Math.round(player.harvestFlat || 0);
@@ -349,7 +372,7 @@ function renderBuildSummary(statsId, setsId) {
       `<span>💪 伤害 <b>${dmgPct}%</b></span>` +
       `<span>⚡ 攻速 <b>${aspdPct}%</b></span>` +
       `<span>📏 范围 <b>${rngTxt}</b></span>` +
-      `<span>🎯 暴击 <b>${critPct}%</b></span>` +
+      `<span>🎯 暴击 <b>${critPct}%</b> <small style="color:#ffd166">(${critDmgPct}%伤)</small></span>` +
       `<span>💨 闪避 <b>${Math.round(Math.min(player.dodgeCap || 0.80, player.dodge) * 100)}%</b></span>` +
       `<span>👟 移速 <b>${Math.round(getEffectiveSpdMul() * 100)}%</b></span>` +
       `<span>🍀 幸运 <b>${player.luck || 0}</b></span>` +

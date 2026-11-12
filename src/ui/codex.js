@@ -48,7 +48,7 @@ function renderCodex() {
     { id: 'items',    label: `🎒 装备 (${ITEMS.length})` },
     { id: 'heroes',   label: `🥔 角色 (${CLASSES.length})` },
     { id: 'monsters', label: `👾 怪物与Boss (${MONSTER_CODEX.length})` },
-    { id: 'world',    label: `🌍 场景与奇遇 (${SCENES.length + SPECIAL_RELICS.length})` }
+    { id: 'world',    label: `🌍 场景与奇遇 (${SCENES.length + (typeof TERRAIN_CODEX !== 'undefined' ? TERRAIN_CODEX.length : 0) + SPECIAL_RELICS.length})` }
   ];
   tabsEl.innerHTML = '';
   tabs.forEach(t => {
@@ -250,9 +250,54 @@ function renderCodex() {
               </div>
             </div>
           </div>
-          <div class="codex-card-desc">第 3 波起小概率在地图上现世（屏幕边缘会有方向指引）。<b>踏入圣物法阵驻留 1.1 秒</b>即可解封召唤特殊首领进入 Boss 战（回合时间自动延长 +25s）！<br><b>${rel.rewardDesc}</b></div>`;
+          <div class="codex-card-desc">第 3 波起小概率在地图上现世（屏幕边缘会有方向指引）。<b>踏入圣物法阵驻留 1.1 秒</b>即可解封召唤特殊首领进入 Boss 战（全屏定格登场特写，回合延长 +25s）！<br><b>${rel.rewardDesc}</b></div>`;
         gridEl.appendChild(card);
       });
     }
   }
 }
+
+// 📜 开局界面与局内可查阅的版本更新日志弹窗
+function openChangelogModal() {
+  if (state === 'wave') pauseGame();
+  beep(510, 0.045, 'triangle', 0.04);
+  const titleEl = document.getElementById('changelogTitle');
+  if (titleEl && typeof APP_VERSION !== 'undefined') {
+    titleEl.textContent = `📜 版本更新日志 · 当前 ${APP_VERSION}`;
+  }
+  const listEl = document.getElementById('changelogList');
+  if (listEl && typeof CHANGELOG_HISTORY !== 'undefined') {
+    listEl.innerHTML = '';
+    CHANGELOG_HISTORY.forEach((entry, idx) => {
+      const card = document.createElement('div');
+      card.className = 'cl-card' + (idx === 0 ? ' latest' : '');
+      card.innerHTML = `
+        <div class="cl-head">
+          <span class="cl-ver">${entry.ver}</span>
+          <span class="cl-tag">${entry.tag || '版本更新'}</span>
+          <span class="cl-date">📅 ${entry.date}</span>
+        </div>
+        <div class="cl-title">${entry.title}</div>
+        <ul class="cl-items">${(entry.items || []).map(line => `<li>${line}</li>`).join('')}</ul>`;
+      listEl.appendChild(card);
+    });
+    listEl.scrollTop = 0;
+  }
+  const modal = document.getElementById('changelogModal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeChangelogModal() {
+  const modal = document.getElementById('changelogModal');
+  if (modal) modal.classList.add('hidden');
+  beep(380, 0.04, 'triangle', 0.035);
+}
+
+(function bindChangelogBackdrop() {
+  const modal = document.getElementById('changelogModal');
+  if (modal && modal.addEventListener) {
+    modal.addEventListener('click', e => {
+      if (e.target === modal) closeChangelogModal();
+    });
+  }
+})();

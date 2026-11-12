@@ -214,22 +214,73 @@ function spawnSpecialRelic(forceId = null) {
   return rel;
 }
 
+// 全屏首领登场 / 隐藏二阶段觉醒切入特写触发器（短暂静止普通怪与倒计时，聚焦展现首领专属立绘）
+function startBossCutscene(mode, variant, title, subtitle, extraTag = '', color = '#ff4d6d', accent = '#ffd166', dur = 1.18) {
+  bossCutscene = { t: dur, maxT: dur, mode, variant, title, subtitle, extraTag, color, accent };
+  if (player) player.invuln = Math.max(player.invuln || 0, dur + 0.35);
+}
+
+// 首领战斗中动态改造战场地形（倾泻熔岩池 / 喷涌毒沼 / 凝结冰湖 / 撕裂断层裂谷）
+function spawnBossTerrain(kind, x, y, baseR = 66) {
+  if (typeof terrains === 'undefined') return;
+  if (terrains.length >= 7) {
+    const rmIdx = terrains.findIndex(t => t.kind !== 'chasm');
+    terrains.splice(rmIdx >= 0 ? rmIdx : 0, 1);
+  }
+  const cx = Math.max(175, Math.min(WORLD.w - 175, x));
+  const cy = Math.max(175, Math.min(WORLD.h - 175, y));
+  if (kind === 'chasm') {
+    let tx = cx, ty = cy;
+    if (player && Math.hypot(tx - player.x, ty - player.y) < 115) {
+      const pushA = Math.atan2(ty - player.y, tx - player.x) || 0;
+      tx = Math.max(190, Math.min(WORLD.w - 190, player.x + Math.cos(pushA) * 135));
+      ty = Math.max(190, Math.min(WORLD.h - 190, player.y + Math.sin(pushA) * 135));
+    }
+    const ang = Math.random() * Math.PI;
+    const halfLen = 72 + Math.random() * 24;
+    terrains.push({
+      kind: 'chasm', x: tx, y: ty,
+      x1: tx - Math.cos(ang) * halfLen, y1: ty - Math.sin(ang) * halfLen,
+      x2: tx + Math.cos(ang) * halfLen, y2: ty + Math.sin(ang) * halfLen,
+      ang, halfLen, r: 28, seed: Math.random() * 100
+    });
+    if (rings.length < 40) rings.push({ x: tx, y: ty, r: 95, color: '#c77dff', t: 0.35, maxT: 0.35, fill: true });
+    announce('🕳️ 首领撕裂大地！战场新增【断层裂谷】', '#c77dff', 2.6);
+  } else {
+    const col = kind === 'lava' ? '#ff6b35' : (kind === 'ice_sheet' ? '#72efdd' : '#a3e635');
+    terrains.push({ kind, x: cx, y: cy, r: baseR, pulse: 0, seed: Math.random() * 100 });
+    if (rings.length < 40) rings.push({ x: cx, y: cy, r: baseR + 20, color: col, t: 0.35, maxT: 0.35, fill: true });
+    const nameMap = { lava: '🌋 首领倾泻【熔岩火池】改造地形！', swamp: '🧪 首领喷涌【剧毒泥沼】污染地面！', ice_sheet: '🧊 首领凝结【寒霜冰面】冰封战场！' };
+    if (nameMap[kind]) announce(nameMap[kind], col, 2.6);
+  }
+}
+
 function summonSpecialBoss(rel) {
   if (!rel || !rel.def) return;
   const def = rel.def;
   beep(185, 0.26, 'sawtooth', 0.085);
-  if (rings.length < 40) rings.push({ x: rel.x, y: rel.y, r: 150, color: def.bossColor, t: 0.38, maxT: 0.38, fill: true });
+  if (rings.length < 40) rings.push({ x: rel.x, y: rel.y, r: 165, color: def.bossColor, t: 0.42, maxT: 0.42, fill: true });
   if (lightnings.length < 35) {
-    lightnings.push({ pts: [{ x: rel.x, y: Math.max(20, rel.y - 260) }, { x: rel.x - 16, y: rel.y - 120 }, { x: rel.x + 12, y: rel.y - 50 }, { x: rel.x, y: rel.y }], color: def.color, t: 0.28, maxT: 0.28 });
+    lightnings.push({ pts: [{ x: rel.x, y: Math.max(20, rel.y - 280) }, { x: rel.x - 18, y: rel.y - 130 }, { x: rel.x + 14, y: rel.y - 55 }, { x: rel.x, y: rel.y }], color: def.color, t: 0.32, maxT: 0.32 });
   }
   waveTime = Math.min(95, waveTime + 25);
   waveMaxTime = Math.max(waveMaxTime, waveTime);
   spawnWarning(rel.x, rel.y, 'special_boss', def.bossId);
   const bw = document.getElementById('bossBarWrap');
-  if (bw) bw.classList.remove('hidden');
+  if (bw) { bw.classList.remove('hidden', 'mythic'); }
   if (player) {
     addText(player.x, player.y - 54, `${def.bossIcon} 特殊首领【${def.bossName}】降临！`, '#ffd166', 20, 2.6);
   }
+  startBossCutscene(
+    'summon',
+    def.bossId,
+    def.bossName,
+    `${def.icon} ${def.name}解封 · ${def.epithet || '奇遇首领降临'}`,
+    '⏱️ 战斗延长 +25s · 近身可躲外环大招 · 击败必掉首领秘宝箱！',
+    def.bossColor,
+    def.color,
+    1.18
+  );
   announce(`${def.bossIcon} 特殊首领【${def.bossName}】已唤醒！本波时间延长 +25s`, '#ffd166', 4.0);
   logInfo('SPECIAL_BOSS', `召唤特殊首领 ${def.bossName}(${def.bossId}) · 延长回合至 ${Math.ceil(waveTime)}s`);
 }
@@ -266,7 +317,7 @@ function beginWave() {
   player.shield = player.maxShield;
   player.shieldRegenT = 7;
   enemies = []; bullets = []; eBullets = []; hazards = []; drops = []; spawns = []; turrets = []; rings = []; trees = [];
-  relics = []; sporeZones = []; banners = []; sandGustT = 0;
+  relics = []; sporeZones = []; banners = []; bossCutscene = null; sandGustT = 0;
   texts = []; particles = []; sparks = []; lightnings = []; slashes = []; beams = []; stains = []; shells = [];
 
   // 生成当前生态专属交互地形（岩浆池 / 毒泥沼 / 断层沟壑 / 极滑冰湖 / 双生传送门）
@@ -328,9 +379,11 @@ function beginWave() {
       const b2 = BOSS_DEFS[v2];
       spawnWarning(WORLD.w / 2 - bossSpread, bossY, 'boss', v1);
       spawnWarning(WORLD.w / 2 + bossSpread, bossY, 'boss', v2);
+      startBossCutscene('final_boss', v1, `${b1.name} & ${b2.name}`, '👑 终局双王同台降临！', '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
       announce(`👑 终局双王降临：${b1.name} & ${b2.name}！`, '#ff4d6d', 4.2);
     } else {
       spawnWarning(WORLD.w / 2, bossY, 'boss', v1);
+      startBossCutscene('final_boss', v1, b1.name, `👑 终局主宰降临 · ${b1.epithet || '深渊霸主'}`, '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
       announce(`👑 终局主宰【${b1.icon}${b1.name}】降临！`, '#ff4d6d', 4.2);
     }
   } else if (isEliteWave) {
@@ -359,7 +412,11 @@ function beginWave() {
   if (cxm) cxm.classList.add('hidden');
   document.getElementById('pauseMenu').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
-  document.getElementById('bossBarWrap').classList.toggle('hidden', !(isBossWave || isEliteWave));
+  const bwWrap = document.getElementById('bossBarWrap');
+  if (bwWrap) {
+    bwWrap.classList.remove('mythic');
+    bwWrap.classList.toggle('hidden', !(isBossWave || isEliteWave));
+  }
 }
 
 function spawnWarning(x, y, type, variant = '') {
@@ -391,7 +448,8 @@ function pickWaveEnemyType(wv) {
   const maxRanged = Math.min(10, 2 + Math.floor(wave * 0.7));
   const allowRanged = countActiveRangedEnemies() < maxRanged;
 
-  if (sceneMobEnabled && curScene.exclMob && Math.random() < 0.11) {
+  const exclProb = (curScene.exclMob && RANGED_ENEMY_TYPES.has(curScene.exclMob)) ? 0.055 : 0.11;
+  if (sceneMobEnabled && curScene.exclMob && Math.random() < exclProb) {
     if (!RANGED_ENEMY_TYPES.has(curScene.exclMob) || allowRanged) {
       return curScene.exclMob;
     }
@@ -436,12 +494,13 @@ function pickWaveEnemyType(wv) {
   return 'chaser';
 }
 
-// 地面高危轰炸预警圈（支持迫击虫、主宰陨石、熔炉地热火柱与紫晶流星）
+// 地面高危轰炸预警圈（支持迫击虫、主宰陨石、外环内圈安全风眼轰炸 innerSafeR 与紫晶流星）
 function spawnHazard(x, y, r, dmg, delay = 1.22, extra = {}) {
   const cx = Math.max(r + 12, Math.min(WORLD.w - r - 12, x));
   const cy = Math.max(r + 12, Math.min(WORLD.h - r - 12, y));
   hazards.push({
     x: cx, y: cy, r,
+    innerSafeR: extra.innerSafeR || 0,
     dmg: Math.max(3, Math.round(dmg)),
     enemyDmg: extra.enemyDmg || 0,
     dropMat: extra.dropMat || 0,
@@ -451,14 +510,18 @@ function spawnHazard(x, y, r, dmg, delay = 1.22, extra = {}) {
 }
 
 // 全异星怪物、4 大新增特异兵种、5 大场景专属怪、随机精英统领、4 大主宰 Boss 与 3 大奇遇首领生成
-// （全面拉开不同怪物在体型 r、血量 hp、移速 spd 与伤害 dmg 上的生态差异，平滑前中后期成长曲线）
+// （全面拉开不同怪物在体型 r、血量 hp、移速 spd 与伤害 dmg 上的生态差异，增强首领压迫感并兼顾近战博弈）
 function createEnemy(x, y, type, variant = '') {
   const endlessMul = wave > MAX_WAVE ? Math.pow(1.25, wave - MAX_WAVE) : 1;
   const wIdx = Math.max(0, wave - 1);
   const s = (1 + wIdx * 0.38 + Math.pow(wIdx, 1.68) * 0.145) * endlessMul * diff.hpMul;
   const dm = (1 + wIdx * 0.16 + Math.max(0, wave - 6) * 0.08) * (wave > MAX_WAVE ? Math.pow(1.12, wave - MAX_WAVE) : 1) * diff.dmgMul;
   const sm = (1 + Math.min(0.22, wIdx * 0.016)) * diff.spdMul;
-  const base = { x, y, hitFlash: 0, phase: Math.random() * 6.28, vx: 0, vy: 0, faceA: 0, burnT: 0, burnTick: 0, burnDmg: 0, chillT: 0, elite: false };
+  const base = {
+    x, y, hitFlash: 0, phase: Math.random() * 6.28, vx: 0, vy: 0, faceA: 0,
+    burnT: 0, burnTick: 0, burnDmg: 0, chillT: 0, freezeT: 0,
+    poisonT: 0, poisonTick: 0, poisonStacks: 0, exposeT: 0, elite: false
+  };
 
   if (type === 'swarmer') {
     const swCnt = wave >= 8 ? 4 : (wave >= 5 ? 3 : 2);
@@ -471,42 +534,46 @@ function createEnemy(x, y, type, variant = '') {
   }
 
   let ent;
+  const mythicRate = Math.min(0.24, 0.14 + (selectedDiff || 0) * 0.016);
   if (type === 'boss') {
     const bKey = (variant && BOSS_DEFS[variant]) ? variant : pickBossVariant();
     const bDef = BOSS_DEFS[bKey];
     const twinScale = (diff.doubleBoss || (endlessMode && wave >= 18)) ? 0.78 : 1;
-    const bhp = Math.round((5600 + Math.max(0, wave - MAX_WAVE) * 2600) * endlessMul * diff.hpMul * twinScale);
+    const bhp = Math.round((7400 + Math.max(0, wave - MAX_WAVE) * 3200) * endlessMul * diff.hpMul * twinScale);
     ent = {
-      ...base, r: 46, hp: bhp, maxHp: bhp, spd: bDef.spd * sm, dmg: Math.round(11.0 * dm),
+      ...base, r: 48, hp: bhp, maxHp: bhp, spd: bDef.spd * sm, dmg: Math.round(11.5 * dm),
       color: bDef.color, type: 'boss', variant: bKey, bossTitle: `${bDef.icon} ${bDef.name}`,
-      dashT: 2.5, sumT: 6.2, meteorT: 4.2, skillT: 2.2, burstLeft: 0, burstCd: 0, mat: 45
+      dashT: 2.5, sumT: 5.6, meteorT: 4.0, skillT: 2.2, terrainCd: 5.8, ringCd: 4.8,
+      burstLeft: 0, burstCd: 0, canPhase2: Math.random() < mythicRate, mythicPhase2: false, mat: 48
     };
   } else if (type === 'mini_boss') {
     const mKey = (variant && MINI_BOSS_DEFS[variant]) ? variant : pickMiniBossVariant();
     const mDef = MINI_BOSS_DEFS[mKey];
-    const mhp = Math.round((640 + wave * 185 + Math.pow(wave, 2.15) * 14) * endlessMul * diff.hpMul);
+    const mhp = Math.round((740 + wave * 205 + Math.pow(wave, 2.16) * 15) * endlessMul * diff.hpMul);
     ent = {
-      ...base, r: 35, hp: mhp, maxHp: mhp, spd: mDef.spd * sm, dmg: Math.round(8.4 * dm),
+      ...base, r: 36, hp: mhp, maxHp: mhp, spd: mDef.spd * sm, dmg: Math.round(8.6 * dm),
       color: mDef.color, type: 'mini_boss', variant: mKey, bossTitle: `${mDef.icon} ${mDef.name}`,
-      dashT: 2.3, meteorT: 4.8, skillT: 2.1, mat: 22
+      dashT: 2.3, meteorT: 4.6, skillT: 2.1, ringCd: 5.4, mat: 24
     };
   } else if (type === 'special_boss') {
     const relDef = SPECIAL_RELICS.find(r => r.bossId === variant) || SPECIAL_RELICS[0];
-    const shp = Math.round((980 + wave * 300 + Math.pow(wave, 2.22) * 21) * endlessMul * diff.hpMul);
-    const sSpd = relDef.bossId === 'crimson_lord' ? 98 : (relDef.bossId === 'golden_golem' ? 72 : 86);
+    const shp = Math.round((1260 + wave * 365 + Math.pow(wave, 2.24) * 24) * endlessMul * diff.hpMul);
+    const sSpd = relDef.bossId === 'crimson_lord' ? 98 : (relDef.bossId === 'golden_golem' ? 74 : 86);
     ent = {
-      ...base, r: 41, hp: shp, maxHp: shp, spd: sSpd * sm, dmg: Math.round(9.2 * dm),
+      ...base, r: 43, hp: shp, maxHp: shp, spd: sSpd * sm, dmg: Math.round(9.6 * dm),
       color: relDef.bossColor, type: 'special_boss', variant: relDef.bossId, bossTitle: `${relDef.bossIcon} ${relDef.bossName}`,
-      dashT: 2.1, skillT: 2.0, meteorT: 4.2, goldStage: 4, mat: relDef.bossId === 'golden_golem' ? 48 : (relDef.bossId === 'crimson_lord' ? 30 : 26)
+      dashT: 2.1, skillT: 2.0, meteorT: 4.0, sumT: 5.6, terrainCd: 6.2, ringCd: 4.9,
+      goldStage: 4, canPhase2: Math.random() < mythicRate, mythicPhase2: false,
+      mat: relDef.bossId === 'golden_golem' ? 48 : (relDef.bossId === 'crimson_lord' ? 30 : 26)
     };
   } else if (type === 'stalker') {
-    ent = { ...base, r: 13, hp: 11.0 * s, maxHp: 11.0 * s, spd: 124 * sm, dmg: Math.round(4.8 * dm), color: '#06d6a0', type, slashCd: 0.7, mat: 2 };
+    ent = { ...base, r: 13, hp: 11.0 * s, maxHp: 11.0 * s, spd: 124 * sm, dmg: Math.round(4.8 * dm), color: '#06d6a0', type, slashCd: 0.7, stepCd: 2.2 + Math.random(), mat: 2 };
   } else if (type === 'sniper_bug') {
     ent = { ...base, r: 15, hp: 11.5 * s, maxHp: 11.5 * s, spd: 54 * sm, dmg: Math.round(6.8 * dm), color: '#ef233c', type, shotT: 2.1 + Math.random() * 0.8, aimA: undefined, mat: 3 };
   } else if (type === 'spinner') {
-    ent = { ...base, r: 19, hp: 26 * s, maxHp: 26 * s, spd: 72 * sm, dmg: Math.round(5.0 * dm), color: '#f59e0b', type, shotT: 2.1 + Math.random() * 0.8, mat: 3 };
+    ent = { ...base, r: 19, hp: 26 * s, maxHp: 26 * s, spd: 74 * sm, dmg: Math.round(5.0 * dm), color: '#f59e0b', type, shotT: 2.1 + Math.random() * 0.8, orbitDir: Math.random() < 0.5 ? 1 : -1, mat: 3 };
   } else if (type === 'juggernaut') {
-    ent = { ...base, r: 36, hp: 135 * s, maxHp: 135 * s, spd: 40 * sm, dmg: Math.round(10.5 * dm), color: '#475569', type, mat: 7 };
+    ent = { ...base, r: 36, hp: 135 * s, maxHp: 135 * s, spd: 40 * sm, dmg: Math.round(10.5 * dm), color: '#475569', type, slamCd: 3.2, mat: 7 };
   } else if (type === 'rad_scorpion') {
     ent = { ...base, r: 21, hp: 34 * s, maxHp: 34 * s, spd: 70 * sm, dmg: Math.round(5.5 * dm), color: '#a3e635', type, shotT: 2.0 + Math.random() * 0.8, mat: 3 };
   } else if (type === 'sand_worm') {
@@ -532,13 +599,13 @@ function createEnemy(x, y, type, variant = '') {
   } else if (type === 'shielder') {
     ent = { ...base, r: 23, hp: 46 * s, maxHp: 46 * s, spd: 58 * sm, dmg: Math.round(5.5 * dm), color: '#5c677d', type, mat: 4 };
   } else if (type === 'summoner') {
-    ent = { ...base, r: 18, hp: 20 * s, maxHp: 20 * s, spd: 54 * sm, dmg: Math.round(3.5 * dm), color: '#7209b7', type, sumT: 3.1 + Math.random(), mat: 4 };
+    ent = { ...base, r: 18, hp: 20 * s, maxHp: 20 * s, spd: 54 * sm, dmg: Math.round(3.5 * dm), color: '#7209b7', type, sumT: 3.1 + Math.random(), boltT: 2.4, mat: 4 };
   } else if (type === 'healer') {
     ent = { ...base, r: 17, hp: 22 * s, maxHp: 22 * s, spd: 62 * sm, dmg: Math.round(3.0 * dm), color: '#2ec4b6', type, healT: 2.5, mat: 4 };
   } else if (type === 'brute') {
-    ent = { ...base, r: 32, hp: 96 * s, maxHp: 96 * s, spd: 50 * sm, dmg: Math.round(8.5 * dm), color: '#9d4edd', type, slamCd: 2.5, mat: 5 };
+    ent = { ...base, r: 32, hp: 96 * s, maxHp: 96 * s, spd: 50 * sm, dmg: Math.round(8.5 * dm), color: '#9d4edd', type, slamCd: 2.6, slamWindup: 0, mat: 5 };
   } else {
-    ent = { ...base, r: 15, hp: 15.5 * s, maxHp: 15.5 * s, spd: (86 + wave * 2.0) * sm, dmg: Math.max(2, Math.round(3.4 * dm)), color: '#d65db1', type: 'chaser', mat: Math.random() < 0.65 ? 1 : 2 };
+    ent = { ...base, r: 15, hp: 15.5 * s, maxHp: 15.5 * s, spd: (86 + wave * 2.0) * sm, dmg: Math.max(2, Math.round(3.4 * dm)), color: '#d65db1', type: 'chaser', lungeCd: 1.8 + Math.random(), lungeT: 0, mat: Math.random() < 0.65 ? 1 : 2 };
   }
 
   // 第 3 波起按难度刷出【狂化精英词缀怪】（金色描边光环，高血高速，亡语慢速毒刺环，双倍赏金）

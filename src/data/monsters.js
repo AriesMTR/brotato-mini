@@ -3,20 +3,20 @@
 // ============================================================================
 const BOSS_DEFS = {
   butcher: {
-    id: 'butcher', icon: '👑', name: '深渊屠夫虫王', color: '#e63946', spd: 90,
-    desc: '深渊母巢暴君：锁定红线狂暴冲锋迸射环形弹幕，周期召唤飞蝇虫群与天基陨石轰击。'
+    id: 'butcher', icon: '👑', name: '深渊屠夫虫王', epithet: '腐血母巢暴君', color: '#e63946', spd: 90,
+    desc: '深渊母巢暴君：蓄力裂地猛冲、释放【血月外环震波（贴身内圈安全）】、喷涌剧毒泥沼改造地形并召唤自爆虫群；大招后短暂暴露破绽，小概率觉醒真红二阶段！'
   },
   frost_queen: {
-    id: 'frost_queen', icon: '❄️', name: '极寒霜晶女皇', color: '#00bbf9', spd: 84,
-    desc: '冰封王座主宰：绽放螺旋霜星寒冰棱弹（命中附带减速），并在玩家四周凝结连环寒冰尖刺阵。'
+    id: 'frost_queen', icon: '❄️', name: '极寒霜晶女皇', epithet: '永冻凛冬神姬', color: '#00bbf9', spd: 84,
+    desc: '冰封王座主宰：绽放螺旋霜星花瓣弹、吟唱【凛冬外环暴雪（近身风眼安全）】、凝结极滑寒冰湖改造地形并召唤冰魄护卫；小概率觉醒极寒神话二阶段！'
   },
   mech_colossus: {
-    id: 'mech_colossus', icon: '⚙️', name: '熔核机械巨像', color: '#f77f00', spd: 78,
-    desc: '重装泰坦兵器：双肩火神炮连续点射高速烈焰弹链，搭配地毯式高爆迫击轰炸与震地冲击波。'
+    id: 'mech_colossus', icon: '⚙️', name: '熔核机械巨像', epithet: '歼星重装泰坦', color: '#f77f00', spd: 78,
+    desc: '重装泰坦兵器：双肩火神炮交叉点射、倾泻滚烫【熔岩火池】改造地形、轰击外环震波并空投旋刃飞盘虫；过热散热期暴露破绽，小概率超载觉醒二阶段！'
   },
   void_weaver: {
-    id: 'void_weaver', icon: '👁️', name: '虚空织网主宰', color: '#9d4edd', spd: 86,
-    desc: '异次元古神之眼：施展虚空折跃瞬移突袭，释放十字星环秘法弹幕并召唤虚空眷属助战。'
+    id: 'void_weaver', icon: '👁️', name: '虚空织网主宰', epithet: '次元裂隙古神', color: '#9d4edd', spd: 86,
+    desc: '异次元古神：施展相位折跃与十字星璇、撕裂【深渊断层裂谷】重塑地形、发动暗物质外环坍缩并召唤虚空眷属；小概率觉醒虚空神话二阶段！'
   }
 };
 
@@ -39,21 +39,21 @@ const MINI_BOSS_DEFS = {
 const SPECIAL_RELICS = [
   {
     id: 'blood_altar', icon: '🩸', name: '绯红血契祭坛', color: '#ff2a55',
-    bossId: 'crimson_lord', bossIcon: '🦇', bossName: '猩红鲜血伯爵', bossColor: '#d90429',
-    rewardDesc: '击败必爆：💎30 晶石 + 🎁×1 战利品宝箱 + 瞬间回满全部生命！',
-    bossDesc: '血族古堡宗主：化作血影高频瞬步斩击，挥洒新月血针弹幕并召唤嗜血蝠群。'
+    bossId: 'crimson_lord', bossIcon: '🦇', bossName: '猩红鲜血伯爵', epithet: '永夜血族真祖', bossColor: '#d90429',
+    rewardDesc: '击败必爆：💎30 晶石 + 🎁×1 首领秘宝箱 + 瞬间回满全部生命！（若觉醒二阶段必爆传说神装）',
+    bossDesc: '血族古堡真祖：化作血影瞬步斩击，召唤绯红血月外环阵（内圈安全）与毒血沼泽，并驱使血蝠虫群助战。'
   },
   {
     id: 'golden_idol', icon: '🪙', name: '黄金贪婪神像', color: '#ffd166',
-    bossId: 'golden_golem', bossIcon: '🏆', bossName: '黄金晶石巨神', bossColor: '#f59e0b',
-    rewardDesc: '受击沿途狂掉晶石！击败必爆：💎48 巨额晶石雨 + 🎁×1 战利品宝箱！',
-    bossDesc: '纯金秘宝构装体：身披厚重黄金晶甲，每损失 20% 生命便喷涌满地晶石，重踏释放黄金棱晶环。'
+    bossId: 'golden_golem', bossIcon: '🏆', bossName: '黄金晶石巨神', epithet: '秘宝黄金神躯', bossColor: '#f59e0b',
+    rewardDesc: '受击沿途狂掉晶石！击败必爆：💎48 巨额晶石雨 + 🎁×1 首领秘宝箱！（若觉醒二阶段必爆传说神装）',
+    bossDesc: '纯金秘宝构装体：每损血 20% 喷涌满地晶石，重踏撕裂矿脉裂谷并召唤铁甲圣甲虫护卫。'
   },
   {
     id: 'void_cube', icon: '🌌', name: '虚空裂隙魔方', color: '#c77dff',
-    bossId: 'abyss_devourer', bossIcon: '👾', bossName: '异次元吞噬者', bossColor: '#7209b7',
-    rewardDesc: '击败必爆：💎26 晶石 + 🎁×1 战利品宝箱 + 本局永久 +12% 全体伤害赐福！',
-    bossDesc: '裂隙深渊异兽：释放双螺旋奇点弹幕与虚空坍缩预警圈，压迫感极强但回报丰厚。'
+    bossId: 'abyss_devourer', bossIcon: '👾', bossName: '异次元吞噬者', epithet: '吞星奇点魔神', bossColor: '#7209b7',
+    rewardDesc: '击败必爆：💎26 晶石 + 🎁×1 首领秘宝箱 + 本局永久 +12% 全体伤害赐福！（若觉醒二阶段必爆传说神装）',
+    bossDesc: '裂隙深渊异兽：释放双螺旋奇点弹幕、暗物质外环坍缩与异变毒沼，并分裂虚空软泥眷属。'
   }
 ];
 

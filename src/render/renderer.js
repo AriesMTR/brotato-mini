@@ -272,19 +272,43 @@ function draw() {
       ctx.restore();
     }
 
-    // 地面高危红圈/元素轰炸预警 + 自爆怪引信读秒范围红圈（外框恒定半径 + 内圈蓄满即炸，所有半径严格防负）
+    // 地面高危红圈 / 首领外环风暴（内圈贴身安全风眼） / 元素轰炸预警
     for (let i = 0; i < hazards.length; i++) {
       const h = hazards[i];
       const hr = Math.max(4, h.r || 40);
       const p = Math.max(0, Math.min(1, 1 - (h.t || 0) / Math.max(0.01, h.maxT || 1)));
       const hCol = h.color || '#ff3b6b';
-      ctx.globalAlpha = 0.12 + p * 0.22;
-      ctx.fillStyle = hCol;
-      ctx.beginPath(); ctx.arc(h.x, h.y, Math.max(0.5, hr * p), 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 0.82;
-      ctx.strokeStyle = hCol;
-      ctx.lineWidth = 2.4;
-      ctx.beginPath(); ctx.arc(h.x, h.y, hr, 0, Math.PI * 2); ctx.stroke();
+      if (h.innerSafeR && h.innerSafeR > 8 && hr > h.innerSafeR + 6) {
+        const inR = h.innerSafeR;
+        const curOuter = inR + (hr - inR) * p;
+        const bandW = Math.max(1.5, curOuter - inR);
+        ctx.save();
+        ctx.globalAlpha = 0.16 + p * 0.26;
+        ctx.strokeStyle = hCol;
+        ctx.lineWidth = bandW;
+        ctx.beginPath(); ctx.arc(h.x, h.y, inR + bandW * 0.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 0.88;
+        ctx.lineWidth = 2.6;
+        ctx.beginPath(); ctx.arc(h.x, h.y, hr, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#72efdd';
+        ctx.lineWidth = 2.4;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath(); ctx.arc(h.x, h.y, inR, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.font = '800 12px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#72efdd';
+        ctx.fillText('✨内圈风眼安全', h.x, h.y + inR - 10);
+        ctx.restore();
+      } else {
+        ctx.globalAlpha = 0.12 + p * 0.22;
+        ctx.fillStyle = hCol;
+        ctx.beginPath(); ctx.arc(h.x, h.y, Math.max(0.5, hr * p), 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.82;
+        ctx.strokeStyle = hCol;
+        ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.arc(h.x, h.y, hr, 0, Math.PI * 2); ctx.stroke();
+      }
     }
     ctx.globalAlpha = 1;
     for (let i = 0; i < enemies.length; i++) {
@@ -323,23 +347,31 @@ function draw() {
       }
     }
 
-    // 地面扩散冲击圈与爆破火球（外圈柔和消散 + 炽白内闪）
+    // 地面扩散冲击圈与爆破火球（支持中空环形外环爆裂与实心震波）
     for (let i = 0; i < rings.length; i++) {
       const rg = rings[i];
       const p = Math.max(0, Math.min(1, 1 - rg.t / Math.max(0.01, rg.maxT)));
       const curR = Math.max(1, rg.r * (0.24 + p * 0.76));
-      if (rg.fill && p < 0.65) {
-        ctx.globalAlpha = Math.max(0, (1 - p / 0.65) * 0.36);
-        ctx.fillStyle = rg.color;
-        ctx.beginPath(); ctx.arc(rg.x, rg.y, Math.max(0.5, curR * 0.88), 0, Math.PI * 2); ctx.fill();
-        ctx.globalAlpha = Math.max(0, (1 - p / 0.65) * 0.45);
-        ctx.fillStyle = '#fff3b0';
-        ctx.beginPath(); ctx.arc(rg.x, rg.y, Math.max(0.5, curR * 0.42), 0, Math.PI * 2); ctx.fill();
+      if (rg.innerR && rg.innerR > 4) {
+        const band = Math.max(4, Math.max(rg.innerR + 6, curR) - rg.innerR);
+        ctx.globalAlpha = Math.max(0.02, (1 - p) * 0.55);
+        ctx.strokeStyle = rg.color;
+        ctx.lineWidth = band;
+        ctx.beginPath(); ctx.arc(rg.x, rg.y, rg.innerR + band * 0.5, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        if (rg.fill && p < 0.65) {
+          ctx.globalAlpha = Math.max(0, (1 - p / 0.65) * 0.36);
+          ctx.fillStyle = rg.color;
+          ctx.beginPath(); ctx.arc(rg.x, rg.y, Math.max(0.5, curR * 0.88), 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = Math.max(0, (1 - p / 0.65) * 0.45);
+          ctx.fillStyle = '#fff3b0';
+          ctx.beginPath(); ctx.arc(rg.x, rg.y, Math.max(0.5, curR * 0.42), 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = Math.max(0.02, (1 - p) * 0.9);
+        ctx.strokeStyle = rg.color;
+        ctx.lineWidth = Math.max(1, 6.5 * (1 - p) + 1.8);
+        ctx.beginPath(); ctx.arc(rg.x, rg.y, curR, 0, Math.PI * 2); ctx.stroke();
       }
-      ctx.globalAlpha = Math.max(0.02, (1 - p) * 0.9);
-      ctx.strokeStyle = rg.color;
-      ctx.lineWidth = Math.max(1, 6.5 * (1 - p) + 1.8);
-      ctx.beginPath(); ctx.arc(rg.x, rg.y, curR, 0, Math.PI * 2); ctx.stroke();
     }
     ctx.globalAlpha = 1;
 
@@ -381,15 +413,20 @@ function draw() {
         ctx.fill(); ctx.stroke();
       } else if (d.kind === 'crate') {
         ctx.save(); ctx.translate(d.x, d.y + by);
-        ctx.strokeStyle = 'rgba(255, 209, 102, 0.55)'; ctx.lineWidth = 2;
+        if (d.isMythic) {
+          ctx.strokeStyle = 'rgba(255, 77, 109, 0.85)'; ctx.lineWidth = 2.6;
+          ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.strokeStyle = d.isMythic ? '#ffd166' : 'rgba(255, 209, 102, 0.55)'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = '#7209b7'; ctx.strokeStyle = '#1d1128'; ctx.lineWidth = 2.2;
+        ctx.fillStyle = d.isMythic ? '#d90429' : (d.isBoss ? '#9d4edd' : '#7209b7');
+        ctx.strokeStyle = '#1d1128'; ctx.lineWidth = 2.2;
         ctx.beginPath(); ctx.roundRect(-9.5, -8.5, 19, 17, 4); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#ffd166';
         ctx.fillRect(-9.5, -2, 19, 4);
         ctx.fillRect(-2, -8.5, 4, 17);
         ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, 0, 2.8, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
         ctx.strokeStyle = '#14281d'; ctx.lineWidth = 1.7;
       } else {
@@ -841,6 +878,131 @@ function draw() {
         ctx.fillText('按住屏幕任意位置滑动走位 · 双指缩放', gx, gy + 68);
         ctx.textAlign = 'left';
       }
+    }
+    ctx.restore();
+  }
+
+  // 首领召唤 / 终局降临 / 隐藏二阶段觉醒 全屏时停登场立绘演出（纯矢量无渐变零开销）
+  if (state === 'wave' && typeof bossCutscene !== 'undefined' && bossCutscene && bossCutscene.t > 0) {
+    const bc = bossCutscene;
+    const maxT = Math.max(0.25, bc.maxT || 1.25);
+    const elapsed = maxT - bc.t;
+    const enterP = Math.min(1, elapsed / 0.18);
+    const exitP = Math.min(1, Math.max(0, bc.t / 0.22));
+    const alpha = enterP * exitP;
+    const isMythic = bc.mode === 'mythic_phase2';
+    const mainCol = bc.color || '#ff3b6b';
+    const accCol = bc.accent || '#ffd166';
+    const portraitPortrait = viewW < 620;
+
+    ctx.save();
+    // 1. 全屏戏剧暗化与银白瞬闪
+    ctx.globalAlpha = 0.74 * alpha;
+    ctx.fillStyle = isMythic ? '#14060d' : '#080512';
+    ctx.fillRect(0, 0, viewW, viewH);
+    if (elapsed < 0.09) {
+      ctx.globalAlpha = (1 - elapsed / 0.09) * 0.42;
+      ctx.fillStyle = isMythic ? '#ffd166' : '#ffffff';
+      ctx.fillRect(0, 0, viewW, viewH);
+    }
+
+    // 2. 宽银幕上下黑边封幅
+    const barH = Math.round(Math.min(54, viewH * 0.085) * enterP);
+    ctx.globalAlpha = 0.95 * exitP;
+    ctx.fillStyle = '#05030a';
+    ctx.fillRect(0, 0, viewW, barH);
+    ctx.fillRect(0, viewH - barH, viewW, barH);
+    ctx.fillStyle = accCol;
+    ctx.fillRect(0, barH - 2, viewW, 2);
+    ctx.fillRect(0, viewH - barH, viewW, 2);
+
+    // 3. 斜向贯穿动漫感战幕横幅 + 速度流线
+    const cy = viewH * 0.5;
+    const bandH = portraitPortrait ? 210 : 168;
+    const slant = portraitPortrait ? 22 : 38;
+    ctx.globalAlpha = 0.94 * alpha;
+    ctx.fillStyle = '#120b22';
+    ctx.beginPath();
+    ctx.moveTo(-20, cy - bandH * 0.5 + slant);
+    ctx.lineTo(viewW + 20, cy - bandH * 0.5 - slant);
+    ctx.lineTo(viewW + 20, cy + bandH * 0.5 - slant);
+    ctx.lineTo(-20, cy + bandH * 0.5 + slant);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = mainCol;
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+
+    // 横幅内高速电芒切线
+    ctx.globalAlpha = 0.35 * alpha;
+    ctx.strokeStyle = accCol;
+    ctx.lineWidth = 2;
+    for (let s = 0; s < 5; s++) {
+      const sy = cy - bandH * 0.38 + s * (bandH * 0.19);
+      const sxOff = ((elapsed * 420 + s * 130) % (viewW * 0.8));
+      ctx.beginPath();
+      ctx.moveTo(sxOff, sy);
+      ctx.lineTo(sxOff + 140, sy - (slant / Math.max(1, viewW)) * 140);
+      ctx.stroke();
+    }
+
+    // 4. 精细首领半身立绘与称号排印
+    ctx.globalAlpha = alpha;
+    const slideOffset = (1 - enterP) * 56;
+    if (portraitPortrait) {
+      const pScale = Math.min(0.92, viewW / 440);
+      drawBossPortrait(bc.variant, viewW * 0.5 - slideOffset, cy - 36, pScale, isMythic);
+      ctx.textAlign = 'center';
+      ctx.font = '800 13px -apple-system, sans-serif';
+      ctx.fillStyle = accCol;
+      ctx.fillText(bc.subtitle || '⚠️ 强敌降临', viewW * 0.5, cy + 44, viewW - 32);
+      ctx.font = '900 24px -apple-system, sans-serif';
+      ctx.strokeStyle = '#090512';
+      ctx.lineWidth = 5;
+      ctx.strokeText(bc.title || '首领降临', viewW * 0.5, cy + 72, viewW - 28);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(bc.title || '首领降临', viewW * 0.5, cy + 72, viewW - 28);
+      if (bc.extraTag) {
+        ctx.font = '800 12px -apple-system, sans-serif';
+        ctx.fillStyle = isMythic ? '#ffd166' : '#e0fbfc';
+        ctx.fillText(bc.extraTag, viewW * 0.5, cy + 95, viewW - 28);
+      }
+    } else {
+      const portX = Math.max(150, viewW * 0.30) - slideOffset;
+      const textX = portX + 128 + slideOffset * 1.4;
+      drawBossPortrait(bc.variant, portX, cy, 1.12, isMythic);
+      ctx.textAlign = 'left';
+      ctx.font = '800 15px -apple-system, sans-serif';
+      ctx.fillStyle = accCol;
+      ctx.fillText(bc.subtitle || '⚠️ 强敌降临', textX, cy - 30, Math.max(180, viewW - textX - 36));
+      ctx.font = '900 34px -apple-system, sans-serif';
+      ctx.strokeStyle = '#090512';
+      ctx.lineWidth = 6;
+      ctx.strokeText(bc.title || '首领降临', textX, cy + 10, Math.max(180, viewW - textX - 36));
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(bc.title || '首领降临', textX, cy + 10, Math.max(180, viewW - textX - 36));
+      if (bc.extraTag) {
+        const tagW = Math.min(viewW - textX - 40, Math.max(210, ctx.measureText(bc.extraTag).width * 0.45 + 28));
+        ctx.fillStyle = isMythic ? 'rgba(217, 4, 41, 0.38)' : 'rgba(255, 255, 255, 0.10)';
+        ctx.strokeStyle = accCol;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(textX, cy + 24, tagW, 28, 7);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = '800 13.5px -apple-system, sans-serif';
+        ctx.fillStyle = isMythic ? '#ffd166' : '#f8f5ff';
+        ctx.fillText(bc.extraTag, textX + 12, cy + 43, Math.max(160, viewW - textX - 56));
+      }
+    }
+
+    if (elapsed > 0.35) {
+      ctx.globalAlpha = 0.65 * exitP;
+      ctx.font = '700 12px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText('按 空格 / 点击屏幕 可跳过演出', viewW * 0.5, viewH - barH - 14);
     }
     ctx.restore();
   }
