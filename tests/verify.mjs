@@ -786,7 +786,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   // 11a. Log Header + Entries + Export Filename must include Date & Code Version
   const curVer = vm.runInContext('APP_VERSION', s);
-  assert.strictEqual(curVer, 'v1.3.1', 'APP_VERSION must be v1.3.1');
+  assert.strictEqual(curVer, 'v1.3.2', 'APP_VERSION must be v1.3.2');
   const logTxt = vm.runInContext('getLogText()', s);
   assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
   assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
@@ -1009,7 +1009,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   // 14a. Start Menu Live Version Pill + Interactive Changelog Modal
   s.document.getElementById('codexModal').classList.add('hidden');
   s.document.getElementById('logModal').classList.add('hidden');
-  assert(els.startVersionPill.textContent.includes('v1.3.1'), '#startVersionPill must display live version v1.3.1 on start screen');
+  assert(els.startVersionPill.textContent.includes('v1.3.2'), '#startVersionPill must display live version v1.3.2 on start screen');
   vm.runInContext('openChangelogModal();', s);
   assert.strictEqual(els.changelogModal.classList.contains('hidden'), false, 'openChangelogModal() must unhide #changelogModal');
   assert(els.changelogList.children.length >= 7, 'Changelog modal must render >= 7 historical version cards');
@@ -1327,4 +1327,138 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert(!indexHtml.includes('portraitModal'), 'Main game index.html must stay clean of developer-only portrait modal');
 }
 
-console.log(`ALL 15 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+// 16. v1.3.2 25% Mythic Phase 2 Rate, Fast Monster '格挡' vs Long Hero Notices, Zero-Alloc Caches, Crash Guards & High-Load Perf Benchmark
+{
+  const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
+
+  // 16a. KeyboardEvent with undefined `key` (IME / browser autofill edge case) must NEVER throw
+  s.window.dispatch('keydown', {});
+  s.window.dispatch('keyup', { key: undefined });
+
+  const v132Check = vm.runInContext(`(() => {
+    startGame('ranger');
+    wave = 8; beginWave();
+
+    // 1) Verify Mythic Phase 2 probability is 25% (~0.25 across 600 boss spawns)
+    let phase2Rolls = 0;
+    const totalRolls = 600;
+    for (let i = 0; i < totalRolls; i++) {
+      enemies = [];
+      const b = createEnemy(600, 600, i % 2 === 0 ? 'boss' : 'special_boss', i % 2 === 0 ? 'butcher' : 'crimson_lord');
+      if (b.canPhase2) phase2Rolls++;
+    }
+    const empiricalRate = phase2Rolls / totalRolls;
+
+    // Verify per-wave reset allows subsequent Boss wave to awaken while blocking twin boss in same wave
+    enemies = [];
+    wave = 8; beginWave();
+    const bWave8 = createEnemy(600, 600, 'special_boss', 'crimson_lord');
+    bWave8.canPhase2 = true;
+    hurtEnemy(bWave8, bWave8.maxHp + 99999, true);
+    const wave8Awakened = !!bWave8.mythicPhase2;
+    const bWave8Twin = createEnemy(660, 600, 'special_boss', 'golden_golem');
+    bWave8Twin.canPhase2 = true;
+    hurtEnemy(bWave8Twin, bWave8Twin.maxHp + 99999, true);
+    const sameWaveTwinBlocked = !bWave8Twin.mythicPhase2;
+
+    wave = 12; beginWave(); bossCutscene = null;
+    const bWave12 = createEnemy(600, 600, 'boss', 'frost_queen');
+    bWave12.canPhase2 = true;
+    hurtEnemy(bWave12, bWave12.maxHp + 99999, true);
+    const wave12AwakenedToo = !!bWave12.mythicPhase2;
+    bossCutscene = null;
+
+    // 2) Verify '格挡' & monster prompts vanish quickly without dark pill, while hero notices stay >= 1.5s with pill
+    enemies = []; texts = [];
+    const sh = createEnemy(700, 500, 'shielder');
+    sh.hp = 5000; sh.maxHp = 5000; sh.faceA = 0;
+    for (let k = 0; k < 12; k++) {
+      // knockA = Math.PI hits shielder head-on (cos(pi - 0) = -1 < -0.25)
+      hurtEnemy(sh, 15, false, Math.PI, false, { noProc: true });
+    }
+    const blockTexts = texts.filter(t => t.txt === '格挡');
+    const blockFastAndClean = blockTexts.length === 1 && blockTexts[0].important === false && blockTexts[0].maxT <= 0.45;
+
+    applyFreeze(sh, 1.2);
+    const freezeTxt = texts.find(t => t.txt.includes('冰冻'));
+    const freezeFast = !!(freezeTxt && freezeTxt.important === false && freezeTxt.maxT <= 0.55);
+
+    const bmb = createEnemy(760, 500, 'bomber');
+    primeBomber(bmb);
+    const bombTxt = texts.find(t => t.txt.includes('自爆预警'));
+    const bombFast = !!(bombTxt && bombTxt.important === false && bombTxt.maxT <= 0.75);
+
+    // Major player notices stay long & important
+    addText(player.x, player.y - 36, '🧊 寒冰疾滑 +28%移速!', '#72efdd', 15, 1.8);
+    addText(player.x, player.y - 36, 'LEVEL UP!', '#ffd166', 22, 1.9, true);
+    const iceTxt = texts.find(t => t.txt.includes('寒冰疾滑'));
+    const lvTxt = texts.find(t => t.txt === 'LEVEL UP!');
+    const heroNoticesLong = !!(iceTxt && iceTxt.important === true && iceTxt.maxT >= 1.75 && lvTxt && lvTxt.important === true && lvTxt.maxT >= 1.85);
+
+    // 3) Verify getSetBonuses() zero-allocation object reuse & instant invalidation on weapon change
+    const sbRef1 = getSetBonuses();
+    const sbRef2 = getSetBonuses();
+    const cacheReused = sbRef1 === sbRef2;
+    const prevGuns = sbRef1.counts.gun;
+    player.weapons.push(makeWeapon('smg', 2));
+    const sbRef3 = getSetBonuses();
+    const cacheUpdatedInPlace = sbRef3 === sbRef1 && sbRef3.counts.gun === prevGuns + 1;
+
+    // 4) NaN damage guard & Exhausted-Item-Pool Crate fallback safety
+    const hpBeforeNaN = sh.hp;
+    hurtEnemy(sh, NaN, false, 0, true);
+    const nanSafe = Number.isFinite(sh.hp) && sh.hp === hpBeforeNaN;
+
+    const origFilter = ITEMS.filter;
+    ITEMS.filter = () => [];
+    pendingCrates = 1;
+    showCrateMenu();
+    ITEMS.filter = origFilter;
+
+    // 5) High-density Wave 12 D5 combat stress benchmark (100 enemies + 6 rapid weapons + turrets + mines)
+    selectedDiff = 4; diff = DIFFS[4];
+    startGame('multitasker');
+    player.weapons = [
+      makeWeapon('minigun', 4), makeWeapon('shotgun', 4), makeWeapon('flamethrower', 4),
+      makeWeapon('smg', 4), makeWeapon('katana', 4), makeWeapon('grenade_launcher', 4),
+      makeWeapon('drone_bay', 3), makeWeapon('screwdriver', 3)
+    ];
+    player.maxHp = 99999; player.hp = 99999;
+    wave = 12; beginWave(); bossCutscene = null;
+    for (let m = 0; m < 85; m++) {
+      const ang = (m / 85) * Math.PI * 2;
+      createEnemy(player.x + Math.cos(ang) * (150 + (m % 5) * 45), player.y + Math.sin(ang) * (150 + (m % 5) * 45), m % 6 === 0 ? 'shielder' : (m % 5 === 0 ? 'splitter' : 'chaser'));
+    }
+    const t0 = Date.now();
+    for (let f = 0; f < 180; f++) {
+      update(0.016);
+      if (f % 3 === 0) draw();
+    }
+    const benchMs = Date.now() - t0;
+
+    return {
+      empiricalRate, wave8Awakened, sameWaveTwinBlocked, wave12AwakenedToo,
+      blockFastAndClean, freezeFast, bombFast, heroNoticesLong,
+      cacheReused, cacheUpdatedInPlace, nanSafe, benchMs
+    };
+  })()`, s);
+
+  assert(v132Check.empiricalRate >= 0.19 && v132Check.empiricalRate <= 0.31, `Mythic Phase 2 rate must be ~25% (got ${(v132Check.empiricalRate * 100).toFixed(1)}%)`);
+  assert.strictEqual(v132Check.wave8Awakened, true, 'Wave 8 Special Boss with canPhase2 must awaken Mythic Phase 2');
+  assert.strictEqual(v132Check.sameWaveTwinBlocked, true, 'Twin Boss in the same wave must NOT double-trigger Mythic Phase 2');
+  assert.strictEqual(v132Check.wave12AwakenedToo, true, 'New Boss wave must reset waveMythicAwakened so Wave 12 Boss still gets its 25% Mythic roll');
+  assert.strictEqual(v132Check.blockFastAndClean, true, 'Shielder 格挡 prompt must be non-important, <=0.45s fast-fading, and throttled against multi-pellet spam');
+  assert.strictEqual(v132Check.freezeFast, true, 'Monster 冰冻 prompt must be non-important and fast-fading (<=0.55s)');
+  assert.strictEqual(v132Check.bombFast, true, 'Bomber 自爆预警 prompt must be non-important and crisp (<=0.75s)');
+  assert.strictEqual(v132Check.heroNoticesLong, true, 'Hero terrain & LEVEL UP notices must remain important with pill backdrop and >=1.75s duration');
+  assert.strictEqual(v132Check.cacheReused, true, 'getSetBonuses() must reuse cached object with zero allocation when weapons are unchanged');
+  assert.strictEqual(v132Check.cacheUpdatedInPlace, true, 'getSetBonuses() must auto-detect weapon array mutation and update set counts');
+  assert.strictEqual(v132Check.nanSafe, true, 'hurtEnemy must safely ignore NaN damage without corrupting enemy HP');
+  assert(els.crateBox.children.length >= 1, 'Exhausted item pool in #crateMenu must still render fallback supply card without soft-locking');
+  assert(v132Check.benchMs < 2500, `180 frames of D5 Wave 12 85-mob bullet-hell stress test must run fast (took ${v132Check.benchMs}ms)`);
+  assert.strictEqual(stats.radialGradients, 0, 'v1.3.2 stress benchmark must create ZERO per-frame radial gradients');
+  assert.strictEqual(stats.shadowBlurs, 0, 'v1.3.2 stress benchmark must set ZERO shadowBlur');
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 16 v1.3.2 verification');
+}
+
+console.log(`ALL 16 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);

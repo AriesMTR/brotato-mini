@@ -17,7 +17,8 @@ function initMenuUI() {
     });
   }
   const dd = document.getElementById('diffDesc');
-  if (dd) dd.textContent = DIFFS[selectedDiff].desc;
+  const activeDiff = DIFFS[selectedDiff] || DIFFS[1] || DIFFS[0];
+  if (dd && activeDiff) dd.textContent = activeDiff.desc;
 
   const st = document.getElementById('sceneTabs');
   if (st) {
@@ -65,7 +66,8 @@ initMenuUI();
 
 const keys = {};
 window.addEventListener('keydown', e => {
-  const k = e.key.toLowerCase();
+  const k = (e && typeof e.key === 'string') ? e.key.toLowerCase() : '';
+  if (!k) return;
   if (k === 'escape') {
     const cm = document.getElementById('codexModal');
     if (cm && !cm.classList.contains('hidden')) { if (e.preventDefault) e.preventDefault(); closeCodex(); return; }
@@ -85,7 +87,10 @@ window.addEventListener('keydown', e => {
   }
   keys[k] = true;
 });
-window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+window.addEventListener('keyup', e => {
+  const k = (e && typeof e.key === 'string') ? e.key.toLowerCase() : '';
+  if (k) keys[k] = false;
+});
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; resetJoy(); });
 if (document.addEventListener) {
   document.addEventListener('visibilitychange', () => {
@@ -225,39 +230,88 @@ function makeWeapon(id, tier = 1) {
   return { id, tier, cd: Math.random() * 0.25, thrust: 0, recoil: 0, angle: 0 };
 }
 
-function getRockCount() {
-  if (!player || !player.weapons) return 0;
-  let c = 0;
-  for (let i = 0; i < player.weapons.length; i++) if (player.weapons[i].id === 'rock') c++;
-  return c;
+const _EMPTY_SET_BONUSES = {
+  counts: { primitive: 0, precise: 0, gun: 0, heavy: 0, elemental: 0, tech: 0 },
+  hp: 0, crit: 0, range: 0, aspd: 0, armor: 0, blast: 0, elem: 0, tech: 0,
+  rocks: 0, sticks: 0, meleeCnt: 0, screwdrivers: 0, maxMineTier: 1
+};
+const _PRIM_STEPS = [2, 4, 6], _PREC_STEPS = [2, 3, 5], _GUN_STEPS = [2, 4, 6];
+const _HVY_STEPS = [2, 3, 5], _ELEM_STEPS = [2, 3, 5], _TECH_STEPS = [2, 3, 5];
+const _HP_TIERS = [0, 6, 14, 24], _CRIT_TIERS = [0, 0.08, 0.16, 0.26], _RNG_TIERS = [0, 40, 85, 140];
+const _ASPD_TIERS = [0, 0.06, 0.14, 0.22], _ARM_TIERS = [0, 2, 5, 9], _ELEM_TIERS = [0, 0.15, 0.32, 0.55], _TECH_TIERS = [0, 0.22, 0.48, 0.80];
+
+function _tierOfSet(c, steps) {
+  return c >= steps[2] ? 3 : (c >= steps[1] ? 2 : (c >= steps[0] ? 1 : 0));
 }
 
-// 计算当前武器套装数量与动态属性加成
+// 计算当前武器套装数量与动态属性加成（带零分配槽位签名缓存，单帧数百次查询 0 GC 开销）
 function getSetBonuses() {
-  const counts = { primitive: 0, precise: 0, gun: 0, heavy: 0, elemental: 0, tech: 0 };
-  if (!player) return { counts, hp: 0, crit: 0, range: 0, aspd: 0, armor: 0, blast: 0, elem: 0, tech: 0 };
-  for (const w of player.weapons) {
-    const s = WEAPONS[w.id] && WEAPONS[w.id].set;
-    if (s && counts[s] !== undefined) counts[s]++;
+  if (!player || !Array.isArray(player.weapons)) return _EMPTY_SET_BONUSES;
+  const ws = player.weapons;
+  let cache = player._sbCache;
+  if (cache && cache._len === ws.length) {
+    let match = true;
+    for (let i = 0; i < ws.length; i++) {
+      const w = ws[i];
+      if (!w || cache._ids[i] !== w.id || cache._tiers[i] !== w.tier) { match = false; break; }
+    }
+    if (match) return cache;
   }
-  const tierOf = (c, steps) => c >= steps[2] ? 3 : (c >= steps[1] ? 2 : (c >= steps[0] ? 1 : 0));
-  const tPrim = tierOf(counts.primitive, [2, 4, 6]);
-  const tPrec = tierOf(counts.precise,   [2, 3, 5]);
-  const tGun  = tierOf(counts.gun,       [2, 4, 6]);
-  const tHvy  = tierOf(counts.heavy,     [2, 3, 5]);
-  const tElem = tierOf(counts.elemental, [2, 3, 5]);
-  const tTech = tierOf(counts.tech,      [2, 3, 5]);
-  return {
-    counts,
-    hp:    [0, 6, 14, 24][tPrim],
-    crit:  [0, 0.08, 0.16, 0.26][tPrec],
-    range: [0, 40, 85, 140][tGun],
-    aspd:  [0, 0.06, 0.14, 0.22][tGun],
-    armor: [0, 2, 5, 9][tHvy],
-    blast: tHvy > 0 ? 0.15 : 0,
-    elem:  [0, 0.15, 0.32, 0.55][tElem],
-    tech:  [0, 0.22, 0.48, 0.80][tTech]
-  };
+  if (!cache) {
+    cache = {
+      counts: { primitive: 0, precise: 0, gun: 0, heavy: 0, elemental: 0, tech: 0 },
+      hp: 0, crit: 0, range: 0, aspd: 0, armor: 0, blast: 0, elem: 0, tech: 0,
+      rocks: 0, sticks: 0, meleeCnt: 0, screwdrivers: 0, maxMineTier: 1,
+      _len: 0, _ids: [], _tiers: []
+    };
+    player._sbCache = cache;
+  }
+  const counts = cache.counts;
+  counts.primitive = 0; counts.precise = 0; counts.gun = 0; counts.heavy = 0; counts.elemental = 0; counts.tech = 0;
+  let rocks = 0, sticks = 0, meleeCnt = 0, screwdrivers = 0, maxMineTier = 1;
+  cache._len = ws.length;
+  cache._ids.length = ws.length;
+  cache._tiers.length = ws.length;
+  for (let i = 0; i < ws.length; i++) {
+    const w = ws[i];
+    if (!w) { cache._ids[i] = ''; cache._tiers[i] = 0; continue; }
+    cache._ids[i] = w.id;
+    cache._tiers[i] = w.tier;
+    const tpl = WEAPONS[w.id];
+    if (!tpl) continue;
+    if (tpl.set && counts[tpl.set] !== undefined) counts[tpl.set]++;
+    if (tpl.melee) meleeCnt++;
+    if (w.id === 'rock') rocks++;
+    else if (w.id === 'stick') sticks++;
+    else if (w.id === 'screwdriver') {
+      screwdrivers++;
+      if (w.tier > maxMineTier) maxMineTier = w.tier;
+    }
+  }
+  const tPrim = _tierOfSet(counts.primitive, _PRIM_STEPS);
+  const tPrec = _tierOfSet(counts.precise,   _PREC_STEPS);
+  const tGun  = _tierOfSet(counts.gun,       _GUN_STEPS);
+  const tHvy  = _tierOfSet(counts.heavy,     _HVY_STEPS);
+  const tElem = _tierOfSet(counts.elemental, _ELEM_STEPS);
+  const tTech = _tierOfSet(counts.tech,      _TECH_STEPS);
+  cache.hp    = _HP_TIERS[tPrim];
+  cache.crit  = _CRIT_TIERS[tPrec];
+  cache.range = _RNG_TIERS[tGun];
+  cache.aspd  = _ASPD_TIERS[tGun];
+  cache.armor = _ARM_TIERS[tHvy];
+  cache.blast = tHvy > 0 ? 0.15 : 0;
+  cache.elem  = _ELEM_TIERS[tElem];
+  cache.tech  = _TECH_TIERS[tTech];
+  cache.rocks = rocks;
+  cache.sticks = sticks;
+  cache.meleeCnt = meleeCnt;
+  cache.screwdrivers = screwdrivers;
+  cache.maxMineTier = maxMineTier;
+  return cache;
+}
+
+function getRockCount() {
+  return getSetBonuses().rocks;
 }
 
 function syncSetHp() {
@@ -276,7 +330,7 @@ let waveCratesDropped = 0;
 
 function startGame(cls) {
   beep(520, 0.08, 'triangle');
-  diff = DIFFS[selectedDiff];
+  diff = DIFFS[selectedDiff] || DIFFS[1] || DIFFS[0];
   inHurtPlayer = false;
   player = {
     cls, x: WORLD.w / 2, y: WORLD.h / 2, r: 21, faceDir: 1, lookA: 0,
@@ -291,7 +345,7 @@ function startGame(cls) {
     meleeBossGuard: 0, meleeSweepBonus: 0, meleeShockwave: false, blastChance: 0, explosionScale: 1, napalmBlast: false, bloodNova: false,
     interest: 0, teslaCount: 0, teslaCd: 1.0, healDropBonus: 0, chillSlowT: 0, inSpore: false,
     invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, mythicCratesQueued: 0, recentCrateIds: [],
-    rarePortraitShown: false, mythicAwakenedCount: 0,
+    rarePortraitShown: false, mythicAwakenedCount: 0, waveMythicAwakened: false,
     lavaExposure: 0, lavaTick: 0, terrainHintT: 0, terrainSpdMul: 1,
     lv: 1, xp: 0, xpNeed: 10, mats: diff.matBonus, kills: 0, invuln: 0, walkT: 0, dustT: 0, moving: false,
     weapons: [], items: {}

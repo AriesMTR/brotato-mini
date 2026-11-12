@@ -676,13 +676,23 @@ const cv = document.createElement('canvas'); let ctx = cv.getContext('2d');
 let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.08, userZoomed = false;
 let isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let bootReady = false;
-const APP_VERSION = 'v1.3.1';
+const APP_VERSION = 'v1.3.2';
 const APP_BUILD_DATE = '2026-11-12';
 
 // 游戏内置版本更新日志数据（供开局主界面「📜 更新日志」弹窗展示）
 const CHANGELOG_HISTORY = [
   {
-    ver: 'v1.3.1', date: '2026-11-12', tag: '当前版本 · 首领立绘稀有化',
+    ver: 'v1.3.2', date: '2026-11-12', tag: '当前版本 · 性能深优与提示调优',
+    title: '⚡ 隐藏二阶段觉醒上调至 25%、怪物体感轻提示快隐与底层性能/防崩深度加固',
+    items: [
+      '⚡ 隐藏神话二阶段概率上调至 25%：首领与奇遇首领初死时触发【隐藏神话二阶段】的概率提升至 25%（每波独立判定，同波双王防连环叠加），触发必播神话立绘特写、延长 +60 秒并掉落传说秘宝舱。',
+      '💬 角色与怪物头顶提示双轨分级：保留角色关键状态/奇遇/地形/升级提示的充裕阅读时长（1.5~2.8s），同时大幅缩短怪物「格挡」（0.38s+防刷屏节流）、「冰冻」、「自爆预警」与高频微回血飘字时长，告别遮挡视野。',
+      '🚀 60FPS 深度性能优化：新增武器羁绊/属性零分配缓存、子弹命中集合惰性分配、怪物数组原地紧缩、距离平方预筛、飘字/横幅文本宽度缓存与离屏视锥剔除，高密虫潮波帧耗时大幅下降。',
+      '🛡️ 全链路防崩溃加固：修复输入法/特殊按键 key 未定义潜在报错、深无尽全道具满配开箱空池兜底、非有限数值防不死怪保护及 WebAudio 并发语音池回收。'
+    ]
+  },
+  {
+    ver: 'v1.3.1', date: '2026-11-12', tag: '首领立绘稀有化',
     title: '✨ 首领全屏登场立绘调整为稀有触发机制（大幅减少打断、提升惊喜感）',
     items: [
       '✨ 首领登场立绘稀有化：取消每次奇遇召唤首领与第 12 波/无尽波主宰现身必播全屏定格立绘的设定，改为 10% 低概率稀有触发「真身显圣」立绘特写，且单局最多触发 1 次登场立绘，保障战斗节奏丝滑连贯。',
@@ -1760,13 +1770,14 @@ function hurtTree(tr, rawDmg) {
     addBurst(tr.x, tr.y - 6, '#5ef29b', 10, 145);
     dropCrystals(tr.x, tr.y, 2 + Math.floor(wave * 0.45));
     const luck = Math.min(90, Math.max(0, (player && player.luck) || 0));
-    const cratesOnMap = drops.filter(d => d.kind === 'crate').length;
+    let cratesOnMap = 0;
+    for (let di = 0; di < drops.length; di++) if (drops[di].kind === 'crate') cratesOnMap++;
     const maxWaveCrates = 1 + (luck >= 60 ? 1 : 0);
     const crateChance = Math.min(0.16, 0.05 + luck * 0.0014);
     if (waveCratesDropped < maxWaveCrates && cratesOnMap < 2 && Math.random() < crateChance) {
       waveCratesDropped++;
       drops.push({ x: tr.x, y: tr.y, kind: 'crate', bob: 0 });
-      addText(tr.x, tr.y - 34, '🎁 战利品箱!', '#ffd166', 16);
+      addText(tr.x, tr.y - 34, '🎁 战利品箱!', '#ffd166', 16, 1.65, true);
     } else if (Math.random() < Math.min(0.80, 0.52 + luck * 0.004)) {
       drops.push({ x: tr.x, y: tr.y, kind: 'heal', bob: 0 });
     }
@@ -1926,6 +1937,7 @@ function beginWave() {
   player.x = WORLD.w / 2; player.y = WORLD.h / 2;
   player.chillSlowT = 0; player.inSpore = false;
   player.lavaExposure = 0; player.lavaTick = 0; player.terrainHintT = 0; player.terrainSpdMul = 1;
+  player.waveMythicAwakened = false;
   cam.x = player.x; cam.y = player.y;
   clampCam();
   player.hp = player.maxHp;
@@ -2151,7 +2163,7 @@ function createEnemy(x, y, type, variant = '') {
   const base = {
     x, y, hitFlash: 0, phase: Math.random() * 6.28, vx: 0, vy: 0, faceA: 0,
     burnT: 0, burnTick: 0, burnDmg: 0, chillT: 0, freezeT: 0,
-    poisonT: 0, poisonTick: 0, poisonStacks: 0, exposeT: 0, elite: false
+    poisonT: 0, poisonTick: 0, poisonStacks: 0, exposeT: 0, _blkTxtCd: 0, elite: false
   };
 
   if (type === 'swarmer') {
@@ -2165,7 +2177,7 @@ function createEnemy(x, y, type, variant = '') {
   }
 
   let ent;
-  const mythicRate = Math.min(0.13, 0.07 + (selectedDiff || 0) * 0.012);
+  const mythicRate = 0.25;
   const bossDefs = getBossDefs();
   const miniBossDefs = getMiniBossDefs();
   const specialRelics = getSpecialRelics();

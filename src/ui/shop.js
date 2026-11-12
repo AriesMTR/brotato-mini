@@ -172,7 +172,8 @@ function buildCrateWeaponChoice(isBossCrate) {
       pickedId = mergeCands[Math.floor(Math.random() * mergeCands.length)];
     } else {
       const owned = player.weapons[Math.floor(Math.random() * player.weapons.length)].id;
-      const sameSet = wKeys.filter(k => WEAPONS[k].set === WEAPONS[owned].set);
+      const ownedTpl = WEAPONS[owned];
+      const sameSet = ownedTpl ? wKeys.filter(k => WEAPONS[k] && WEAPONS[k].set === ownedTpl.set) : [];
       if (sameSet.length) pickedId = sameSet[Math.floor(Math.random() * sameSet.length)];
     }
   }
@@ -269,6 +270,18 @@ function showCrateMenu() {
     }
   }
   if (secondChoice) choices.push(secondChoice);
+  if (!choices.length) {
+    // 极端深无尽全唯一道具拿满时的兜底补给核，彻底杜绝开箱界面无选项卡死
+    const fbSup = (typeof CRATE_SUPPLIES !== 'undefined' && CRATE_SUPPLIES.length > 0)
+      ? CRATE_SUPPLIES[Math.floor(Math.random() * CRATE_SUPPLIES.length)]
+      : { id: 'sup_fallback_core', name: '超载能量晶核', icon: '⚡', tier: 3, cost: 36, desc: '全体伤害永久 +10%，最大生命 +6，并恢复满状态！', apply: p => { p.dmgMul += 0.10; p.maxHp += 6; p.hp = p.maxHp; } };
+    choices.push({
+      kind: 'supply',
+      supply: fbSup,
+      tier: fbSup.tier || 3,
+      recycleVal: Math.max(14, Math.round((fbSup.cost || 32) * getShopScale() * 0.55))
+    });
+  }
 
   const consumeCrate = () => {
     if (isMythicCrate && player.mythicCratesQueued > 0) player.mythicCratesQueued--;
@@ -417,7 +430,8 @@ function rollOffers() {
       let id = validW[Math.floor(Math.random() * validW.length)];
       if (player.weapons.length && Math.random() < 0.28) {
         const owned = player.weapons[Math.floor(Math.random() * player.weapons.length)].id;
-        const sameSet = validW.filter(k => WEAPONS[k].set === WEAPONS[owned].set);
+        const ownedTpl = WEAPONS[owned];
+        const sameSet = ownedTpl ? validW.filter(k => WEAPONS[k] && WEAPONS[k].set === ownedTpl.set) : [];
         if (validW.includes(owned) && Math.random() < 0.5) id = owned;
         else if (sameSet.length) id = sameSet[Math.floor(Math.random() * sameSet.length)];
       }
@@ -455,8 +469,9 @@ function openShop(fresh) {
         const uw = upgradable[Math.floor(Math.random() * upgradable.length)];
         uw.tier++;
         syncSetHp();
-        anvilUpgradedMsg = ` · ⚒️ 神砧免费升阶【${WEAPONS[uw.id].name} Lv${uw.tier}】!`;
-        logInfo('SHOP', `铁匠神砧自动升阶 ${WEAPONS[uw.id].name} -> Lv.${uw.tier}`);
+        const uwName = (WEAPONS[uw.id] && WEAPONS[uw.id].name) || uw.id;
+        anvilUpgradedMsg = ` · ⚒️ 神砧免费升阶【${uwName} Lv${uw.tier}】!`;
+        logInfo('SHOP', `铁匠神砧自动升阶 ${uwName} -> Lv.${uw.tier}`);
       }
     }
     mobDrawerOpen = false;
@@ -538,6 +553,7 @@ function renderShop() {
     el.className = `card t${o.tier}${o.locked ? ' is-locked' : ''}`;
     if (o.kind === 'weapon') {
       const tpl = WEAPONS[o.id];
+      if (!tpl) return;
       const sLabel = SET_DEFS[tpl.set] ? SET_DEFS[tpl.set].label : '';
       const scale = tpl.set === 'elemental' ? getElemMul() : (tpl.techScale ? getTechMul() : 1);
       const aspdBonus = tpl.aspdScale ? Math.max(0, getEffectiveAtkSpd() - 1) * 9 : 0;
@@ -590,7 +606,9 @@ function renderShop() {
         renderShop();
       };
     } else {
-      const it = o.item, ok = player.mats >= o.cost;
+      const it = o.item;
+      if (!it) return;
+      const ok = player.mats >= o.cost;
       const ownedCnt = (player.items && player.items[it.id]) || 0;
       el.innerHTML = `
         <div class="card-main">
@@ -649,6 +667,7 @@ function renderShop() {
     document.getElementById('slotHint').innerHTML = `⚔️ 随身军械库 (<b>${player.weapons.length}</b>/${player.maxSlots}) · 同名同阶点击合成，${sellTipText}`;
     player.weapons.forEach((w, idx) => {
       const tpl = WEAPONS[w.id];
+      if (!tpl) return;
       const hasPair = w.tier < 4 && player.weapons.some((x, j) => j !== idx && x.id === w.id && x.tier === w.tier);
       const tierMul = [0, 1, 1.9, 3.0, 4.4][w.tier];
       const refund = Math.max(4, Math.round(tpl.cost * tierMul * getShopScale() * 0.35));
