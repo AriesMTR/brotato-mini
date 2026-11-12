@@ -42,7 +42,7 @@ const WEAPONS = {
   claws:     { name: '利爪',   icon: '🐾', set: 'precise',   melee: true,  dmg: 9.5,  cd: 0.34, range: 100, cost: 18, critBonus: 0.18, critMult: 2.1, aspdScale: true, mode: 'claw', arcColor: '#f472b6', desc: '三道撕裂爪痕，额外受攻击速度加成基础伤害' },
   katana:    { name: '太刀',   icon: '⚔️', set: 'precise',   melee: true,  dmg: 19,   cd: 0.76, range: 132, cost: 20, critBonus: 0.14, critMult: 2.2, mode: 'crescent', arcColor: '#f8f9fa', desc: '大弧度凌厉居合斩，暴击伤害高达 220%' },
   crossbow:  { name: '十字弩', icon: '🏹', set: 'precise',   melee: false, dmg: 15,   cd: 0.88, range: 400, spd: 750, pierce: 1, rangeScale: 0.045, critBonus: 0.15, cost: 17, desc: '攻击范围越高伤害越高！暴击时箭矢穿透次数额外 +2' },
-  shuriken:  { name: '手里剑', icon: '💠', set: 'precise',   melee: false, dmg: 10.5, cd: 0.50, range: 310, spd: 630, bounce: 2, critBonus: 0.12, isStar: true, cost: 17, desc: '高速旋转飞镖，命中自动弹射 2 次（暴击再+1次）' },
+  shuriken:  { name: '手里剑', icon: '💠', set: 'precise',   melee: false, dmg: 10.5, cd: 0.50, range: 310, spd: 630, bounce: 2, critBonus: 0.12, isStar: true, poisonHit: 0.30, cost: 17, desc: '高速旋转淬毒飞镖，命中自动弹射 2 次（暴击+1次）并概率叠毒' },
   sniper:    { name: '狙击枪', icon: '🔭', set: 'precise',   melee: false, dmg: 38,   cd: 1.44, range: 560, isSniper: true, pierce: 3, rangeScale: 0.035, critBonus: 0.22, critMult: 2.3, cost: 23, desc: '超远程瞬发穿甲弹，享受攻击范围增伤并穿透 3 怪' },
   hammer:    { name: '战锤',   icon: '🔨', set: 'heavy',     melee: true,  dmg: 26,   cd: 1.14, range: 115, cost: 19, knockMult: 2.3, slam: true, mode: 'blunt', arcColor: '#f4a261', desc: '重击震出裂地冲击圈，强力击退成片敌人' },
   wrench:    { name: '扳手',   icon: '🔧', set: 'tech',      melee: true,  dmg: 13,   cd: 0.80, range: 98,  cost: 16, mode: 'blunt', arcColor: '#ffd166', desc: '钝器重击，每把扳手在场上额外部署 1 座炮台' },
@@ -50,7 +50,7 @@ const WEAPONS = {
   smg:       { name: '冲锋枪', icon: '💨', set: 'gun',       melee: false, dmg: 5.6,  cd: 0.17, range: 295, spd: 720, spread: 0.17, cost: 16, desc: '倾泻高密度弹雨，伴随黄铜抛壳与火舌' },
   shotgun:   { name: '霰弹枪', icon: '💥', set: 'gun',       melee: false, dmg: 8.4,  cd: 0.98, range: 260, spd: 640, pellets: 5, spread: 0.35, cost: 18, desc: '一次轰出 5 颗灼热霰弹丸，近身粉碎' },
   minigun:   { name: '加特林', icon: '⚙️', set: 'heavy',     melee: false, dmg: 5.2,  cd: 0.105,range: 340, spd: 760, pierce: 1, spread: 0.20, minTier: 2, cost: 25, desc: '重装六管火神炮，狂暴倾泻穿甲弹幕' },
-  icicle:    { name: '寒冰锥', icon: '🧊', set: 'elemental', melee: false, dmg: 17,   cd: 0.72, range: 360, spd: 700, pierce: 2, critBonus: 0.14, critMult: 2.1, isIce: true, cost: 18, desc: '射出极寒穿透冰锥，100% 冰缓减速敌人并具高额暴伤' },
+  icicle:    { name: '寒冰锥', icon: '🧊', set: 'elemental', melee: false, dmg: 17,   cd: 0.72, range: 360, spd: 700, pierce: 2, critBonus: 0.14, critMult: 2.1, isIce: true, freezeHit: 0.28, cost: 18, desc: '射出极寒穿透冰锥，必冰缓且 28% 概率直接冰冻定身敌人' },
   laser:     { name: '激光枪', icon: '⚡', set: 'elemental', melee: false, dmg: 25,   cd: 1.16, range: 445, pierce: 4, isBeam: true, cost: 22, desc: '瞬发高能电浆光束，无视正面盾牌穿透 4 怪' },
   flamer:    { name: '喷火器', icon: '🔥', set: 'elemental', melee: false, dmg: 4.3,  cd: 0.15, range: 220, spd: 390, pierce: 4, spread: 0.26, isFlame: true, cost: 20, desc: '持续喷吐穿透火流，引燃怪物造成持续灼烧' },
   taser:     { name: '电击枪', icon: '🌩️', set: 'elemental', melee: false, dmg: 14,   cd: 0.80, range: 290, chains: 4, isChain: true, cost: 21, desc: '释放跳跃连锁闪电劈向 4 名敌人，并附带减速' },
@@ -74,9 +74,13 @@ const ITEMS = [
   { id: 'plate',      name: '合金护板',   icon: '🪨', cost: 15, tier: 1, desc: '护甲 +3（减免受击伤害），最大生命 +3',            apply: p => { p.armor += 3; p.maxHp += 3; p.hp += 3; } },
   { id: 'clover',     name: '幸运四叶草', icon: '🍀', cost: 14, tier: 1, maxCount: 5, desc: '幸运 +7（提升高级装/血包/宝箱率），闪避 +2%',  apply: p => { p.luck += 7; p.healDropBonus += 0.018; p.dodge = Math.min(p.dodgeCap, p.dodge + 0.02); } },
   { id: 'boots',      name: '战术军靴',   icon: '🥾', cost: 15, tier: 1, desc: '移动速度 +10%，闪避率 +4%（上限80%）',            apply: p => { p.spdMul += 0.10; p.dodge = Math.min(p.dodgeCap, p.dodge + 0.04); } },
+  { id: 'hawk_eye',   name: '鹰眼瞄准镜', icon: '🦅', cost: 15, tier: 1, maxCount: 4, desc: '暴击伤害 +25%，暴击率 +5%',                       apply: p => { p.critDmg = (p.critDmg || 0) + 0.25; p.crit += 0.05; } },
+  { id: 'venom_gland',name: '剧毒曼陀罗腺',icon: '🧪', cost: 15, tier: 1, maxCount: 4, desc: '攻击 45% 概率叠【剧毒】（持续掉血且每层使怪物易伤+3%）', apply: p => { p.poisonChance = (p.poisonChance || 0) + 0.45; p.elemBonus += 0.08; } },
 
   // --- T2 精良装备 ---
   { id: 'scope',      name: '战术瞄具',   icon: '🎯', cost: 24, tier: 2, desc: '攻击范围 +60，暴击率 +10%，攻速 -4%',            apply: p => { p.rangeBonus += 60; p.crit += 0.10; p.atkSpd -= 0.04; } },
+  { id: 'crit_gauntlet', name: '裂魂暴击拳套', icon: '🥊', cost: 27, tier: 2, maxCount: 3, desc: '暴击伤害 +40%，暴击率 +6%，攻速 -3%',        apply: p => { p.critDmg = (p.critDmg || 0) + 0.40; p.crit += 0.06; p.atkSpd -= 0.03; } },
+  { id: 'brawler_pauldron', name: '破城重肩甲', icon: '🛡️', cost: 26, tier: 2, maxCount: 3, desc: '近战伤害 +16%，护甲 +3；持近战武器贴身抗首领伤 +12%', apply: p => { p.meleeBonus += 0.16; p.armor += 3; p.meleeBossGuard = (p.meleeBossGuard || 0) + 0.12; } },
   { id: 'butterfly',  name: '幻影蝴蝶',   icon: '🦋', cost: 25, tier: 2, desc: '闪避率 +6%，元素伤害 +16%，攻击范围 -20',        apply: p => { p.dodge = Math.min(p.dodgeCap, p.dodge + 0.06); p.elemBonus += 0.16; p.rangeBonus -= 20; } },
   { id: 'snail',      name: '重甲蜗牛',   icon: '🐌', cost: 25, tier: 2, maxCount: 3, desc: '全场敌人移速永久 -6%（最多叠 3 只），自身移速 -2%', apply: p => { p.enemySlow = Math.min(0.18, p.enemySlow + 0.06); p.spdMul = Math.max(0.72, p.spdMul - 0.02); } },
   { id: 'jetpack',    name: '喷气推进包', icon: '🚀', cost: 26, tier: 2, maxCount: 3, desc: '移动速度 +12%，闪避率 +5%（上限80%），护甲 -1', apply: p => { p.spdMul += 0.12; p.dodge = Math.min(p.dodgeCap, p.dodge + 0.05); p.armor -= 1; } },
@@ -102,6 +106,9 @@ const ITEMS = [
   { id: 'blood_chalice', name: '猩红圣餐杯', icon: '🍷', cost: 42, tier: 3, maxCount: 2, desc: '生命窃取 +9%，最大生命 +8，血包治疗量 +2',       apply: p => { p.lifesteal += 0.09; p.maxHp += 8; p.hp += 8; p.healBonus += 2; } },
   { id: 'chrono_watch',  name: '时停怀表',   icon: '⏱️', cost: 43, tier: 3, maxCount: 2, desc: '攻击速度 +14%，移速 +8%，受击无敌时间延长 +30%', apply: p => { p.atkSpd += 0.14; p.spdMul += 0.08; p.invulnBonus = (p.invulnBonus || 0) + 0.30; } },
   { id: 'overclock_core',name: '超频能量核', icon: '🔋', cost: 43, tier: 3, maxCount: 2, desc: '元素与工程伤害 +24%，攻击范围 +45，护甲 -2',     apply: p => { p.elemBonus += 0.24; p.rangeBonus += 45; p.armor -= 2; } },
+  { id: 'frost_prism',   name: '绝对零度棱镜', icon: '💎', cost: 42, tier: 3, maxCount: 2, desc: '攻击 24% 概率【冰冻】定身怪物 1.2s；碎冰暴击伤害额外 +25%', apply: p => { p.freezeChance = (p.freezeChance || 0) + 0.24; p.chillChance += 0.25; p.elemBonus += 0.16; } },
+  { id: 'plague_flask',  name: '瘟疫炼金瓶', icon: '⚗️', cost: 43, tier: 3, maxCount: 2, desc: '攻击必叠【剧毒】（上限升至 12 层），毒杀敌人向四周传染毒火爆发！', apply: p => { p.poisonChance = (p.poisonChance || 0) + 1.0; p.maxPoisonStacks = Math.max(p.maxPoisonStacks || 8, 12); p.plagueSpread = true; p.elemBonus += 0.20; } },
+  { id: 'assassin_crest',name: '暗影处决徽章', icon: '🗡️', cost: 42, tier: 3, maxCount: 2, desc: '暴击伤害 +55%，暴击率 +8%；近战武器暴击时 35% 概率回 1 生命', apply: p => { p.critDmg = (p.critDmg || 0) + 0.55; p.crit += 0.08; p.critMeleeHeal = true; } },
 
   // --- T4 传说装备（严格低爆率且设唯一/上限，杜绝后期重复刷屏与失衡） ---
   { id: 'reactor',        name: '聚变反应堆',   icon: '☀️', cost: 68, tier: 4, maxCount: 2, desc: '【传说】全伤 +24%，攻速 +16%，护盾 +14，再生 +2/s', apply: p => { p.dmgMul += 0.24; p.atkSpd += 0.16; p.maxShield += 14; p.shield += 14; if (!p.noRegen) p.regen += 2; } },
@@ -110,7 +117,8 @@ const ITEMS = [
   { id: 'soul_harvester', name: '噬魂死神镰',   icon: '💀', cost: 72, tier: 4, maxCount: 1, desc: '【传说·唯一】全伤 +28%，暴击 +12%；击杀敌人 18% 概率迸射索敌魂雷', apply: p => { p.dmgMul += 0.28; p.crit += 0.12; p.soulBolt = true; } },
   { id: 'aegis_core',     name: '不朽神盾核',   icon: '💠', cost: 68, tier: 4, maxCount: 1, desc: '【传说·唯一】能量护盾 +22，护甲 +5，护盾破碎回充速度加快 35%', apply: p => { p.maxShield += 22; p.shield += 22; p.armor += 5; p.fastShield = true; } },
   { id: 'hermes_wings',   name: '赫尔墨斯飞翼', icon: '🪽', cost: 68, tier: 4, maxCount: 1, desc: '【传说·唯一】移速 +22%，闪避上限升至 85%（闪避+8%），免疫移速惩罚与冰缓', apply: p => { p.noSlow = true; p.dodgeCap = Math.max(p.dodgeCap, 0.85); p.dodge = Math.min(p.dodgeCap, p.dodge + 0.08); p.spdMul = Math.max(1.0, p.spdMul) + 0.22; } },
-  { id: 'star_crown',     name: '星界帝王冠',   icon: '🌟', cost: 70, tier: 4, maxCount: 1, desc: '【传说·唯一】全伤 +18%，攻击速度 +12%，拾取范围 +100，幸运 +10', apply: p => { p.dmgMul += 0.18; p.atkSpd += 0.12; p.magnet += 100; p.luck += 10; } }
+  { id: 'star_crown',     name: '星界帝王冠',   icon: '🌟', cost: 70, tier: 4, maxCount: 1, desc: '【传说·唯一】全伤 +18%，攻击速度 +12%，拾取范围 +100，幸运 +10', apply: p => { p.dmgMul += 0.18; p.atkSpd += 0.12; p.magnet += 100; p.luck += 10; } },
+  { id: 'doom_edge',      name: '毁灭裁决神石', icon: '☄️', cost: 72, tier: 4, maxCount: 1, desc: '【传说·唯一】暴击伤害 +85%，暴击率 +12%，全体伤害 +18%', apply: p => { p.critDmg = (p.critDmg || 0) + 0.85; p.crit += 0.12; p.dmgMul += 0.18; } }
 ];
 
 // 异星战利品箱专属即时补给核心（丰富开箱池，提供属性原液/急救满血/高纯晶簇等多元收益）
@@ -132,6 +140,8 @@ const UPGRADES = [
   { name: '弱点洞悉', icon: '🎯', desc: '暴击率 +8%',                      apply: p => { p.crit += 0.08; } },
   { name: '暗影闪避', icon: '💨', desc: '闪避率 +5%（上限80%）',           apply: p => { p.dodge = Math.min(p.dodgeCap, p.dodge + 0.05); } },
   { name: '元素过载', icon: '🔥', desc: '元素与爆炸伤害 +18%，暴击 +4%',   apply: p => { p.elemBonus += 0.18; p.crit += 0.04; } },
+  { name: '致命暴伤', icon: '💥', desc: '暴击伤害 +28%，暴击率 +4%',       apply: p => { p.critDmg = (p.critDmg || 0) + 0.28; p.crit += 0.04; } },
+  { name: '冰火毒淬', icon: '🧪', desc: '攻击附带灼烧/冰冻/剧毒率各 +16%', apply: p => { p.burnChance += 0.16; p.freezeChance = (p.freezeChance || 0) + 0.10; p.poisonChance = (p.poisonChance || 0) + 0.20; } },
   { name: '丰收幸运', icon: '🍀', desc: '收获 +8（波末发钻且成长），幸运 +6', apply: p => { p.harvestFlat += 8; p.luck += 6; } },
   { name: '引力晶核', icon: '🧲', desc: '拾取范围 +60，晶石爆率 +10%',     apply: p => { p.magnet += 60; p.harvest += 0.10; } }
 ];

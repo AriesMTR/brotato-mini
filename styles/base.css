@@ -102,6 +102,12 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   width: min(420px, 48vw); margin-top: 5px; background: rgba(18,14,24,0.94);
   padding: 6px 10px; border-radius: 11px; border: 1px solid rgba(239,71,111,0.55);
 }
+.boss-bar-wrap.mythic {
+  border-color: #ffd166;
+  box-shadow: 0 0 18px rgba(255, 209, 102, 0.45);
+}
+.boss-bar-wrap.mythic .boss-name { color: #ffd166; }
+.boss-bar-wrap.mythic .hp-fill { background: linear-gradient(90deg, #ff2a55, #ff9f1c, #ffd166); }
 .boss-name { font-size: 12px; font-weight: 800; color: #ff758f; margin-bottom: 4px; letter-spacing: .8px; }
 
 .hud-right {
@@ -521,3 +527,31 @@ h2 { font-size: 24px; font-weight: 900; color: #f8f5ff; text-shadow: 0 2px 8px r
 .crate-card-wrap.single { max-width: 420px; grid-template-columns: 1fr; }
 .crate-btns { display: flex; gap: 8px; margin-top: 6px; }
 .crate-btns .btn { flex: 1; padding: 9px 10px; font-size: 13.5px; }
+
+/* 版本更新日志弹窗样式 */
+.changelog-box { max-width: 760px; max-height: min(84vh, 720px); }
+.changelog-list {
+  flex: 1; min-height: 180px; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; gap: 10px; padding-right: 4px;
+}
+.cl-card {
+  background: rgba(28, 22, 42, 0.88); border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px; padding: 11px 14px; text-align: left;
+}
+.cl-card.latest {
+  border-color: rgba(255, 209, 102, 0.55);
+  background: linear-gradient(180deg, rgba(48, 34, 68, 0.92), rgba(24, 18, 38, 0.94));
+}
+.cl-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 5px; }
+.cl-ver {
+  font-size: 13px; font-weight: 900; color: #161122; background: #ffd166;
+  padding: 2px 8px; border-radius: 99px;
+}
+.cl-tag {
+  font-size: 11.5px; font-weight: 800; color: #72efdd; background: rgba(114, 239, 221, 0.14);
+  border: 1px solid rgba(114, 239, 221, 0.35); padding: 1.5px 8px; border-radius: 99px;
+}
+.cl-date { font-size: 11.5px; color: #a79ec0; margin-left: auto; }
+.cl-title { font-size: 14px; font-weight: 800; color: #f8f5ff; margin-bottom: 6px; }
+.cl-items { margin: 0; padding-left: 18px; color: #d8d1eb; font-size: 12.5px; line-height: 1.55; }
+.cl-items li { margin-bottom: 3px; }
