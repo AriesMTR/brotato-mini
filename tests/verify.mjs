@@ -786,7 +786,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   // 11a. Log Header + Entries + Export Filename must include Date & Code Version
   const curVer = vm.runInContext('APP_VERSION', s);
-  assert.strictEqual(curVer, 'v1.3.0', 'APP_VERSION must be v1.3.0');
+  assert.strictEqual(curVer, 'v1.3.1', 'APP_VERSION must be v1.3.1');
   const logTxt = vm.runInContext('getLogText()', s);
   assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
   assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
@@ -1009,7 +1009,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   // 14a. Start Menu Live Version Pill + Interactive Changelog Modal
   s.document.getElementById('codexModal').classList.add('hidden');
   s.document.getElementById('logModal').classList.add('hidden');
-  assert(els.startVersionPill.textContent.includes('v1.3.0'), '#startVersionPill must display live version v1.3.0 on start screen');
+  assert(els.startVersionPill.textContent.includes('v1.3.1'), '#startVersionPill must display live version v1.3.1 on start screen');
   vm.runInContext('openChangelogModal();', s);
   assert.strictEqual(els.changelogModal.classList.contains('hidden'), false, 'openChangelogModal() must unhide #changelogModal');
   assert(els.changelogList.children.length >= 7, 'Changelog modal must render >= 7 historical version cards');
@@ -1114,13 +1114,33 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert.strictEqual(meleeFairCheck.hpAfterCloseEye, 200, 'Standing inside Boss Donut inner wind-eye (40px < 96px) must deal ZERO damage to melee player');
   assert(meleeFairCheck.hpAfterOuterBlast < 200, 'Standing in Boss Donut outer blast ring (150px) must hurt distant camper');
 
-  // 14d. Full-Screen Time-Stop Cutscene + All 7 Boss Portraits + Hidden Mythic Phase 2 (+60s & Guaranteed T4 Mythic Drop)
+  // 14d. Rare Full-Screen Time-Stop Cutscene + All 7 Boss Portraits + Hidden Mythic Phase 2 (+60s & Guaranteed T4 Mythic Drop)
   const mythicCheck = vm.runInContext(`(() => {
+    // Verify rarity & per-run cap of Boss entrance portrait cutscenes:
+    // Across 120 runs, each summoning 3 Special Bosses + Wave 12 Final Boss, entrance cutscenes must be rare (<35% of runs) and NEVER >1 in the same run!
+    let runsWithIntro = 0;
+    let maxIntrosInSingleRun = 0;
+    for (let r = 0; r < 120; r++) {
+      startGame('allrounder');
+      let countThisRun = 0;
+      for (let k = 0; k < 3; k++) {
+        bossCutscene = null;
+        const testRel = spawnSpecialRelic('blood_altar');
+        summonSpecialBoss(testRel);
+        if (bossCutscene) countThisRun++;
+      }
+      bossCutscene = null;
+      wave = 12; beginWave();
+      if (bossCutscene) countThisRun++;
+      if (countThisRun > 0) runsWithIntro++;
+      if (countThisRun > maxIntrosInSingleRun) maxIntrosInSingleRun = countThisRun;
+    }
+
     startGame('allrounder');
     wave = 8; beginWave();
     enemies = []; relics = []; drops = []; pendingCrates = 0;
     const rel = spawnSpecialRelic('blood_altar');
-    summonSpecialBoss(rel);
+    summonSpecialBoss(rel, true);
     const summonCutsceneActive = !!(bossCutscene && bossCutscene.mode === 'summon' && bossCutscene.t > 1.0);
     const wtFrozen0 = waveTime;
     update(0.05); // During bossCutscene, waveTime stays frozen while boss spawn ticks!
@@ -1136,7 +1156,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     }
     bossCutscene = null;
 
-    // Trigger Hidden Mythic Phase 2 on Boss lethal hit!
+    // Trigger Hidden Mythic Phase 2 on Boss lethal hit (and verify max 1 Mythic Phase 2 per run)!
     enemies = []; drops = [];
     const b = createEnemy(650, 650, 'boss', 'frost_queen');
     b.canPhase2 = true;
@@ -1145,6 +1165,12 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     const awakened = !!b.mythicPhase2 && b.hp > 0 && waveTime >= 75 && !!(bossCutscene && bossCutscene.mode === 'mythic_phase2');
     draw(); // Render Mythic cutscene + Mythic Boss sprite!
     bossCutscene = null;
+
+    // Second Boss in the same run must NOT awaken a second Mythic Phase 2
+    const bTwin = createEnemy(700, 650, 'boss', 'butcher');
+    bTwin.canPhase2 = true;
+    hurtEnemy(bTwin, bTwin.maxHp + 99999, true);
+    const secondMythicBlocked = !bTwin.mythicPhase2;
 
     // Let Boss execute Terrain Alteration & Minion Summon during Phase 2
     terrains = [];
@@ -1163,12 +1189,15 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     for (const d of drops) { d.x = player.x; d.y = player.y; }
     update(0.05);
     showCrateMenu();
-    return { summonCutsceneActive, timerStayedFrozen, awakened, alteredTerrain, droppedMythic, gotTrophyBuff };
+    return { runsWithIntro, maxIntrosInSingleRun, summonCutsceneActive, timerStayedFrozen, awakened, secondMythicBlocked, alteredTerrain, droppedMythic, gotTrophyBuff };
   })()`, s);
 
-  assert.strictEqual(mythicCheck.summonCutsceneActive, true, 'Summoning Special Boss must trigger full-screen time-stop cutscene');
+  assert(mythicCheck.maxIntrosInSingleRun <= 1, `At most 1 Boss entrance portrait cutscene may trigger per run (got ${mythicCheck.maxIntrosInSingleRun})`);
+  assert(mythicCheck.runsWithIntro > 0 && mythicCheck.runsWithIntro < 68, `Boss entrance portrait cutscenes must remain rare across runs, not every boss spawn (got ${mythicCheck.runsWithIntro}/120 across 4 bosses/run)`);
+  assert.strictEqual(mythicCheck.summonCutsceneActive, true, 'Rare/forced Special Boss summon must trigger full-screen time-stop cutscene');
   assert.strictEqual(mythicCheck.timerStayedFrozen, true, 'waveTime must pause during Boss entrance cutscene');
   assert.strictEqual(mythicCheck.awakened, true, 'Boss with canPhase2 must awaken Mythic Phase 2 on lethal hit, restoring HP, adding +60s, and playing hidden cutscene');
+  assert.strictEqual(mythicCheck.secondMythicBlocked, true, 'At most 1 Mythic Phase 2 awakening may occur per run');
   assert.strictEqual(mythicCheck.alteredTerrain, true, 'Boss must actively alter battlefield terrain during combat');
   assert.strictEqual(mythicCheck.droppedMythic, true, 'Defeating Mythic Phase 2 Boss must drop a Mythic Legendary Crate');
   assert.strictEqual(mythicCheck.gotTrophyBuff, true, 'Defeating Mythic Phase 2 Boss must grant permanent +15% dmg & +25% critDmg trophy');

@@ -15,13 +15,21 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: fal
 let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.08, userZoomed = false;
 let isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let bootReady = false;
-const APP_VERSION = 'v1.3.0';
+const APP_VERSION = 'v1.3.1';
 const APP_BUILD_DATE = '2026-11-12';
 
 // 游戏内置版本更新日志数据（供开局主界面「📜 更新日志」弹窗展示）
 const CHANGELOG_HISTORY = [
   {
-    ver: 'v1.3.0', date: '2026-11-12', tag: '当前版本 · 异形地形与全流派军械',
+    ver: 'v1.3.1', date: '2026-11-12', tag: '当前版本 · 首领立绘稀有化',
+    title: '✨ 首领全屏登场立绘调整为稀有触发机制（大幅减少打断、提升惊喜感）',
+    items: [
+      '✨ 首领登场立绘稀有化：取消每次奇遇召唤首领与第 12 波/无尽波主宰现身必播全屏定格立绘的设定，改为 10% 低概率稀有触发「真身显圣」立绘特写，且单局最多触发 1 次登场立绘，保障战斗节奏丝滑连贯。',
+      '⚡ 隐藏神话二阶段稀有度收紧：首领初死逆天觉醒【隐藏神话二阶段】的概率收紧至 7%~13% 且单局最多觉醒 1 次，触发时必定播放真红神话觉醒立绘动画并延长 +60 秒。'
+    ]
+  },
+  {
+    ver: 'v1.3.0', date: '2026-11-12', tag: '异形地形与全流派军械',
     title: '🗺️ 一图一异形地形重塑、32武器/68道具全流派均衡扩充与第5波异常修复',
     items: [
       '🗺️ 一图一专属异形地形：精简每张地图仅保留 1 处标志性生态地形，彻底告别规则圆形，重绘多瓣玄武熔岩火口、曲岸蘑菇毒泥沼、多棱碎晶寒霜冰镜、锯齿折线大裂谷与双生菱晶虚空裂隙门。',

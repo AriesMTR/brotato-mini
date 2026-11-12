@@ -411,7 +411,21 @@ function spawnSpecialRelic(forceId = null) {
   return rel;
 }
 
-// 全屏首领登场 / 隐藏二阶段觉醒切入特写触发器（短暂静止普通怪与倒计时，聚焦展现首领专属立绘）
+// 全屏首领登场 / 隐藏二阶段觉醒切入特写触发器（低频稀有展现，保障每次出现都有惊喜感与稀有仪式感）
+const RARE_PORTRAIT_RATE = 0.10;
+function shouldRollRareBossPortrait(forceCutscene = false) {
+  if (forceCutscene) {
+    if (player) player.rarePortraitShown = true;
+    return true;
+  }
+  if (!player || player.rarePortraitShown) return false;
+  if (Math.random() < RARE_PORTRAIT_RATE) {
+    player.rarePortraitShown = true;
+    return true;
+  }
+  return false;
+}
+
 function startBossCutscene(mode, variant, title, subtitle, extraTag = '', color = '#ff4d6d', accent = '#ffd166', dur = 1.18, extra = null) {
   bossCutscene = Object.assign({ t: dur, maxT: dur, mode, variant, title, subtitle, extraTag, color, accent }, extra || {});
   if (player) player.invuln = Math.max(player.invuln || 0, dur + 0.35);
@@ -451,7 +465,7 @@ function spawnBossTerrain(kind, x, y, baseR = 68) {
   }
 }
 
-function summonSpecialBoss(rel) {
+function summonSpecialBoss(rel, forceCutscene = false) {
   if (!rel || !rel.def) return;
   const def = rel.def;
   beep(185, 0.26, 'sawtooth', 0.085);
@@ -465,20 +479,24 @@ function summonSpecialBoss(rel) {
   const bw = document.getElementById('bossBarWrap');
   if (bw) { bw.classList.remove('hidden', 'mythic'); }
   if (player) {
+    player.invuln = Math.max(player.invuln || 0, 0.75);
     addText(player.x, player.y - 54, `${def.bossIcon} 特殊首领【${def.bossName}】降临！`, '#ffd166', 20, 2.6);
   }
-  startBossCutscene(
-    'summon',
-    def.bossId,
-    def.bossName,
-    `${def.icon} ${def.name}解封 · ${def.epithet || '奇遇首领降临'}`,
-    '⏱️ 战斗延长 +25s · 近身可躲外环大招 · 击败必掉首领秘宝箱！',
-    def.bossColor,
-    def.color,
-    1.18
-  );
+  const showRarePortrait = shouldRollRareBossPortrait(forceCutscene);
+  if (showRarePortrait) {
+    startBossCutscene(
+      'summon',
+      def.bossId,
+      def.bossName,
+      `✨ 稀有真身显圣 · ${def.icon}${def.name}解封`,
+      '⏱️ 战斗延长 +25s · 近身可躲外环大招 · 击败必掉首领秘宝箱！',
+      def.bossColor,
+      def.color,
+      1.18
+    );
+  }
   announce(`${def.bossIcon} 特殊首领【${def.bossName}】已唤醒！本波时间延长 +25s`, '#ffd166', 4.0);
-  logInfo('SPECIAL_BOSS', `召唤特殊首领 ${def.bossName}(${def.bossId}) · 延长回合至 ${Math.ceil(waveTime)}s`);
+  logInfo('SPECIAL_BOSS', `召唤特殊首领 ${def.bossName}(${def.bossId}) · 立绘特写=${showRarePortrait} · 延长回合至 ${Math.ceil(waveTime)}s`);
 }
 
 function beginWave() {
@@ -581,16 +599,21 @@ function beginWave() {
     const v1 = pickBossVariant();
     lastBossVariant = v1;
     const b1 = bossDefs[v1] || FALLBACK_BOSS_DEFS.butcher;
+    const showRarePortrait = !endlessMode && shouldRollRareBossPortrait(false);
     if (diff.doubleBoss || (endlessMode && wave >= 18)) {
       const v2 = pickBossVariant(v1);
-      const b2 = bossDefs[v2] || FALLBACK_BOSS_DEFS.queen;
+      const b2 = bossDefs[v2] || FALLBACK_BOSS_DEFS.frost_queen;
       spawnWarning(WORLD.w / 2 - bossSpread, bossY, 'boss', v1);
       spawnWarning(WORLD.w / 2 + bossSpread, bossY, 'boss', v2);
-      startBossCutscene('final_boss', v1, `${b1.name} & ${b2.name}`, '👑 终局双王同台降临！', '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
+      if (showRarePortrait) {
+        startBossCutscene('final_boss', v1, `${b1.name} & ${b2.name}`, '✨ 稀有异象 · 终局双王真身显圣！', '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
+      }
       announce(`👑 终局双王降临：${b1.name} & ${b2.name}！`, '#ff4d6d', 4.2);
     } else {
       spawnWarning(WORLD.w / 2, bossY, 'boss', v1);
-      startBossCutscene('final_boss', v1, b1.name, `👑 终局主宰降临 · ${b1.epithet || '深渊霸主'}`, '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
+      if (showRarePortrait) {
+        startBossCutscene('final_boss', v1, b1.name, `✨ 稀有异象 · ${b1.epithet || '终局主宰真身显圣'}`, '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
+      }
       announce(`👑 终局主宰【${b1.icon}${b1.name}】降临！`, '#ff4d6d', 4.2);
     }
   } else if (isEliteWave) {
@@ -741,7 +764,7 @@ function createEnemy(x, y, type, variant = '') {
   }
 
   let ent;
-  const mythicRate = Math.min(0.24, 0.14 + (selectedDiff || 0) * 0.016);
+  const mythicRate = Math.min(0.13, 0.07 + (selectedDiff || 0) * 0.012);
   const bossDefs = getBossDefs();
   const miniBossDefs = getMiniBossDefs();
   const specialRelics = getSpecialRelics();
