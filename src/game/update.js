@@ -166,39 +166,23 @@ function update(dt) {
     }
   }
 
-  // 多样化异星虫潮按波次与难度递进刷出（随波数与难度显著增加怪物密度与物种丰富度）
+  // 多样化异星虫潮按波次与难度平滑递进刷出（下调前 1~4 波初期怪量压力，并由 pickWaveEnemyType 严格控制远程怪占比）
   spawnAcc -= dt;
-  const hordeBoost = hordeWave ? 1.20 : 1;
-  const maxActiveEnemies = isTouch ? Math.min(92, 52 + wave * 4) : Math.min(120, 68 + wave * 5);
+  const hordeBoost = hordeWave ? (wave <= 4 ? 1.12 : 1.18) : 1;
+  const maxActiveEnemies = isTouch ? Math.min(86, 26 + wave * 5) : Math.min(112, 32 + wave * 6);
   if (!overtime && spawnAcc <= 0 && waveTime > 1.5 && enemies.length < maxActiveEnemies) {
-    const count = Math.max(2, Math.round((1.75 + wave * 0.52 + Math.pow(Math.max(0, wave - 3), 1.25) * 0.18) * diff.spawnMul * hordeBoost));
+    const baseCount = 1.10 + wave * 0.38 + Math.pow(Math.max(0, wave - 4), 1.25) * 0.18;
+    const count = Math.max(1, Math.round(baseCount * diff.spawnMul * hordeBoost));
     const early = selectedDiff >= 3 ? 1 : 0;
     for (let i = 0; i < count; i++) {
       const ang = Math.random() * Math.PI * 2;
-      const dist = 250 + Math.random() * 340;
+      const dist = 255 + Math.random() * 340;
       const x = Math.max(60, Math.min(WORLD.w - 60, player.x + Math.cos(ang) * dist));
       const y = Math.max(60, Math.min(WORLD.h - 60, player.y + Math.sin(ang) * dist));
-      const wv = wave + early;
-      let type = 'chaser', r = Math.random();
-      if (sceneMobEnabled && curScene.exclMob && Math.random() < 0.18) {
-        type = curScene.exclMob;
-      } else if (wv >= 6 && r < 0.05) type = 'juggernaut';
-      else if (wv >= 6 && r < 0.11) type = 'healer';
-      else if (wv >= 5 && r < 0.17) type = 'summoner';
-      else if (wv >= 5 && r < 0.25) type = 'brute';
-      else if (wv >= 4 && r < 0.32) type = 'mortar';
-      else if (wv >= 4 && r < 0.40) type = 'shielder';
-      else if (wv >= 4 && r < 0.48) type = 'spinner';
-      else if (wv >= 4 && r < 0.56) type = 'splitter';
-      else if (wv >= 3 && r < 0.63) type = 'sniper_bug';
-      else if (wv >= 3 && r < 0.70) type = 'bomber';
-      else if (wv >= 3 && r < 0.78) type = 'charger';
-      else if (wv >= 2 && r < 0.85) type = 'shooter';
-      else if (wv >= 2 && r < 0.91) type = 'stalker';
-      else if ((wv >= 2 && r < 0.97) || (wave === 1 && waveTime < 11 && r < 0.28)) type = 'swarmer';
+      const type = pickWaveEnemyType(wave + early);
       spawnWarning(x, y, type);
     }
-    spawnAcc = Math.max(0.44, (1.42 - wave * 0.065) / Math.pow(diff.spawnMul * hordeBoost, 0.55));
+    spawnAcc = Math.max(0.48, (1.68 - wave * 0.072) / Math.pow(diff.spawnMul * hordeBoost, 0.52));
   }
 
   // 地面红圈/元素预警轰炸倒计时引爆
@@ -1126,8 +1110,8 @@ function update(dt) {
         const xpScale = wave === 1 ? 0.68 : 0.52;
         const rawXp = v * xpScale * player.harvest;
         const xpGain = Math.floor(rawXp) + (Math.random() < (rawXp % 1) ? 1 : 0);
-        // 适度收敛前期晶石产出并对齐怪量增长与商店通胀曲线，每波购物更有抉择感
-        const matRate = 0.82 / (1 + Math.max(0, wave - 1) * 0.19);
+        // 适度保证前期清怪晶石购买力，并对齐中后期怪量增长与商店通胀曲线
+        const matRate = 0.94 / (1 + Math.max(0, wave - 1) * 0.19);
         const rawMat = v * player.harvest * matRate;
         const matGain = Math.floor(rawMat) + (Math.random() < (rawMat % 1) ? 1 : 0);
         player.mats += matGain; player.xp += xpGain;
