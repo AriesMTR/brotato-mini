@@ -15,13 +15,22 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: fal
 let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.08, userZoomed = false;
 let isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let bootReady = false;
-const APP_VERSION = 'v1.3.3';
+const APP_VERSION = 'v1.3.4';
 const APP_BUILD_DATE = '2026-11-12';
 
 // 游戏内置版本更新日志数据（供开局主界面「📜 更新日志」弹窗展示）
 const CHANGELOG_HISTORY = [
   {
-    ver: 'v1.3.3', date: '2026-11-12', tag: '当前版本 · 首领立绘按种解锁 & 战败重开本波',
+    ver: 'v1.3.4', date: '2026-11-12', tag: '当前版本 · 10首领双形态夏装&隐藏换装立绘',
+    title: '👑 10 位首领专属二次元夏装立绘 + 隐藏二阶段专属性感换装立绘全面实装',
+    items: [
+      '🏖️ 10 位首领专属一阶段夏装半身立绘：为 4 大终局魔王、3 大奇遇霸主与 3 大精英统领逐一绘制了与剧情女主同画风的高清二次元美少女夏装立绘，33% 登场特写（每种首领单局上限 1 次）实时展示。',
+      '🔥 隐藏二阶段专属换装立绘（共 20 套立绘）：当触发 25%【隐藏神话二阶段】觉醒时，首领立绘立即切换为更加惊艳迷人的二阶段限定泳装/轻纱换装立绘，并叠加六翼金红神辉与专属换装铭牌！',
+      '🎨 开发者立绘检视台同步升级：新增「✨ 一阶 vs 二阶换装同框对比」与「🔥 二阶换装演出」一键预览。'
+    ]
+  },
+  {
+    ver: 'v1.3.3', date: '2026-11-12', tag: '首领立绘按种解锁 & 战败重开本波',
     title: '🎬 首领登场立绘上调至 33%（按每种首领上限 1 次）与战败重开本回合机制',
     items: [
       '🎬 常规与奇遇首领立绘上调至 33%：第 5/9 波精英统领、第 12 波与无尽终局主宰以及奇遇召唤首领登场立绘触发率统一调整为 33%。',

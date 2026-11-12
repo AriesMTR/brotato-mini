@@ -17,6 +17,7 @@ const scenesCode = readSrc('src/data/scenes.js');
 const texturesCode = readSrc('src/world/textures.js');
 const arsenalCode = readSrc('src/data/arsenal.js');
 const monstersCode = readSrc('src/data/monsters.js');
+const bossPortraitsCode = readSrc('src/data/boss_portraits.js');
 
 // Extract terrain geometry + portal generator from spawner.js (up to spawnArenaTerrains end)
 const spawnerFull = readSrc('src/game/spawner.js');
@@ -490,9 +491,12 @@ function buildHtml(preferredAnimeBase) {
       <div class="grid-4" id="ovHeroineGrid"></div>
 
       <div class="section-head">
-        <h2>👑 10 位终局魔王 / 奇遇召唤霸主 / 精英统领 · 半身立绘与战场状态墙</h2>
+        <h2>👑 10 位终局魔王 / 奇遇召唤霸主 / 精英统领 · 一阶夏装 &amp; 二阶段隐藏换装立绘墙</h2>
         <div class="pill-bar" id="ovBossBar">
-          <span class="pill mythic" data-bflag="mythic">🔥 真红二阶段觉醒</span>
+          <span class="pill on" data-bview="bust_only">🏖️ 半身立绘大图</span>
+          <span class="pill" data-bview="compare">✨ 一阶 vs 二阶换装同框对比</span>
+          <span class="pill" data-bview="dual">⚔️ 立绘 + 战场实体同屏</span>
+          <span class="pill mythic" data-bflag="mythic">🔥 切换二阶段隐藏换装</span>
           <span class="pill" data-bflag="expose">🎯 破绽暴露金圈</span>
           <span class="pill" data-bflag="burn">🔥 灼烧火舌</span>
           <span class="pill" data-bflag="freeze">🧊 六角玄冰禁锢</span>
@@ -596,10 +600,10 @@ function buildHtml(preferredAnimeBase) {
           <div class="dual-canvas-wrap">
             <div class="canvas-card">
               <div class="card-title" style="width:100%">
-                <span id="bossPortraitTitle">👑 半身立绘特写 (drawBossPortrait)</span>
+                <span id="bossPortraitTitle">👑 夏装半身立绘特写 (drawBossPortrait)</span>
                 <span class="tag" id="bossCategoryTag">终局魔王</span>
               </div>
-              <canvas id="studioBossPortraitCanvas" width="520" height="400"></canvas>
+              <canvas id="studioBossPortraitCanvas" width="520" height="460"></canvas>
             </div>
             <div class="canvas-card">
               <div class="card-title" style="width:100%">
@@ -705,6 +709,8 @@ ${texturesCode}
 ${arsenalCode}
 
 ${monstersCode}
+
+${bossPortraitsCode}
 
 ${spawnerGeoCode}
 
@@ -1022,7 +1028,8 @@ ${rendererTerrainCode}
       syncOverviewHeroines();
     });
 
-    // Overview Boss Cards
+    // Overview Boss Cards (10 Anime Summer Bust Portraits + optional dual battle entity)
+    let ovBossViewMode = 'bust_only';
     const ovBossFlags = { mythic: false, expose: false, burn: false, freeze: false, poison: false, flash: false };
     const ovBossCanvases = [];
 
@@ -1031,11 +1038,15 @@ ${rendererTerrainCode}
       grid.innerHTML = '';
       ovBossCanvases.length = 0;
       ALL_BOSS_ENTRIES.forEach((b, idx) => {
+        const spec = (typeof BOSS_PORTRAIT_DATA !== 'undefined' && BOSS_PORTRAIT_DATA[b.variant]) || null;
+        const shortName = spec ? spec.personaName.split(' · ')[0] : b.name;
+        const p1Label = spec ? (shortName + ' · ' + spec.summerTitle) : b.epithet;
         const card = document.createElement('div');
         card.className = 'card';
         card.innerHTML = \`
-          <div class="card-stage" style="padding:6px">
-            <canvas width="300" height="200" style="width:100%;height:auto;display:block;"></canvas>
+          <div class="card-stage" style="padding:4px">
+            <canvas width="420" height="360" style="width:100%;height:auto;display:block;"></canvas>
+            <div class="vn-caption-overlay"><b data-role="bpersona">\${p1Label}</b><span data-role="bphase">33% 一阶登场立绘</span></div>
           </div>
           <div class="card-body">
             <div class="card-title">
@@ -1044,27 +1055,44 @@ ${rendererTerrainCode}
             </div>
             <div class="card-sub">\${b.epithet}</div>
             <div class="mini-actions">
-              <button class="mini-btn" data-jump-boss="\${idx}">🔍 调状态</button>
-              <button class="mini-btn" data-cutscene-boss="\${idx}">🎬 登场演出</button>
+              <button class="mini-btn" data-cutscene-boss="\${idx}">🎬 一阶登场</button>
+              <button class="mini-btn" data-mythic-boss="\${idx}" style="border-color:#ff4d6d;color:#ffd166;">🔥 二阶换装</button>
+              <button class="mini-btn" data-jump-boss="\${idx}">🔍 检视台</button>
             </div>
           </div>
         \`;
         grid.appendChild(card);
-        ovBossCanvases.push({ def: b, canvas: card.querySelector('canvas') });
+        ovBossCanvases.push({
+          def: b,
+          spec,
+          canvas: card.querySelector('canvas'),
+          personaEl: card.querySelector('[data-role="bpersona"]'),
+          phaseEl: card.querySelector('[data-role="bphase"]'),
+          idx
+        });
         card.querySelector('[data-jump-boss]').onclick = () => {
           selectedBossIdx = idx;
           document.querySelector('[data-tab="bosses"]').click();
           syncBossRosterUI();
         };
         card.querySelector('[data-cutscene-boss]').onclick = () => {
-          triggerFullscreenCutscene(b, ovBossFlags.mythic);
+          triggerFullscreenCutscene(b, false);
+        };
+        card.querySelector('[data-mythic-boss]').onclick = () => {
+          triggerFullscreenCutscene(b, true);
         };
       });
     }
 
     document.getElementById('ovBossBar').addEventListener('click', e => {
       const pill = e.target.closest('.pill');
-      if (!pill || !pill.dataset.bflag) return;
+      if (!pill) return;
+      if (pill.dataset.bview) {
+        ovBossViewMode = pill.dataset.bview;
+        document.querySelectorAll('#ovBossBar [data-bview]').forEach(p => p.classList.toggle('on', p === pill));
+        return;
+      }
+      if (!pill.dataset.bflag) return;
       const k = pill.dataset.bflag;
       ovBossFlags[k] = !ovBossFlags[k];
       pill.classList.toggle('on', ovBossFlags[k]);
@@ -1308,6 +1336,7 @@ ${rendererTerrainCode}
         const k = p.dataset.st;
         bossStudioState[k] = !bossStudioState[k];
         p.classList.toggle('on', bossStudioState[k]);
+        if (k === 'mythicPhase2') syncBossRosterUI();
       };
 
       document.getElementById('playBossIntroBtn').onclick = () => {
@@ -1321,11 +1350,15 @@ ${rendererTerrainCode}
 
     function syncBossRosterUI() {
       const b = ALL_BOSS_ENTRIES[selectedBossIdx];
+      const spec = (typeof BOSS_PORTRAIT_DATA !== 'undefined' && BOSS_PORTRAIT_DATA[b.variant]) || null;
+      const isM = !!bossStudioState.mythicPhase2;
+      const activeSkin = spec ? (isM ? ('🔥隐藏换装：' + spec.mythicTitle) : spec.summerTitle) : '';
+      const personaNote = spec ? (' · ' + spec.personaName.split(' · ')[0] + '（' + activeSkin + '）') : '';
       document.querySelectorAll('#bossRoster .roster-item').forEach((btn, i) => btn.classList.toggle('active', i === selectedBossIdx));
-      document.getElementById('bossPortraitTitle').textContent = '👑 ' + b.name + ' · 半身立绘特写';
+      document.getElementById('bossPortraitTitle').textContent = '👑 ' + b.name + personaNote;
       document.getElementById('bossCategoryTag').textContent = b.cat + ' · ' + b.epithet;
       document.getElementById('bossSkillDesc').innerHTML =
-        \`<b>称号：</b>\${b.epithet}<br><b>招式机制：</b>\${b.skills}<br><b>近战友好窗口：</b>释放大招后进入 <b>破绽暴露金圈 (exposeT)</b>，移动放缓且承受全流派伤害 ×1.35！\`;
+        \`<b>一阶段夏装（33% 登场）：</b>\${spec ? (spec.personaName + ' · ' + spec.summerTitle) : b.name}<br><b>二阶段隐藏换装（25% 觉醒）：</b><span style="color:#ffd166">\${spec ? (spec.personaName.split(' · ')[0] + ' · ' + spec.mythicTitle) : '真红觉醒形态'}</span><br><b>招式机制：</b>\${b.skills}<br><b>近战友好窗口：</b>释放大招后进入 <b>破绽暴露金圈 (exposeT)</b>，移动放缓且承受全流派伤害 ×1.35！\`;
     }
 
     function makeDummyBossEntity(b, flags, nowMs, cx, cy) {
@@ -1594,23 +1627,133 @@ ${rendererTerrainCode}
             drawHeroineLiveBust(item.canvas, item.id, 'crop-bust', now, item.idx);
           }
         }
-        // Render all 10 Boss cards (left: Half-Body Portrait, right: Live Battle Entity)
+        // Render all 10 Boss cards (Summer Anime Half-Body Bust + status effects / optional live entity)
         for (const item of ovBossCanvases) {
           const c = item.canvas;
           const g = c.getContext('2d');
           g.clearRect(0, 0, c.width, c.height);
           const prevCtx = ctx;
           ctx = g;
-          drawBossPortrait(item.def.variant, 102, 114, 0.72, ovBossFlags.mythic);
-          const dummy = makeDummyBossEntity(item.def, {
-            mythicPhase2: ovBossFlags.mythic,
-            expose: ovBossFlags.expose,
-            burn: ovBossFlags.burn,
-            freeze: ovBossFlags.freeze,
-            poison: ovBossFlags.poison,
-            hitFlash: ovBossFlags.flash && (Math.floor(now / 180) % 2 === 0)
-          }, now, 232, 108);
-          drawEnemySprite(dummy);
+
+          if (item.spec) {
+            const shortN = item.spec.personaName.split(' · ')[0];
+            if (ovBossViewMode === 'compare') {
+              item.personaEl.textContent = shortN + ' · 双形态换装对比';
+              item.phaseEl.textContent = '左：一阶夏装 ｜ 右：二阶隐藏换装';
+            } else if (ovBossFlags.mythic) {
+              item.personaEl.textContent = '🔥 ' + shortN + ' · ' + (item.spec.mythicTitle || item.spec.summerTitle);
+              item.phaseEl.textContent = '25% 二阶段隐藏换装';
+            } else {
+              item.personaEl.textContent = shortN + ' · ' + item.spec.summerTitle;
+              item.phaseEl.textContent = '33% 一阶登场立绘';
+            }
+          }
+
+          if (ovBossViewMode === 'compare') {
+            // Side-by-side Phase 1 Summer Outfit vs Hidden Phase 2 Awakened Swimwear Outfit!
+            const p1Canvas = typeof getBossAnimePortrait === 'function' ? getBossAnimePortrait(item.def.variant, false) : null;
+            const p2Canvas = typeof getBossAnimePortrait === 'function' ? getBossAnimePortrait(item.def.variant, true) : null;
+            const breath = Math.sin(now * 0.0025 + item.idx * 0.7) * 2.2;
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            if (p1Canvas) {
+              const sc = 0.52;
+              const dw = p1Canvas.width * sc, dh = p1Canvas.height * sc;
+              ctx.drawImage(p1Canvas, 105 - dw * 0.5, 22 + breath, dw, dh);
+            } else {
+              drawBossPortrait(item.def.variant, 105, 160, 0.95, false);
+            }
+            ctx.strokeStyle = 'rgba(255, 209, 102, 0.32)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(210, 18); ctx.lineTo(210, 310); ctx.stroke();
+            if (p2Canvas) {
+              ctx.fillStyle = 'rgba(255, 42, 85, 0.16)';
+              ctx.strokeStyle = '#ffd166';
+              ctx.lineWidth = 2;
+              ctx.beginPath(); ctx.arc(315, 148, 76, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+              const sc = 0.52;
+              const dw = p2Canvas.width * sc, dh = p2Canvas.height * sc;
+              ctx.drawImage(p2Canvas, 315 - dw * 0.5, 22 - breath, dw, dh);
+            } else {
+              drawBossPortrait(item.def.variant, 315, 160, 0.95, true);
+            }
+          } else if (ovBossViewMode === 'bust_only') {
+            // Heroine-style full Half-Body Bust showcase (swaps between Phase 1 Summer & Phase 2 Hidden Costume!)
+            const animeCanvas = typeof getBossAnimePortrait === 'function' ? getBossAnimePortrait(item.def.variant, ovBossFlags.mythic) : null;
+            if (ovBossFlags.mythic) {
+              drawBossPortrait(item.def.variant, c.width * 0.5, c.height * 0.47, 1.58, true);
+            } else if (animeCanvas) {
+              ctx.save();
+              ctx.strokeStyle = item.def.color;
+              ctx.globalAlpha = 0.45;
+              ctx.lineWidth = 2.4;
+              ctx.beginPath();
+              ctx.arc(c.width * 0.5, c.height * 0.44, 112, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.restore();
+
+              const breath = Math.sin(now * 0.0025 + item.idx * 0.7) * 2.8;
+              const sway = Math.cos(now * 0.0015 + item.idx * 0.7) * 1.4;
+              const sc = 0.66;
+              const dw = animeCanvas.width * sc, dh = animeCanvas.height * sc;
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              ctx.drawImage(animeCanvas, (c.width - dw) * 0.5 + sway, 6 + breath, dw, dh);
+            } else {
+              drawBossPortrait(item.def.variant, c.width * 0.5, c.height * 0.46, 1.45, false);
+            }
+
+            // Status effect overlays directly on the portrait stage when toggled
+            if (ovBossFlags.expose) {
+              ctx.save();
+              ctx.strokeStyle = '#ffd166';
+              ctx.lineWidth = 3;
+              ctx.setLineDash([10, 7]);
+              ctx.beginPath();
+              ctx.arc(c.width * 0.5, c.height * 0.44, 128, 0, Math.PI * 2);
+              ctx.stroke();
+              ctx.restore();
+            }
+            if (ovBossFlags.burn) {
+              ctx.fillStyle = 'rgba(255, 107, 53, 0.22)';
+              ctx.fillRect(0, 0, c.width, c.height);
+            }
+            if (ovBossFlags.freeze) {
+              ctx.strokeStyle = '#72efdd';
+              ctx.lineWidth = 3.5;
+              ctx.strokeRect(8, 8, c.width - 16, c.height - 16);
+            }
+            if (ovBossFlags.poison) {
+              ctx.fillStyle = '#a3e635';
+              for (let p = 0; p < 5; p++) {
+                const px = 65 + p * 72 + Math.sin(now * 0.003 + p) * 10;
+                const py = 270 - ((now * 0.05 + p * 44) % 180);
+                ctx.beginPath();
+                ctx.arc(px, py, 5 + (p % 2) * 2, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+            if (ovBossFlags.flash && (Math.floor(now / 180) % 2 === 0)) {
+              ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+              ctx.fillRect(0, 0, c.width, c.height);
+            }
+          } else {
+            drawBossPortrait(item.def.variant, 136, 166, 1.28, ovBossFlags.mythic);
+            const dummy = makeDummyBossEntity(item.def, {
+              mythicPhase2: ovBossFlags.mythic,
+              expose: ovBossFlags.expose,
+              burn: ovBossFlags.burn,
+              freeze: ovBossFlags.freeze,
+              poison: ovBossFlags.poison,
+              hitFlash: ovBossFlags.flash && (Math.floor(now / 180) % 2 === 0)
+            }, now, 326, 164);
+            ctx.save();
+            ctx.translate(326, 164);
+            ctx.scale(1.22, 1.22);
+            dummy.x = 0; dummy.y = 0;
+            drawEnemySprite(dummy);
+            ctx.restore();
+          }
           ctx = prevCtx;
         }
         // Render all 8 Potato Hero cards
@@ -1639,7 +1782,7 @@ ${rendererTerrainCode}
 
         ctx = pCanvas.getContext('2d');
         ctx.clearRect(0, 0, pCanvas.width, pCanvas.height);
-        drawBossPortrait(b.variant, pCanvas.width * 0.5, pCanvas.height * 0.56, 1.48, bossStudioState.mythicPhase2);
+        drawBossPortrait(b.variant, pCanvas.width * 0.5, pCanvas.height * 0.50, 1.92, bossStudioState.mythicPhase2);
 
         ctx = eCanvas.getContext('2d');
         ctx.clearRect(0, 0, eCanvas.width, eCanvas.height);
@@ -1802,14 +1945,21 @@ ${rendererTerrainCode}
           ctx.stroke();
 
           const slideOffset = (1 - enterP) * 56;
-          const portX = Math.max(160, vw * 0.29) - slideOffset;
-          const textX = portX + 135 + slideOffset * 1.3;
-          drawBossPortrait(bc.variant, portX, cy, 1.18, isMythic);
+          const portX = Math.max(165, vw * 0.285) - slideOffset;
+          const textX = portX + 138 + slideOffset * 1.3;
+          const pSpec = (typeof BOSS_PORTRAIT_DATA !== 'undefined' && BOSS_PORTRAIT_DATA[bc.variant]) || null;
+          drawBossPortrait(bc.variant, portX, cy - 2, 1.28, isMythic);
 
           ctx.textAlign = 'left';
           ctx.font = '800 16px -apple-system, sans-serif';
           ctx.fillStyle = bc.accent;
-          ctx.fillText(bc.subtitle, textX, cy - 32, Math.max(200, vw - textX - 40));
+          const skinBadge = pSpec
+            ? (isMythic
+              ? ('【🔥隐藏换装 · ' + pSpec.personaName.split(' · ')[0] + '·' + (pSpec.mythicTitle || pSpec.summerTitle) + '】')
+              : ('【' + pSpec.personaName.split(' · ')[0] + '·' + pSpec.summerTitle + '】'))
+            : '';
+          const fullSub = skinBadge ? (bc.subtitle + ' · ' + skinBadge) : bc.subtitle;
+          ctx.fillText(fullSub, textX, cy - 32, Math.max(200, vw - textX - 40));
 
           ctx.font = '900 36px -apple-system, sans-serif';
           ctx.strokeStyle = '#090512';

@@ -288,11 +288,11 @@ function triggerBossMythicPhase2(e) {
       'mythic_phase2',
       e.variant,
       (e.bossTitle || '神话首领').replace(/^⚡\s*/, ''),
-      '⚡ 隐藏二阶段觉醒 · 真红神话狂暴形态！',
+      '⚡ 隐藏二阶段觉醒 · 专属隐藏换装立绘解封！',
       '⏱️ 决战时间补充 +60秒 · 击败必爆【传说神装秘宝舱】与永久赐福！',
       '#ff2a55',
       '#ffd166',
-      1.45
+      1.65
     );
   }
   if (player) addText(player.x, player.y - 52, '⚡ 隐藏二阶段觉醒！时间 +60s！', '#ffd166', 21, 2.8);

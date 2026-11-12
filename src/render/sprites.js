@@ -1369,7 +1369,7 @@ function drawPotatoHero() {
   }
 }
 
-// 7 大首领（4 大终局魔王 + 3 大奇遇召唤霸主）全屏静止登场演出专属精细半身立绘
+// 10 大首领（4 大终局魔王 + 3 大奇遇召唤霸主 + 3 大精英统领）全屏登场与二阶段觉醒专属二次元夏装半身立绘
 function drawBossPortrait(variant, cx, cy, scale, isMythic) {
   const now = performance.now();
   const s = scale || 1;
@@ -1379,17 +1379,33 @@ function drawBossPortrait(variant, cx, cy, scale, isMythic) {
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
 
+  const ringCol = isMythic
+    ? '#ffd166'
+    : (variant === 'frost_queen'
+      ? '#72efdd'
+      : (variant === 'mech_colossus'
+        ? '#ff9f1c'
+        : (variant === 'void_weaver' || variant === 'abyss_devourer'
+          ? '#c77dff'
+          : (variant === 'golden_golem'
+            ? '#ffd166'
+            : (variant === 'vanguard'
+              ? '#f72585'
+              : (variant === 'pyro_lord'
+                ? '#fb5607'
+                : (variant === 'shadow_stalker' ? '#06d6a0' : '#ff3b6b')))))));
+
   // 神话二阶段背后的六翼金红神辉与旋转圣印（零渐变纯几何绘制）
   if (isMythic) {
-    ctx.fillStyle = 'rgba(255, 209, 102, 0.22)';
+    ctx.fillStyle = 'rgba(255, 42, 85, 0.26)';
     ctx.strokeStyle = '#ffd166';
     ctx.lineWidth = 2.4;
     for (const dir of [-1, 1]) {
       for (let w = 0; w < 3; w++) {
         ctx.beginPath();
-        ctx.moveTo(0, 6 - w * 10);
-        ctx.lineTo(dir * (102 - w * 12), -56 + w * 26);
-        ctx.lineTo(dir * (76 - w * 10), -18 + w * 28);
+        ctx.moveTo(0, 4 - w * 11);
+        ctx.lineTo(dir * (114 - w * 12), -64 + w * 28);
+        ctx.lineTo(dir * (84 - w * 10), -20 + w * 30);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
@@ -1397,8 +1413,76 @@ function drawBossPortrait(variant, cx, cy, scale, isMythic) {
     }
   }
 
-  // 立绘底层徽章法阵底座
-  const ringCol = isMythic ? '#ffd166' : (variant === 'frost_queen' ? '#72efdd' : (variant === 'mech_colossus' ? '#ff9f1c' : (variant === 'void_weaver' || variant === 'abyss_devourer' ? '#c77dff' : (variant === 'golden_golem' ? '#ffd166' : '#ff3b6b'))));
+  // 优先渲染高清二次元美少女半身立绘（常规登场展示一阶段夏装；隐藏二阶段触发时自动切换更华丽性感的二阶段专属换装立绘！）
+  const animeImg = typeof getBossAnimePortrait === 'function' ? getBossAnimePortrait(variant, !!isMythic) : null;
+  if (animeImg) {
+    // 背后专属色系星芒法阵圆盘（角色头冠与双马尾自然破框突出）
+    ctx.fillStyle = isMythic ? 'rgba(34, 8, 20, 0.88)' : 'rgba(14, 9, 26, 0.86)';
+    ctx.strokeStyle = ringCol;
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    ctx.arc(0, -6, 74, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(0, -6);
+    ctx.rotate(now * 0.0012);
+    ctx.strokeStyle = isMythic ? '#ff4d6d' : 'rgba(255, 255, 255, 0.38)';
+    ctx.lineWidth = 1.7;
+    ctx.setLineDash([12, 8]);
+    ctx.beginPath();
+    ctx.arc(0, 0, 64, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // 四角星芒点缀
+    ctx.fillStyle = isMythic ? '#ffd166' : ringCol;
+    for (const dir of [-1, 1]) {
+      const sx = dir * 78, sy = -36 + Math.sin(now * 0.003 + dir) * 3;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy - 6);
+      ctx.lineTo(sx + 2.2, sy - 2.2);
+      ctx.lineTo(sx + 6, sy);
+      ctx.lineTo(sx + 2.2, sy + 2.2);
+      ctx.lineTo(sx, sy + 6);
+      ctx.lineTo(sx - 2.2, sy + 2.2);
+      ctx.lineTo(sx - 6, sy);
+      ctx.lineTo(sx - 2.2, sy - 2.2);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 绘制高清夏装半身立绘（460x540 黄金半身比例：完整展现头饰/面庞/露肩夏装上衣/腰腹与夏日短裙短裤）
+    const breath = Math.sin(now * 0.0026) * 2.1;
+    const sway = Math.cos(now * 0.0016) * 1.1;
+    const dw = 166, dh = 195;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(animeImg, -dw * 0.5 + sway, -dh * 0.50 + breath, dw, dh);
+
+    // 底部轻巧棱钻收边铭纹（承接半身柔化下缘，不遮挡夏装裙摆）
+    ctx.strokeStyle = ringCol;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-54, 90);
+    ctx.lineTo(0, 96);
+    ctx.lineTo(54, 90);
+    ctx.stroke();
+    ctx.fillStyle = '#ffd166';
+    ctx.beginPath();
+    ctx.moveTo(0, 91);
+    ctx.lineTo(4.5, 96);
+    ctx.lineTo(0, 101);
+    ctx.lineTo(-4.5, 96);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+    return;
+  }
+
+  // 立绘底层徽章法阵底座（无头环境或首帧解码前兜底矢量立绘）
   ctx.fillStyle = 'rgba(14, 9, 26, 0.92)';
   ctx.strokeStyle = ringCol;
   ctx.lineWidth = 3.5;

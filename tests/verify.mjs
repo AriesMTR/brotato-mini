@@ -16,7 +16,7 @@ const cssFiles = rawCssRefs.map(r => r.split("?")[0]);
 const jsFiles = rawJsRefs.map(r => r.split("?")[0]);
 
 assert.strictEqual(cssFiles.length, 2, "Expected 2 modular stylesheets (base.css + mobile.css)");
-assert.strictEqual(jsFiles.length, 16, "Expected 16 modular script files in index.html");
+assert.strictEqual(jsFiles.length, 17, "Expected 17 modular script files in index.html");
 
 for (const rel of [...cssFiles, ...jsFiles, "manifest.json", "assets/icon.svg"]) {
   assert(fs.existsSync(path.join(ROOT, rel)), "Missing modular project file: " + rel);
@@ -787,7 +787,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   // 11a. Log Header + Entries + Export Filename must include Date & Code Version
   const curVer = vm.runInContext('APP_VERSION', s);
-  assert.strictEqual(curVer, 'v1.3.3', 'APP_VERSION must be v1.3.3');
+  assert.strictEqual(curVer, 'v1.3.4', 'APP_VERSION must be v1.3.4');
   const logTxt = vm.runInContext('getLogText()', s);
   assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
   assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
@@ -1010,7 +1010,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   // 14a. Start Menu Live Version Pill + Interactive Changelog Modal
   s.document.getElementById('codexModal').classList.add('hidden');
   s.document.getElementById('logModal').classList.add('hidden');
-  assert(els.startVersionPill.textContent.includes('v1.3.3'), '#startVersionPill must display live version v1.3.3 on start screen');
+  assert(els.startVersionPill.textContent.includes('v1.3.4'), '#startVersionPill must display live version v1.3.4 on start screen');
   vm.runInContext('openChangelogModal();', s);
   assert.strictEqual(els.changelogModal.classList.contains('hidden'), false, 'openChangelogModal() must unhide #changelogModal');
   assert(els.changelogList.children.length >= 7, 'Changelog modal must render >= 7 historical version cards');
@@ -1626,4 +1626,87 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 17 v1.3.3 verification');
 }
 
-console.log(`ALL 17 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+// 18. v1.3.4 10 Boss Summer Anime Beauty Bust Portraits (Data Integrity, GPU Mask Composite & 33%/25% Cutscene Rendering)
+{
+  const { sandbox: s, stats } = createEnv(false, 1440, 900, 2);
+
+  // Inject mock Image class into sandbox to exercise full RGB+Alpha offscreen composite & ctx.drawImage path
+  let drawnPortraits = 0;
+  const drawnImgRefs = [];
+  const liveCtx = vm.runInContext('ctx', s);
+  const origDrawImg = liveCtx.drawImage;
+  liveCtx.drawImage = function (img, ...args) {
+    if (img && img.width === 440 && img.height === 516) {
+      drawnPortraits++;
+      drawnImgRefs.push(img);
+    }
+    return origDrawImg.call(this, img, ...args);
+  };
+
+  s.Image = class MockImage {
+    constructor() {
+      this.naturalWidth = 440;
+      this.naturalHeight = 516;
+      this.width = 440;
+      this.height = 516;
+      this.onload = null;
+    }
+    set src(val) {
+      this._src = val;
+      if (typeof this.onload === 'function') this.onload();
+    }
+    get src() { return this._src; }
+  };
+
+  const v134Check = vm.runInContext(`(() => {
+    const expectedVariants = [
+      'butcher', 'frost_queen', 'mech_colossus', 'void_weaver',
+      'crimson_lord', 'golden_golem', 'abyss_devourer',
+      'vanguard', 'pyro_lord', 'shadow_stalker'
+    ];
+    const allPresent = expectedVariants.every(v => {
+      const spec = BOSS_PORTRAIT_DATA[v];
+      return spec &&
+        spec.w === 440 &&
+        spec.h === 516 &&
+        typeof spec.personaName === 'string' && spec.personaName.length > 2 &&
+        typeof spec.summerTitle === 'string' && spec.summerTitle.includes('夏装') &&
+        typeof spec.mythicTitle === 'string' && spec.mythicTitle.length > 2 &&
+        spec.mythicTitle !== spec.summerTitle &&
+        typeof spec.rgb === 'string' && spec.rgb.startsWith('data:image/jpeg;base64,') && spec.rgb.length > 10000 &&
+        typeof spec.mask === 'string' && spec.mask.startsWith('data:image/png;base64,') && spec.mask.length > 2000 &&
+        typeof spec.mythicRgb === 'string' && spec.mythicRgb.startsWith('data:image/jpeg;base64,') && spec.mythicRgb.length > 10000 &&
+        typeof spec.mythicMask === 'string' && spec.mythicMask.startsWith('data:image/png;base64,') && spec.mythicMask.length > 2000 &&
+        spec.mythicRgb !== spec.rgb;
+    });
+
+    preloadAllBossPortraits();
+    const allCompositedAndDistinct = expectedVariants.every(v => {
+      const c1 = getBossAnimePortrait(v, false);
+      const c2 = getBossAnimePortrait(v, true);
+      return c1 && c2 && c1 !== c2 && c1.width === 440 && c1.height === 516 && c2.width === 440 && c2.height === 516;
+    });
+
+    startGame('ranger');
+    wave = 12;
+    beginWave();
+    for (const v of expectedVariants) {
+      startBossCutscene('final_boss', v, '测试首领', '✨ 稀有真身显圣', '测试标签', '#ff4d6d', '#ffd166', 1.15);
+      draw();
+      startBossCutscene('mythic_phase2', v, '测试神话二阶段', '🔥 神话觉醒', '测试神话标签', '#ff2a55', '#ffd166', 1.65);
+      draw();
+    }
+    return { allPresent, allCompositedAndDistinct, count: Object.keys(BOSS_PORTRAIT_DATA).length };
+  })()`, s);
+
+  assert.strictEqual(v134Check.count, 10, 'BOSS_PORTRAIT_DATA must define all 10 Bosses');
+  assert.strictEqual(v134Check.allPresent, true, 'All 10 Bosses must carry distinct Phase 1 summer & Hidden Phase 2 mythic costume data URIs');
+  assert.strictEqual(v134Check.allCompositedAndDistinct, true, 'getBossAnimePortrait(v, false) and getBossAnimePortrait(v, true) must return distinct 440x516 canvases');
+  assert(drawnPortraits >= 20, `Expected >= 20 anime Boss portrait drawImage calls across 10 Phase-1 + 10 Phase-2 cutscenes (got ${drawnPortraits})`);
+  assert.strictEqual(new Set(drawnImgRefs).size, 20, 'Cutscenes must render 20 distinct canvas instances (10 Phase-1 + 10 Hidden Phase-2)');
+  assert.strictEqual(stats.radialGradients, 0, 'v1.3.4 anime Boss cutscenes must create ZERO per-frame radial gradients');
+  assert.strictEqual(stats.shadowBlurs, 0, 'v1.3.4 anime Boss cutscenes must set ZERO shadowBlur');
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 18 v1.3.4 verification');
+}
+
+console.log(`ALL 18 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);

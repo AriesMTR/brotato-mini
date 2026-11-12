@@ -1158,7 +1158,7 @@ function draw() {
 
     // 3. 斜向贯穿动漫感战幕横幅 + 速度流线
     const cy = viewH * 0.5;
-    const bandH = portraitPortrait ? 210 : 168;
+    const bandH = portraitPortrait ? 236 : 186;
     const slant = portraitPortrait ? 22 : 38;
     ctx.globalAlpha = 0.94 * alpha;
     ctx.fillStyle = '#120b22';
@@ -1187,35 +1187,44 @@ function draw() {
       ctx.stroke();
     }
 
-    // 4. 精细首领半身立绘与称号排印
+    // 4. 二次元美少女夏装半身立绘破框切入与称号排印
     ctx.globalAlpha = alpha;
     const slideOffset = (1 - enterP) * 56;
+    const personaSpec = (typeof BOSS_PORTRAIT_DATA !== 'undefined' && BOSS_PORTRAIT_DATA) ? BOSS_PORTRAIT_DATA[bc.variant] : null;
     if (portraitPortrait) {
-      const pScale = Math.min(0.92, viewW / 440);
-      drawBossPortrait(bc.variant, viewW * 0.5 - slideOffset, cy - 36, pScale, isMythic);
+      const pScale = Math.min(0.86, viewW / 450);
+      drawBossPortrait(bc.variant, viewW * 0.5 - slideOffset, cy - 42, pScale, isMythic);
       ctx.textAlign = 'center';
       ctx.font = '800 13px -apple-system, sans-serif';
       ctx.fillStyle = accCol;
-      ctx.fillText(bc.subtitle || '⚠️ 强敌降临', viewW * 0.5, cy + 44, viewW - 32);
+      ctx.fillText(bc.subtitle || '⚠️ 强敌降临', viewW * 0.5, cy + 54, viewW - 32);
       ctx.font = '900 24px -apple-system, sans-serif';
       ctx.strokeStyle = '#090512';
       ctx.lineWidth = 5;
-      ctx.strokeText(bc.title || '首领降临', viewW * 0.5, cy + 72, viewW - 28);
+      ctx.strokeText(bc.title || '首领降临', viewW * 0.5, cy + 80, viewW - 28);
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(bc.title || '首领降临', viewW * 0.5, cy + 72, viewW - 28);
+      ctx.fillText(bc.title || '首领降临', viewW * 0.5, cy + 80, viewW - 28);
       if (bc.extraTag) {
         ctx.font = '800 12px -apple-system, sans-serif';
         ctx.fillStyle = isMythic ? '#ffd166' : '#e0fbfc';
-        ctx.fillText(bc.extraTag, viewW * 0.5, cy + 95, viewW - 28);
+        ctx.fillText(bc.extraTag, viewW * 0.5, cy + 102, viewW - 28);
       }
     } else {
-      const portX = Math.max(150, viewW * 0.30) - slideOffset;
-      const textX = portX + 128 + slideOffset * 1.4;
-      drawBossPortrait(bc.variant, portX, cy, 1.12, isMythic);
+      const portX = Math.max(164, viewW * 0.285) - slideOffset;
+      const textX = portX + 136 + slideOffset * 1.35;
+      drawBossPortrait(bc.variant, portX, cy - 2, 1.24, isMythic);
       ctx.textAlign = 'left';
       ctx.font = '800 15px -apple-system, sans-serif';
       ctx.fillStyle = accCol;
-      ctx.fillText(bc.subtitle || '⚠️ 强敌降临', textX, cy - 30, Math.max(180, viewW - textX - 36));
+      const skinLabel = personaSpec
+        ? (isMythic
+          ? `【🔥隐藏换装 · ${personaSpec.personaName.split(' · ')[0]}·${personaSpec.mythicTitle || personaSpec.summerTitle}】`
+          : `【${personaSpec.personaName.split(' · ')[0]}·${personaSpec.summerTitle}】`)
+        : '';
+      const subTxt = skinLabel
+        ? `${bc.subtitle || '⚠️ 强敌降临'} · ${skinLabel}`
+        : (bc.subtitle || '⚠️ 强敌降临');
+      ctx.fillText(subTxt, textX, cy - 32, Math.max(180, viewW - textX - 36));
       ctx.font = '900 34px -apple-system, sans-serif';
       ctx.strokeStyle = '#090512';
       ctx.lineWidth = 6;
