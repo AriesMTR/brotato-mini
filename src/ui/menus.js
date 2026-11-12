@@ -270,6 +270,7 @@ function startGame(cls) {
     enemySlow: 0, thorns: 0, cyberball: 0, critHeal: 0, rangeToDmg: false, hasAnvil: false, healBonus: 0,
     burnChance: 0, chillChance: 0, blastChance: 0, explosionScale: 1,
     interest: 0, teslaCount: 0, teslaCd: 1.0, healDropBonus: 0, chillSlowT: 0, inSpore: false,
+    invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, recentCrateIds: [],
     lv: 1, xp: 0, xpNeed: 10, mats: diff.matBonus, kills: 0, invuln: 0, walkT: 0, dustT: 0, moving: false,
     weapons: [], items: {}
   };
@@ -299,7 +300,7 @@ function startGame(cls) {
   }
   syncSetHp();
   wave = 1; endlessMode = false; pendingLevels = 0; pendingCrates = 0; freeRerollsLeft = 0; anvilUpgradedMsg = ''; shopOffers = [];
-  logInfo('GAME', `开局 cls=${cls}, diff=${diff.badge}, sceneMode=${selectedScene}, ui=${uiMode}, world=${WORLD.w}x${WORLD.h}`);
+  logInfo('GAME', `开局 ver=${typeof APP_VERSION !== 'undefined' ? APP_VERSION : '-'}, cls=${cls}, diff=${diff.badge}, sceneMode=${selectedScene}, ui=${uiMode}, world=${WORLD.w}x${WORLD.h}`);
   document.getElementById('startMenu').classList.add('hidden');
   document.getElementById('endMenu').classList.add('hidden');
   document.getElementById('pauseMenu').classList.add('hidden');
@@ -347,8 +348,8 @@ function renderBuildSummary(statsId, setsId) {
       `<span>⚡ 攻速 <b>${aspdPct}%</b></span>` +
       `<span>📏 范围 <b>${rngTxt}</b></span>` +
       `<span>🎯 暴击 <b>${critPct}%</b></span>` +
-      `<span>💨 闪避 <b>${Math.round(player.dodge * 100)}%</b></span>` +
-      `<span>👟 移速 <b>${Math.round(player.spdMul * 100)}%</b></span>` +
+      `<span>💨 闪避 <b>${Math.round(Math.min(player.dodgeCap || 0.80, player.dodge) * 100)}%</b></span>` +
+      `<span>👟 移速 <b>${Math.round(getEffectiveSpdMul() * 100)}%</b></span>` +
       `<span>🍀 幸运 <b>${player.luck || 0}</b></span>` +
       `<span>🌾 收获 <b>${harv}</b></span>`;
   }

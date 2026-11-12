@@ -136,12 +136,12 @@ function update(dt) {
     }
   }
 
-  // 能量护盾自动回充（7秒未受击恢复 50% 护盾）
+  // 能量护盾自动回充（7秒未受击恢复 50% 护盾，不朽神盾核缩短冷却）
   if (player.maxShield > 0 && player.shield < player.maxShield) {
     player.shieldRegenT -= dt;
     if (player.shieldRegenT <= 0) {
       player.shield = Math.min(player.maxShield, player.shield + Math.ceil(player.maxShield * 0.5));
-      player.shieldRegenT = 5.0;
+      player.shieldRegenT = player.fastShield ? 3.2 : 5.0;
       rings.push({ x: player.x, y: player.y, r: 34, color: '#4cc9f0', t: 0.22, maxT: 0.22 });
       addText(player.x, player.y - 28, '+护盾', '#72efdd', 13);
     }
@@ -232,8 +232,10 @@ function update(dt) {
   if (player.moving) {
     if (Math.abs(dx) > 0.08) player.faceDir = dx > 0 ? 1 : -1;
     const len = Math.hypot(dx, dy) || 1;
-    const envSpdMul = (sandGustT > 0 ? 1.14 : 1) * (player.chillSlowT > 0 ? 0.82 : 1);
-    const v = player.spd * Math.max(0.5, player.spdMul) * envSpdMul * moveScale;
+    const chillMul = (player.chillSlowT > 0 && !player.noSlow) ? 0.85 : 1;
+    const envSpdMul = (sandGustT > 0 ? 1.14 : 1) * chillMul;
+    const effSpd = Math.max(player.noSlow ? 1.0 : 0.72, getEffectiveSpdMul() * envSpdMul);
+    const v = player.spd * effSpd * moveScale;
     player.x = Math.max(player.r + 8, Math.min(WORLD.w - player.r - 8, player.x + (dx / len) * v * dt));
     player.y = Math.max(player.r + 8, Math.min(WORLD.h - player.r - 8, player.y + (dy / len) * v * dt));
     player.walkT += dt * 13 * moveScale;
@@ -1098,7 +1100,7 @@ function update(dt) {
     if (b.shape === 'disc') b.rot = (b.rot || 0) + dt * 14;
     if (b.x < 0 || b.x > WORLD.w || b.y < 0 || b.y > WORLD.h) { eBullets.splice(i, 1); continue; }
     if (Math.hypot(player.x - b.x, player.y - b.y) < player.r + b.r - 5) {
-      if (b.chillPlayer && player.invuln <= 0) player.chillSlowT = 1.25;
+      if (b.chillPlayer && !player.noSlow && player.invuln <= 0) player.chillSlowT = 1.25;
       hurtPlayer(b.dmg);
       eBullets.splice(i, 1);
       if (state !== 'wave') return;
@@ -1150,9 +1152,18 @@ function update(dt) {
           beep(920, 0.12, 'triangle', 0.06);
         }
       } else if (d.kind === 'crate') {
-        pendingCrates++;
-        addText(player.x, player.y - 34, `🎁 宝箱 +1`, '#ffd166', 19);
-        beep(880, 0.11, 'triangle', 0.06);
+        if (pendingCrates < 3) {
+          pendingCrates++;
+          if (d.isBoss) player.bossCratesQueued = (player.bossCratesQueued || 0) + 1;
+          addText(player.x, player.y - 34, d.isBoss ? '👑 首领秘宝 +1' : '🎁 宝箱 +1', '#ffd166', 19);
+          beep(880, 0.11, 'triangle', 0.06);
+        } else {
+          const bonusMat = 16 + wave * 3;
+          player.mats += bonusMat;
+          player.hp = Math.min(player.maxHp, player.hp + 6);
+          addText(player.x, player.y - 34, `🎁 满载折算 +${bonusMat}💎 +6HP`, '#ffd166', 17);
+          beep(780, 0.09, 'sine', 0.05);
+        }
       } else {
         const healAmt = 5 + (player.healBonus || 0);
         player.hp = Math.min(player.maxHp, player.hp + healAmt);

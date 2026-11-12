@@ -132,6 +132,7 @@ function renderCodex() {
             <div class="codex-card-title">${it.name}</div>
             <div class="card-badges">
               <span class="tag t${it.tier}">${tNames[it.tier]}</span>
+              ${it.maxCount ? `<span class="tag tag-merge">${it.maxCount === 1 ? '唯一' : '限×' + it.maxCount}</span>` : ''}
               <span class="tag">💎 基准售价 ${it.cost}</span>
             </div>
           </div>

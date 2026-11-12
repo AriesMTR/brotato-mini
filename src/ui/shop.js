@@ -49,66 +49,254 @@ function finishWave() {
   advancePostWave();
 }
 
+// 严格受控的战利品与商店品质概率曲线（幸运收益递减软上限，杜绝后期满屏传说刷屏）
+function rollShopTier(waveNum, luck) {
+  const luckF = Math.min(1, Math.max(0, luck || 0) / 90);
+  const p4 = waveNum < 6 ? 0 : Math.min(0.08, 0.010 + (waveNum - 6) * 0.0065 + luckF * 0.025);
+  const p3 = waveNum < 3 ? 0 : Math.min(0.25, 0.035 + (waveNum - 3) * 0.018 + luckF * 0.045);
+  const p2 = waveNum < 2 ? 0 : Math.min(0.42, 0.18 + (waveNum - 2) * 0.032 + luckF * 0.04);
+  const u = Math.random();
+  if (u < p4) return 4;
+  if (u < p4 + p3) return 3;
+  if (u < p4 + p3 + p2) return 2;
+  return 1;
+}
+
+function rollCrateTier(waveNum, luck, isBossCrate = false) {
+  const luckF = Math.min(1, Math.max(0, luck || 0) / 90);
+  const p4 = waveNum < 5 ? 0 : Math.min(isBossCrate ? 0.14 : 0.10, (isBossCrate ? 0.035 : 0.012) + (waveNum - 5) * 0.0075 + luckF * 0.028);
+  const p3 = waveNum < 3 ? 0 : Math.min(isBossCrate ? 0.34 : 0.28, (isBossCrate ? 0.14 : 0.055) + (waveNum - 3) * 0.020 + luckF * 0.055);
+  const p2 = waveNum < 2 ? (isBossCrate ? 0.45 : 0.22) : Math.min(0.46, 0.28 + (waveNum - 2) * 0.024);
+  const u = Math.random();
+  if (u < p4) return 4;
+  if (u < p4 + p3) return 3;
+  if (u < p4 + p3 + p2) return 2;
+  return (isBossCrate && waveNum >= 4) ? 2 : 1;
+}
+
+function isItemAvailable(it, excludeSet = null, checkWaveMin = false) {
+  if (!it || (excludeSet && excludeSet.has(it.id))) return false;
+  if (checkWaveMin && ((it.tier >= 4 && wave < 5) || (it.tier >= 3 && wave < 3))) return false;
+  const ownedCnt = (player && player.items && player.items[it.id]) || 0;
+  if (it.maxCount && ownedCnt >= it.maxCount) return false;
+  return true;
+}
+
+function pickWeightedItem(targetTier, excludeSet = new Set(), checkWaveMin = false) {
+  const tierOrder = [];
+  for (let t = targetTier; t >= 1; t--) tierOrder.push(t);
+  for (let t = targetTier + 1; t <= 4; t++) tierOrder.push(t);
+
+  let pool = [];
+  for (const t of tierOrder) {
+    pool = ITEMS.filter(it => it.tier === t && isItemAvailable(it, excludeSet, checkWaveMin));
+    if (pool.length > 0) break;
+  }
+  if (!pool.length) {
+    pool = ITEMS.filter(it => isItemAvailable(it, excludeSet, false));
+  }
+  if (!pool.length) return null;
+
+  const recent = (player && player.recentCrateIds) || [];
+  let totalW = 0;
+  const weights = pool.map(it => {
+    const ownedCnt = (player && player.items && player.items[it.id]) || 0;
+    const recentPenalty = recent.includes(it.id) ? 2.6 : 0;
+    const w = 1 / (1 + ownedCnt * 1.15 + recentPenalty);
+    totalW += w;
+    return w;
+  });
+
+  let r = Math.random() * totalW;
+  for (let i = 0; i < pool.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return pool[i];
+  }
+  return pool[pool.length - 1];
+}
+
+function recordCrateHistory(itemId) {
+  if (!player || !itemId) return;
+  if (!Array.isArray(player.recentCrateIds)) player.recentCrateIds = [];
+  player.recentCrateIds.push(itemId);
+  if (player.recentCrateIds.length > 6) player.recentCrateIds.shift();
+}
+
+function buildCrateWeaponChoice(isBossCrate) {
+  if (!player || player.maxSlots <= 0) return null;
+  const wTier = Math.max(1, rollCrateTier(wave, player.luck || 0, isBossCrate));
+  const wKeys = Object.keys(WEAPONS).filter(k => {
+    const effT = Math.max(wTier, WEAPONS[k].minTier || 1);
+    return effT <= 4 && (WEAPONS[k].minTier || 1) <= wTier && canBuyWeapon(k, effT);
+  });
+  if (!wKeys.length) return null;
+
+  let pickedId = wKeys[Math.floor(Math.random() * wKeys.length)];
+  if (player.weapons.length && Math.random() < 0.45) {
+    const mergeCands = wKeys.filter(k => {
+      const effT = Math.max(wTier, WEAPONS[k].minTier || 1);
+      return player.weapons.some(w => w.id === k && w.tier === effT && w.tier < 4);
+    });
+    if (mergeCands.length && Math.random() < 0.65) {
+      pickedId = mergeCands[Math.floor(Math.random() * mergeCands.length)];
+    } else {
+      const owned = player.weapons[Math.floor(Math.random() * player.weapons.length)].id;
+      const sameSet = wKeys.filter(k => WEAPONS[k].set === WEAPONS[owned].set);
+      if (sameSet.length) pickedId = sameSet[Math.floor(Math.random() * sameSet.length)];
+    }
+  }
+
+  const tpl = WEAPONS[pickedId];
+  const effTier = Math.min(4, Math.max(wTier, tpl.minTier || 1));
+  const tierMul = [0, 1, 1.9, 3.0, 4.4][effTier];
+  const recycleVal = Math.max(8, Math.round(tpl.cost * tierMul * getShopScale() * 0.48));
+  const canMergeNow = player.weapons.some(w => w.id === pickedId && w.tier === effTier && w.tier < 4);
+  return { kind: 'weapon', id: pickedId, tpl, tier: effTier, recycleVal, canMergeNow };
+}
+
 function showCrateMenu() {
   state = 'crate';
   const cm = document.getElementById('crateMenu');
   if (!cm) { pendingCrates = 0; advancePostWave(); return; }
   cm.classList.remove('hidden');
   cm.scrollTop = 0;
+
+  const isBossCrate = (player.bossCratesQueued || 0) > 0;
   const ct = document.getElementById('crateTitle');
-  if (ct) ct.textContent = `🎁 开启异星战利品箱！（剩余 ${pendingCrates} 个）`;
+  if (ct) {
+    ct.textContent = `${isBossCrate ? '👑 开启首领秘宝舱！' : '🎁 开启异星战术补给箱！'}（剩余 ${pendingCrates} 个）`;
+  }
 
   const luck = player.luck || 0;
-  const r = Math.random() + (wave - 1) * 0.036 + Math.min(0.28, luck * 0.0038);
-  let tier = 1;
-  if (wave >= 5 && r > 1.48) tier = 4;
-  else if (wave >= 3 && r > 1.22) tier = 3;
-  else if (wave >= 2 && r > 0.84) tier = 2;
-  const tierPool = ITEMS.filter(it => it.tier === tier);
-  const pickPool = tierPool.length ? tierPool : ITEMS;
-  const it = pickPool[Math.floor(Math.random() * pickPool.length)];
-  const recycleVal = Math.max(8, Math.round(it.cost * getShopScale() * 0.52));
-  const ownedCnt = (player.items && player.items[it.id]) || 0;
+  const excludeIds = new Set();
+  const choices = [];
+
+  // 选项 1：防重复加权战利品道具
+  const t1 = rollCrateTier(wave, luck, isBossCrate);
+  const item1 = pickWeightedItem(t1, excludeIds, true);
+  if (item1) {
+    excludeIds.add(item1.id);
+    recordCrateHistory(item1.id);
+    choices.push({
+      kind: 'item',
+      item: item1,
+      tier: item1.tier,
+      recycleVal: Math.max(8, Math.round(item1.cost * getShopScale() * 0.52))
+    });
+  }
+
+  // 选项 2：动态提供【武器空投】、【异星战术补给核】或【第二件不重复道具】，大幅丰富开箱决策
+  const modeR = Math.random();
+  let secondChoice = null;
+  if (player.maxSlots > 0 && modeR < 0.42) {
+    secondChoice = buildCrateWeaponChoice(isBossCrate);
+  } else if (modeR < 0.76 && typeof CRATE_SUPPLIES !== 'undefined' && CRATE_SUPPLIES.length > 0) {
+    const sup = CRATE_SUPPLIES[Math.floor(Math.random() * CRATE_SUPPLIES.length)];
+    secondChoice = {
+      kind: 'supply',
+      supply: sup,
+      tier: sup.tier || 2,
+      recycleVal: Math.max(10, Math.round((sup.cost || 28) * getShopScale() * 0.50))
+    };
+  }
+  if (!secondChoice) {
+    const t2 = rollCrateTier(wave, luck, isBossCrate);
+    const item2 = pickWeightedItem(t2, excludeIds, true);
+    if (item2) {
+      excludeIds.add(item2.id);
+      recordCrateHistory(item2.id);
+      secondChoice = {
+        kind: 'item',
+        item: item2,
+        tier: item2.tier,
+        recycleVal: Math.max(8, Math.round(item2.cost * getShopScale() * 0.52))
+      };
+    }
+  }
+  if (secondChoice) choices.push(secondChoice);
+
+  const consumeCrate = () => {
+    if (isBossCrate && player.bossCratesQueued > 0) player.bossCratesQueued--;
+    pendingCrates--;
+    advancePostWave();
+  };
 
   const box = document.getElementById('crateBox');
   box.innerHTML = '';
-  const el = document.createElement('div');
-  el.className = `card t${it.tier}`;
-  el.innerHTML = `
-    <div class="card-head" style="padding-right:0">
-      <div class="item-emblem t${it.tier}">${it.icon}</div>
-      <div class="card-meta">
-        <div class="card-title">${it.name}</div>
-        <div class="card-badges">
-          <span class="tag t${it.tier}">${TIER_NAMES[it.tier]}战利品</span>
-          ${ownedCnt > 0 ? `<span class="tag tag-owned">已拥有 ×${ownedCnt}</span>` : ''}
+  box.classList.toggle('single', choices.length <= 1);
+
+  choices.forEach(c => {
+    const el = document.createElement('div');
+    el.className = `card t${c.tier}`;
+    let icon = '🎁', title = '', badgesHtml = '', descHtml = '';
+    if (isBossCrate) badgesHtml += `<span class="tag tag-merge">👑 首领秘宝</span>`;
+
+    if (c.kind === 'item') {
+      const it = c.item;
+      const ownedCnt = (player.items && player.items[it.id]) || 0;
+      icon = it.icon;
+      title = it.name;
+      badgesHtml += `<span class="tag t${it.tier}">${TIER_NAMES[it.tier]}道具</span>`;
+      if (it.maxCount) badgesHtml += `<span class="tag">${it.maxCount === 1 ? '唯一' : '限×' + it.maxCount}</span>`;
+      if (ownedCnt > 0) badgesHtml += `<span class="tag tag-owned">已拥有 ×${ownedCnt}</span>`;
+      descHtml = `<div class="card-desc">${it.desc}</div>`;
+    } else if (c.kind === 'weapon') {
+      const tpl = c.tpl;
+      const setLabel = (SET_DEFS[tpl.set] && SET_DEFS[tpl.set].label) || '';
+      icon = tpl.icon;
+      title = `${tpl.name} Lv${c.tier}`;
+      badgesHtml += `<span class="tag t${c.tier}">⚔️ ${TIER_NAMES[c.tier]}空投</span>`;
+      if (setLabel) badgesHtml += `<span class="tag">${setLabel}</span>`;
+      if (c.canMergeNow) badgesHtml += `<span class="tag tag-merge">⬆️ 可直接合成</span>`;
+      descHtml = `<div class="card-desc">${tpl.desc}</div>`;
+    } else if (c.kind === 'supply') {
+      const sup = c.supply;
+      icon = sup.icon;
+      title = sup.name;
+      badgesHtml += `<span class="tag t${c.tier}">⚡ 战术补给核</span>`;
+      descHtml = `<div class="card-desc">${sup.desc}</div>`;
+    }
+
+    el.innerHTML = `
+      <div class="card-head" style="padding-right:0">
+        <div class="item-emblem t${c.tier}">${icon}</div>
+        <div class="card-meta">
+          <div class="card-title">${title}</div>
+          <div class="card-badges">${badgesHtml}</div>
         </div>
       </div>
-    </div>
-    <div class="card-body">
-      <div class="card-desc">${it.desc}</div>
-      <div class="crate-btns">
-        <button class="btn take-btn" style="justify-content:center">🎁 免费收下</button>
-        <button class="btn btn-sec recycle-btn" style="justify-content:center">♻️ 回收 (+${recycleVal}💎)</button>
-      </div>
-    </div>`;
-  el.querySelector('.take-btn').onclick = () => {
-    player.items[it.id] = (player.items[it.id] || 0) + 1;
-    it.apply(player);
-    syncSetHp();
-    beep(660, 0.09, 'triangle');
-    logInfo('CRATE', `收下战利品 ${it.name} (T${it.tier})`);
-    pendingCrates--;
-    advancePostWave();
-  };
-  el.querySelector('.recycle-btn').onclick = () => {
-    player.mats += recycleVal;
-    beep(480, 0.07, 'sine');
-    logInfo('CRATE', `熔炼战利品 ${it.name} (+${recycleVal}💎)`);
-    pendingCrates--;
-    advancePostWave();
-  };
-  box.appendChild(el);
+      <div class="card-body">
+        ${descHtml}
+        <div class="crate-btns">
+          <button class="btn take-btn" style="justify-content:center">🎁 选此补给</button>
+          <button class="btn btn-sec recycle-btn" style="justify-content:center">♻️ 熔炼 (+${c.recycleVal}💎)</button>
+        </div>
+      </div>`;
+
+    el.querySelector('.take-btn').onclick = () => {
+      if (c.kind === 'item') {
+        player.items[c.item.id] = (player.items[c.item.id] || 0) + 1;
+        c.item.apply(player);
+        logInfo('CRATE', `收下战利品道具 ${c.item.name} (T${c.tier}${isBossCrate ? ', 首领箱' : ''})`);
+      } else if (c.kind === 'weapon') {
+        addOrMergeWeapon(c.id, c.tier);
+        logInfo('CRATE', `收下空投武器 ${c.tpl.name} Lv.${c.tier}`);
+      } else if (c.kind === 'supply') {
+        c.supply.apply(player, wave);
+        logInfo('CRATE', `激活战术补给 ${c.supply.name}`);
+      }
+      syncSetHp();
+      beep(660, 0.09, 'triangle');
+      consumeCrate();
+    };
+    el.querySelector('.recycle-btn').onclick = () => {
+      player.mats += c.recycleVal;
+      beep(480, 0.07, 'sine');
+      logInfo('CRATE', `熔炼补给 ${title} (+${c.recycleVal}💎)`);
+      consumeCrate();
+    };
+    box.appendChild(el);
+  });
 }
 
 function showLevelUp() {
@@ -159,15 +347,11 @@ function rollOffers() {
   const usedItems = new Set(locked.filter(o => o.kind === 'item').map(o => o.item.id));
   const shopScale = getShopScale();
   const discountMul = Math.max(0.60, 1 - (player.shopDiscount || 0));
-  const luckBonus = Math.min(0.28, (player.luck || 0) * 0.0032);
+  const luck = player.luck || 0;
   let guard = 0;
   while (locked.length < 4 && guard++ < 40) {
     const isWeapon = player.maxSlots > 0 && Math.random() < 0.54;
-    let tier = 1;
-    const r = Math.random() + (wave - 1) * 0.036 + luckBonus;
-    if (wave >= 6 && r > 1.48) tier = 4;
-    else if (wave >= 3 && r > 1.24) tier = 3;
-    else if (wave >= 2 && r > 0.86) tier = 2;
+    const tier = rollShopTier(wave, luck);
 
     if (isWeapon) {
       const validW = wKeys.filter(k => (WEAPONS[k].minTier || 1) <= tier);
@@ -186,14 +370,11 @@ function rollOffers() {
       const cost = Math.max(2, Math.round(tpl.cost * tierMul * shopScale * discountMul));
       locked.push({ kind: 'weapon', id, tier: effTier, cost, locked: false });
     } else {
-      const avail = ITEMS.filter(it => !usedItems.has(it.id) && (it.tier < 4 || wave >= 5) && (it.tier < 3 || wave >= 3));
-      if (!avail.length) continue;
-      const pool = avail.filter(it => it.tier === tier);
-      const pickPool = pool.length ? pool : avail;
-      const it = pickPool[Math.floor(Math.random() * pickPool.length)];
+      const it = pickWeightedItem(tier, usedItems, true);
+      if (!it) continue;
       usedItems.add(it.id);
       const ownedCnt = (player.items && player.items[it.id]) || 0;
-      const cost = Math.max(2, Math.round(it.cost * shopScale * (1 + ownedCnt * 0.20) * discountMul));
+      const cost = Math.max(2, Math.round(it.cost * shopScale * (1 + ownedCnt * 0.22) * discountMul));
       locked.push({ kind: 'item', item: it, tier: it.tier, cost, locked: false });
     }
   }
