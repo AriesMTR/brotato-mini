@@ -98,3 +98,11 @@ const MONSTER_CODEX = [
   { id: 'sb_golden',   cat: 'special', icon: '🏆', name: '黄金晶石巨神', badge: '🪙 奇遇召唤首领', wave: '第 3 波起 · 激活黄金贪婪神像', stats: '💎48+ 暴富晶石雨 + 🎁×1 宝箱', desc: `${SPECIAL_RELICS[1].bossDesc}<br><b>${SPECIAL_RELICS[1].rewardDesc}</b>` },
   { id: 'sb_abyss',    cat: 'special', icon: '👾', name: '异次元吞噬者', badge: '🌌 奇遇召唤首领', wave: '第 3 波起 · 激活虚空裂隙魔方', stats: '🎁×1 宝箱 + 💎26 + 永久+12%全伤', desc: `${SPECIAL_RELICS[2].bossDesc}<br><b>${SPECIAL_RELICS[2].rewardDesc}</b>` }
 ];
+
+// 显式挂载至全局对象，防止跨脚本缓存错位导致首领/统领常量无法访问
+if (typeof globalThis !== 'undefined') {
+  globalThis.BOSS_DEFS = BOSS_DEFS;
+  globalThis.MINI_BOSS_DEFS = MINI_BOSS_DEFS;
+  globalThis.SPECIAL_RELICS = SPECIAL_RELICS;
+  globalThis.MONSTER_CODEX = MONSTER_CODEX;
+}

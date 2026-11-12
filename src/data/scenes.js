@@ -5,7 +5,7 @@ const SCENES = [
   {
     id: 'wasteland', icon: '🌑', name: '紫晶废土',
     exclMob: 'rad_scorpion', exclMobName: '🦂 辐射裂变蝎',
-    terrainSummary: '🕳️ 断层裂谷 · 🧪 辐射泥沼 · 🌀 双生传送门',
+    terrainSummary: '🌀 专属地形：双生虚空晶裂门（A ↔ B 跃迁）',
     eventId: 'rad_meteor', eventIcon: '☄️', eventName: '紫晶流星雨',
     eventDesc: '第 3 波起概率出现：间歇坠落紫晶辐射流星（无差别炸伤范围目标，并在坑内爆出额外晶石！）',
     voidBg: '#0e0b14', centerCol: '#383047', midCol: '#2b2538', edgeCol: '#201b2a',
@@ -16,7 +16,7 @@ const SCENES = [
   {
     id: 'desert', icon: '🏜️', name: '赤砂荒原',
     exclMob: 'sand_worm', exclMobName: '🐍 沙暴钻地虫',
-    terrainSummary: '🕳️ 荒漠大裂谷 · 🌋 沸腾熔坑 · 🌀 虚空传送门',
+    terrainSummary: '🕳️ 专属地形：荒漠断层大裂谷（锯齿岩壑掩体）',
     eventId: 'sandstorm', eventIcon: '🌪️', eventName: '赤砂顺风热浪',
     eventDesc: '第 3 波起概率出现：周期刮起狂沙顺风（风场期间角色移速 +14%，并额外催生荒漠晶树）',
     voidBg: '#160f0a', centerCol: '#61432e', midCol: '#4d3423', edgeCol: '#382518',
@@ -27,7 +27,7 @@ const SCENES = [
   {
     id: 'glacier', icon: '❄️', name: '极寒冰窟',
     exclMob: 'frost_wisp', exclMobName: '🧊 霜晶冰魄灵',
-    terrainSummary: '🧊 极滑寒霜冰湖 · 🕳️ 冰渊裂隙 · 🌀 虚空传送门',
+    terrainSummary: '🧊 专属地形：极寒多棱碎晶冰湖（+28%疾滑）',
     eventId: 'blizzard', eventIcon: '🌨️', eventName: '极光寒霜脉冲',
     eventDesc: '第 3 波起概率出现：极光寒潮冻结全场部分怪物减速，同时在地面凝结寒冰尖刺预警圈',
     voidBg: '#08121a', centerCol: '#26495c', midCol: '#1d394a', edgeCol: '#142936',
@@ -38,7 +38,7 @@ const SCENES = [
   {
     id: 'foundry', icon: '⚙️', name: '机械熔炉',
     exclMob: 'magma_imp', exclMobName: '🔥 熔岩火精',
-    terrainSummary: '🌋 炽热岩浆池 · 🕳️ 工业排渣沟 · 🌀 虚空传送门',
+    terrainSummary: '🌋 专属地形：裂地多瓣熔岩火池（双向灼烧）',
     eventId: 'geysers', eventIcon: '🌋', eventName: '熔炉地热喷涌',
     eventDesc: '第 3 波起概率出现：地底熔铁泄压阀定时喷发烈焰火柱，对圈内怪物与贪刀玩家同时造成高额灼伤',
     voidBg: '#111013', centerCol: '#383a45', midCol: '#2b2d36', edgeCol: '#1f2027',
@@ -49,7 +49,7 @@ const SCENES = [
   {
     id: 'fungal', icon: '🍄', name: '荧光菌丛',
     exclMob: 'spore_mother', exclMobName: '🍄 剧毒孢子母体',
-    terrainSummary: '🧪 腐化毒泥沼 · 🌀 双生菌丝传送门',
+    terrainSummary: '🧪 专属地形：腐殖曲岸剧毒泥沼（聚怪毒蚀）',
     eventId: 'spore_tide', eventIcon: '✨', eventName: '灵能治愈孢潮',
     eventDesc: '第 3 波起概率出现：地面绽放翠绿荧光灵能法阵，踏入阵内每秒回复生命并提升 +14% 攻速',
     voidBg: '#09130f', centerCol: '#213f33', midCol: '#193128', edgeCol: '#12241d',
@@ -61,24 +61,24 @@ const SCENES = [
 
 const TERRAIN_CODEX = [
   {
-    id: 'portal', icon: '🌀', name: '双生虚空传送门', badge: '空间跃迁机关', scenes: '第 2 波起刷出（废土/菌丛必出）',
-    desc: '成对生成于战场两端的紫色星环裂隙（<b>A ↔ B 双向连通</b>）。踏入就绪的传送门可<b>瞬间跃迁至另一端</b>，赋予<b>短暂无敌并在落点震退杀伤周遭虫群</b>（共享 4.5 秒充能冷却）！'
+    id: 'portal', icon: '🌀', name: '虚空晶裂传送门', badge: '紫晶废土专属', scenes: '🌑 紫晶废土（唯一标志地形）',
+    desc: '撕裂空间的棱晶次元裂隙（<b>A ↔ B 双向连通</b>，浮空紫晶簇环绕）。踏入就绪的裂隙门可<b>瞬间跃迁至另一端</b>，赋予<b>短暂无敌并在落点震退杀伤周遭虫群</b>（共享 4.5 秒充能冷却）！'
   },
   {
-    id: 'lava', icon: '🌋', name: '炽热岩浆池', badge: '双向灼烧地形', scenes: '机械熔炉 · 赤砂荒原',
-    desc: '翻涌高温熔岩的地表火池。<b>异虫踏入会持续挂上高频灼烧并减速 -20%</b>（可故意绕池引怪群烧！）；玩家持续踩入超过 0.35 秒也会受到滚烫灼伤（拥有赫尔墨斯飞翼可免疫）。'
+    id: 'lava', icon: '🌋', name: '裂地熔岩火池', badge: '机械熔炉专属', scenes: '⚙️ 机械熔炉（唯一标志地形）',
+    desc: '地壳崩裂形成的不规则多瓣玄武岩火池。<b>异虫踏入会持续挂上高频灼烧并减速 -18%</b>（可绕着火池边缘引怪群烧！）；玩家持续踩入超过 0.35 秒也会受到滚烫灼伤（赫尔墨斯飞翼可免疫）。'
   },
   {
-    id: 'swamp', icon: '🧪', name: '腐化毒泥沼', badge: '战术聚怪地形', scenes: '荧光菌丛 · 紫晶废土',
-    desc: '冒泡的粘稠异星沼泽。<b>踏入泥沼的怪物移速大幅降低 -38%</b>，非常适合配合火箭筒、喷火器等范围武器聚怪洗地；玩家涉水时移速轻微降低（受 72% 保底保护）。'
+    id: 'swamp', icon: '🧪', name: '腐殖剧毒泥沼', badge: '荧光菌丛专属', scenes: '🍄 荧光菌丛（唯一标志地形）',
+    desc: '蜿蜒曲折、岸边生长荧光毒菇的异星泥沼湿地。<b>踏入泥沼的怪物移速大幅降低 -38% 并叠毒腐蚀</b>，非常适合范围与元素武器聚怪洗地；玩家涉水轻微减速（受 72% 移速保底保护）。'
   },
   {
-    id: 'chasm', icon: '🕳️', name: '断层裂谷沟壑', badge: '隔谷风筝掩体', scenes: '赤砂荒原 · 紫晶废土 · 冰窟 · 熔炉',
-    desc: '深不见底的地壳断层裂隙。<b>阻挡玩家与地面异虫通行</b>（触碰边缘自动顺滑绕行，绝不卡位），但<b>所有远程子弹、激光与电浆均可直接飞跃沟壑</b>，是远程流隔岸风筝的绝佳掩体！'
+    id: 'chasm', icon: '🕳️', name: '荒漠断层大裂谷', badge: '赤砂荒原专属', scenes: '🏜️ 赤砂荒原（唯一标志地形）',
+    desc: '横亘沙原的折线锯齿岩层深渊。<b>阻挡玩家与地面异虫通行</b>（沿岩壁自动顺滑绕行，绝不卡位），但<b>所有远程子弹、激光与榴弹均可直接飞越裂谷</b>，是隔谷风筝与卡位聚怪的绝佳掩体！'
   },
   {
-    id: 'ice_sheet', icon: '🧊', name: '极滑寒霜冰湖', badge: '高速溜冰地形', scenes: '极寒冰窟专属',
-    desc: '光滑如镜的天然寒冰湖面。<b>玩家踏上冰面立即获得 +28% 疾滑移速加成</b>，而异虫在冰面上打滑移速降低 -15%，拉扯走位极其飘逸！'
+    id: 'ice_sheet', icon: '🧊', name: '极寒碎晶冰湖', badge: '极寒冰窟专属', scenes: '❄️ 极寒冰窟（唯一标志地形）',
+    desc: '棱角分明、内蕴冰裂纹的天然多边形寒冰湖面。<b>玩家踏上冰湖立即获得 +28% 疾滑移速加成</b>，而异虫在冰面上打滑移速降低 -15%，拉扯走位极其飘逸！'
   }
 ];
 let selectedScene = 'random', curScene = SCENES[0], sceneSeed = 1024, bakedSceneKey = '';

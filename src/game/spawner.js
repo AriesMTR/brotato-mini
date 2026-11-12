@@ -1,11 +1,210 @@
-// 异星晶树机制与交互式战场地形引擎（岩浆池、毒泥沼、断层沟壑、寒霜冰湖、双生虚空传送门）
+// 异星晶树机制与一图一专属【非规则异形战场地形引擎】（多瓣熔岩池、曲岸毒泥沼、多棱碎晶冰湖、折线大裂谷、菱晶虚空门）
+const FALLBACK_BOSS_DEFS = {
+  butcher: { id: 'butcher', icon: '👑', name: '深渊屠夫虫王', epithet: '腐血母巢暴君', color: '#e63946', spd: 90, desc: '深渊母巢暴君' },
+  frost_queen: { id: 'frost_queen', icon: '❄️', name: '极寒霜晶女皇', epithet: '永冻凛冬神姬', color: '#00bbf9', spd: 84, desc: '冰封王座主宰' },
+  mech_colossus: { id: 'mech_colossus', icon: '⚙️', name: '熔核机械巨像', epithet: '歼星重装泰坦', color: '#f77f00', spd: 78, desc: '重装泰坦兵器' },
+  void_weaver: { id: 'void_weaver', icon: '👁️', name: '虚空织网主宰', epithet: '次元裂隙古神', color: '#9d4edd', spd: 86, desc: '异次元古神' }
+};
+const FALLBACK_MINI_BOSS_DEFS = {
+  vanguard: { id: 'vanguard', icon: '⚔️', name: '狂厄裂地统领', color: '#f72585', spd: 86, desc: '重甲先锋统领' },
+  pyro_lord: { id: 'pyro_lord', icon: '🔥', name: '炽焰重炮统领', color: '#fb5607', spd: 80, desc: '熔火狂热统领' },
+  shadow_stalker: { id: 'shadow_stalker', icon: '⚡', name: '幽影雷刃统领', color: '#7209b7', spd: 96, desc: '极速刺客统领' }
+};
+const FALLBACK_SPECIAL_RELICS = [
+  { id: 'blood_altar', icon: '🩸', name: '绯红血契祭坛', color: '#ff2a55', bossId: 'crimson_lord', bossIcon: '🦇', bossName: '猩红鲜血伯爵', epithet: '永夜血族真祖', bossColor: '#d90429' },
+  { id: 'golden_idol', icon: '🪙', name: '黄金贪婪神像', color: '#ffd166', bossId: 'golden_golem', bossIcon: '🏆', bossName: '黄金晶石巨神', epithet: '秘宝黄金神躯', bossColor: '#f59e0b' },
+  { id: 'void_cube', icon: '🌌', name: '虚空裂隙魔方', color: '#c77dff', bossId: 'abyss_devourer', bossIcon: '👾', bossName: '异次元吞噬者', epithet: '吞星奇点魔神', bossColor: '#7209b7' }
+];
+
+function getBossDefs() {
+  return (typeof BOSS_DEFS !== 'undefined' && BOSS_DEFS) ? BOSS_DEFS : (globalThis.BOSS_DEFS || FALLBACK_BOSS_DEFS);
+}
+function getMiniBossDefs() {
+  return (typeof MINI_BOSS_DEFS !== 'undefined' && MINI_BOSS_DEFS) ? MINI_BOSS_DEFS : (globalThis.MINI_BOSS_DEFS || FALLBACK_MINI_BOSS_DEFS);
+}
+function getSpecialRelics() {
+  return (typeof SPECIAL_RELICS !== 'undefined' && Array.isArray(SPECIAL_RELICS) && SPECIAL_RELICS.length)
+    ? SPECIAL_RELICS
+    : (globalThis.SPECIAL_RELICS || FALLBACK_SPECIAL_RELICS);
+}
+
 function pointSegClosest(px, py, x1, y1, x2, y2) {
   const vx = x2 - x1, vy = y2 - y1;
   const lenSq = vx * vx + vy * vy || 1;
   const t = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / lenSq));
   const cx = x1 + vx * t, cy = y1 + vy * t;
   const dx = px - cx, dy = py - cy;
-  return { cx, cy, dx, dy, dSq: dx * dx + dy * dy };
+  return { cx, cy, dx, dy, dSq: dx * dx + dy * dy, t };
+}
+
+// 非规则异形地形极坐标轮廓函数（熔岩三瓣裂口 / 毒沼花生曲岸 / 冰湖多棱晶湾，彻底告别正圆）
+function terrainRadiusAt(tr, ang) {
+  const baseR = Math.max(24, tr.r || 78);
+  const s = tr.seed !== undefined ? tr.seed : 1.7;
+  const rot = tr.rot !== undefined ? tr.rot : (s % 6.28);
+  const a = ang - rot;
+  let mod = 1;
+  if (tr.kind === 'lava') {
+    mod = 1 + 0.25 * Math.sin(2 * a + s * 0.7) + 0.17 * Math.cos(3 * a - s * 1.3) + 0.09 * Math.sin(5 * a + s * 2.1);
+  } else if (tr.kind === 'swamp') {
+    mod = 1 + 0.29 * Math.cos(2 * a + s * 0.9) + 0.16 * Math.sin(3 * a + s * 1.6) - 0.08 * Math.cos(4 * a - s * 0.5);
+  } else if (tr.kind === 'ice_sheet') {
+    mod = 1 + 0.22 * Math.sin(2 * a - s * 0.8) + 0.16 * Math.cos(3 * a + s * 1.4) + 0.11 * Math.cos(5 * a - s * 1.9);
+  }
+  return baseR * Math.max(0.56, Math.min(1.36, mod));
+}
+
+// 惰性烘焙不规则地形几何顶点与岸线装饰细节（零每帧分配，渲染与碰撞 100% 对齐）
+function ensureTerrainGeometry(tr) {
+  if (!tr || (tr._geoReady && tr._geoX === tr.x && tr._geoY === tr.y)) return tr;
+  const s = tr.seed !== undefined ? tr.seed : 2.3;
+  tr.seed = s;
+  if (tr.rot === undefined) tr.rot = (s * 1.37) % (Math.PI * 2);
+
+  if (tr.kind === 'chasm') {
+    const x1 = tr.x1 !== undefined ? tr.x1 : tr.x - 95;
+    const y1 = tr.y1 !== undefined ? tr.y1 : tr.y;
+    const x2 = tr.x2 !== undefined ? tr.x2 : tr.x + 95;
+    const y2 = tr.y2 !== undefined ? tr.y2 : tr.y;
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 160;
+    const ux = dx / len, uy = dy / len;
+    const nx = -uy, ny = ux;
+    const baseW = Math.max(18, tr.r || 30);
+    // 6 段折线锯齿断层主脊（两端尖削收窄如大地撕裂口，中段犬牙交错）
+    const steps = 6;
+    const spine = [];
+    for (let k = 0; k <= steps; k++) {
+      const f = k / steps;
+      const midEnvelope = Math.sin(f * Math.PI);
+      const kink = (k === 0 || k === steps) ? 0 : Math.sin(s * 2.3 + k * 2.15) * (baseW * 0.62) * midEnvelope;
+      const wScale = (k === 0 || k === steps) ? 0.18 : (0.58 + 0.56 * midEnvelope + 0.14 * Math.cos(s + k * 1.9));
+      spine.push({
+        x: x1 + dx * f + nx * kink,
+        y: y1 + dy * f + ny * kink,
+        w: baseW * wScale
+      });
+    }
+    tr.spine = spine;
+    tr.halfLen = Math.max(tr.halfLen || 0, len * 0.55 + baseW);
+    const buildRim = (widthMul, jitterAmp) => {
+      const pts = [];
+      for (let k = 0; k <= steps; k++) {
+        const p = spine[k];
+        const jit = (k === 0 || k === steps) ? 0 : Math.sin(s * 3.1 + k * 2.7) * jitterAmp;
+        pts.push({ x: p.x + nx * (p.w * widthMul + jit), y: p.y + ny * (p.w * widthMul + jit) });
+      }
+      for (let k = steps; k >= 0; k--) {
+        const p = spine[k];
+        const jit = (k === 0 || k === steps) ? 0 : Math.cos(s * 2.7 + k * 2.3) * jitterAmp;
+        pts.push({ x: p.x - nx * (p.w * widthMul + jit), y: p.y - ny * (p.w * widthMul + jit) });
+      }
+      return pts;
+    };
+    tr.outerCliff = buildRim(1.36, 6.5);
+    tr.midCliff = buildRim(1.06, 4.2);
+    tr.abyssPoly = buildRim(0.74, 3.4);
+    // 裂谷边缘延伸的地表细碎裂纹分支
+    tr.cracks = [];
+    for (let c = 1; c < steps; c += 2) {
+      const sp = spine[c];
+      const side = (c % 4 === 1) ? 1 : -1;
+      const ca = Math.atan2(ny * side, nx * side) + Math.sin(s + c) * 0.45;
+      const cl = baseW * (1.45 + (c % 2) * 0.3);
+      const sx0 = sp.x + nx * side * sp.w * 0.9;
+      const sy0 = sp.y + ny * side * sp.w * 0.9;
+      const mx = sp.x + Math.cos(ca + 0.22) * (cl * 0.58);
+      const my = sp.y + Math.sin(ca + 0.22) * (cl * 0.58);
+      const ex = sp.x + Math.cos(ca - 0.18) * cl;
+      const ey = sp.y + Math.sin(ca - 0.18) * cl;
+      tr.cracks.push({ x0: sx0, y0: sy0, x1: sx0, y1: sy0, mx, my, xm: mx, ym: my, x2: ex, y2: ey });
+    }
+    tr._geoX = tr.x; tr._geoY = tr.y;
+    tr._geoReady = true;
+    return tr;
+  }
+
+  // 不规则池沼/冰湖轮廓点集
+  const n = tr.kind === 'ice_sheet' ? 16 : (tr.kind === 'lava' ? 22 : 20);
+  const verts = [];
+  let maxR = tr.r || 78;
+  for (let k = 0; k < n; k++) {
+    const ang = (k / n) * Math.PI * 2;
+    let rad = terrainRadiusAt(tr, ang);
+    if (tr.kind === 'lava') {
+      // 熔岩池增加犬牙交错的玄武岩裂齿感
+      rad *= (k % 2 === 0 ? 1.06 : 0.92);
+    } else if (tr.kind === 'ice_sheet') {
+      // 冰湖呈现棱晶折角尖角切面
+      rad *= (k % 4 === 0 ? 1.14 : (k % 2 === 0 ? 0.88 : 0.97));
+    }
+    if (rad > maxR) maxR = rad;
+    const ux = Math.cos(ang), uy = Math.sin(ang);
+    verts.push({ ang, rad, ux, uy, x: tr.x + ux * rad, y: tr.y + uy * rad });
+  }
+  tr.verts = verts;
+  tr.boundR = maxR + 18;
+  if (tr.kind === 'lava') {
+    tr.crusts = [];
+    for (let c = 0; c < 4; c++) {
+      const ca = tr.rot + c * 1.57 + 0.42;
+      const crd = (tr.r || 80) * (0.28 + (c % 2) * 0.22);
+      tr.crusts.push({
+        x: tr.x + Math.cos(ca) * crd,
+        y: tr.y + Math.sin(ca) * crd,
+        sz: 7 + (c % 3) * 3.5,
+        rot: ca * 0.7 + s
+      });
+    }
+  } else if (tr.kind === 'swamp') {
+    tr.shoals = [];
+    for (let sh = 0; sh < 3; sh++) {
+      const sa = tr.rot + sh * 2.09 + 0.55;
+      const er = terrainRadiusAt(tr, sa);
+      tr.shoals.push({
+        x: tr.x + Math.cos(sa) * (er * 1.06),
+        y: tr.y + Math.sin(sa) * (er * 1.06),
+        rx: 18 + sh * 5,
+        ry: 11 + (sh % 2) * 4,
+        rot: sa + 1.25
+      });
+    }
+  }
+  tr._geoX = tr.x; tr._geoY = tr.y;
+  tr._geoReady = true;
+  return tr;
+}
+
+function isPointInTerrain(tr, px, py, pad = 0) {
+  if (!tr || tr.kind === 'chasm') return false;
+  ensureTerrainGeometry(tr);
+  const dx = px - tr.x, dy = py - tr.y;
+  const maxB = (tr.boundR || (tr.r || 78) * 1.4) + pad;
+  if (dx * dx + dy * dy > maxB * maxB) return false;
+  const d = Math.hypot(dx, dy);
+  if (d <= (tr.r || 70) * 0.50 + pad) return true;
+  const ang = Math.atan2(dy, dx);
+  return d < terrainRadiusAt(tr, ang) + pad;
+}
+
+function closestOnChasm(tr, px, py) {
+  ensureTerrainGeometry(tr);
+  if (tr.spine && tr.spine.length >= 2) {
+    let best = null;
+    for (let s = 0; s < tr.spine.length - 1; s++) {
+      const a = tr.spine[s], b = tr.spine[s + 1];
+      const seg = pointSegClosest(px, py, a.x, a.y, b.x, b.y);
+      const localW = a.w + (b.w - a.w) * seg.t;
+      const gap = Math.sqrt(seg.dSq) - localW;
+      if (!best || gap < best.gap) {
+        best = { ...seg, localW, gap };
+      }
+    }
+    return best;
+  }
+  const seg = pointSegClosest(px, py, tr.x1, tr.y1, tr.x2, tr.y2);
+  const localW = tr.r || 30;
+  return { ...seg, localW, gap: Math.sqrt(seg.dSq) - localW };
 }
 
 function isBlockedByTerrain(x, y, pad = 28) {
@@ -13,19 +212,17 @@ function isBlockedByTerrain(x, y, pad = 28) {
     for (let i = 0; i < terrains.length; i++) {
       const tr = terrains[i];
       if (tr.kind === 'chasm') {
-        const seg = pointSegClosest(x, y, tr.x1, tr.y1, tr.x2, tr.y2);
-        const minR = (tr.r || 32) + pad;
-        if (seg.dSq < minR * minR) return true;
+        const hit = closestOnChasm(tr, x, y);
+        if (hit && hit.gap < pad) return true;
       } else if (tr.kind === 'lava') {
-        const minR = (tr.r || 68) + pad * 0.7;
-        if ((x - tr.x) * (x - tr.x) + (y - tr.y) * (y - tr.y) < minR * minR) return true;
+        if (isPointInTerrain(tr, x, y, pad * 0.7)) return true;
       }
     }
   }
   if (typeof portals !== 'undefined') {
     for (let i = 0; i < portals.length; i++) {
       const p = portals[i];
-      const minR = (p.r || 34) + pad;
+      const minR = (p.r || 36) + pad;
       if ((x - p.x) * (x - p.x) + (y - p.y) * (y - p.y) < minR * minR) return true;
     }
   }
@@ -34,108 +231,105 @@ function isBlockedByTerrain(x, y, pad = 28) {
 
 function pushOutOfChasms(ent) {
   if (!ent || typeof terrains === 'undefined' || !terrains.length) return;
-  for (let i = 0; i < terrains.length; i++) {
-    const tr = terrains[i];
-    if (tr.kind !== 'chasm') continue;
-    const seg = pointSegClosest(ent.x, ent.y, tr.x1, tr.y1, tr.x2, tr.y2);
-    const minD = (tr.r || 32) + (ent.r || 16);
-    if (seg.dSq < minD * minD) {
-      const d = Math.sqrt(seg.dSq) || 0.01;
-      const nx = d > 0.05 ? seg.dx / d : 0;
-      const ny = d > 0.05 ? seg.dy / d : -1;
-      ent.x = seg.cx + nx * minD;
-      ent.y = seg.cy + ny * minD;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < terrains.length; i++) {
+      const tr = terrains[i];
+      if (tr.kind !== 'chasm') continue;
+      const hit = closestOnChasm(tr, ent.x, ent.y);
+      if (!hit) continue;
+      const minD = hit.localW + (ent.r || 16);
+      if (hit.dSq < minD * minD) {
+        const d = Math.sqrt(hit.dSq) || 0.01;
+        const nx = d > 0.05 ? hit.dx / d : 0;
+        const ny = d > 0.05 ? hit.dy / d : -1;
+        ent.x = hit.cx + nx * minD;
+        ent.y = hit.cy + ny * minD;
+      }
     }
   }
 }
 
+function makeRiftPortal(id, label, x, y, color, phaseOffset = 0) {
+  const shards = [];
+  for (let k = 0; k < 5; k++) {
+    shards.push({
+      ang: phaseOffset + k * ((Math.PI * 2) / 5) + 0.25,
+      dist: 36 + (k % 2) * 7,
+      len: 10 + (k % 3) * 3,
+      tilt: (k % 2 === 0 ? 0.35 : -0.35)
+    });
+  }
+  return { id, label, x, y, r: 36, pulse: phaseOffset, color, shards };
+}
+
+// 一图一专属异形地形生成（每张地图仅刷出 1 处符合生态气质的不规则标志地形，视觉清爽且战术鲜明）
 function spawnArenaTerrains() {
   terrains = [];
   portals = [];
   portalPairCd = 0;
   const cx = WORLD.w * 0.5, cy = WORLD.h * 0.5;
   const scId = (curScene && curScene.id) || 'wasteland';
-  const placed = [];
 
-  const pickSpot = (minCenter = 240, wallPad = 195, minSep = 220) => {
-    for (let tries = 0; tries < 24; tries++) {
-      const x = wallPad + Math.random() * Math.max(120, WORLD.w - wallPad * 2);
-      const y = wallPad + Math.random() * Math.max(120, WORLD.h - wallPad * 2);
-      if (Math.hypot(x - cx, y - cy) < minCenter) continue;
-      if (placed.some(p => Math.hypot(x - p.x, y - p.y) < minSep)) continue;
-      placed.push({ x, y });
-      return { x, y };
+  const pickSingleLandmarkSpot = (minCenter = 235, wallPad = 235) => {
+    for (let tries = 0; tries < 28; tries++) {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = minCenter + 35 + Math.random() * 145;
+      const x = Math.max(wallPad, Math.min(WORLD.w - wallPad, cx + Math.cos(ang) * dist));
+      const y = Math.max(wallPad, Math.min(WORLD.h - wallPad, cy + Math.sin(ang) * dist));
+      if (Math.hypot(x - cx, y - cy) >= minCenter * 0.85) return { x, y };
     }
-    return null;
+    return { x: Math.min(WORLD.w - wallPad, cx + 260), y: cy };
   };
 
-  const addChasm = () => {
-    const sp = pickSpot(255, 220, 260);
-    if (!sp) return;
+  if (scId === 'wasteland') {
+    // 🌑 紫晶废土唯一专属地形：A ↔ B 菱晶撕裂虚空传送门（成对连通，1 套空间机关）
+    const diag = Math.random() < 0.5 ? 1 : -1;
+    const ox = Math.min(440, WORLD.w * 0.24) + (Math.random() - 0.5) * 70;
+    const oy = Math.min(285, WORLD.h * 0.22) + (Math.random() - 0.5) * 60;
+    const p1x = Math.max(165, Math.min(WORLD.w - 165, cx - ox));
+    const p1y = Math.max(165, Math.min(WORLD.h - 165, cy - oy * diag));
+    const p2x = Math.max(165, Math.min(WORLD.w - 165, cx + ox));
+    const p2y = Math.max(165, Math.min(WORLD.h - 165, cy + oy * diag));
+    portals.push(
+      makeRiftPortal(0, 'A', p1x, p1y, '#c77dff', 0),
+      makeRiftPortal(1, 'B', p2x, p2y, '#4cc9f0', Math.PI)
+    );
+  } else if (scId === 'desert') {
+    // 🏜️ 赤砂荒原唯一专属地形：1 道折线锯齿断层大裂谷
+    const sp = pickSingleLandmarkSpot(250, 260);
     const ang = Math.random() * Math.PI;
-    const halfLen = 78 + Math.random() * 28;
-    terrains.push({
+    const halfLen = 112 + Math.random() * 26;
+    terrains.push(ensureTerrainGeometry({
       kind: 'chasm',
       x: sp.x, y: sp.y,
       x1: sp.x - Math.cos(ang) * halfLen, y1: sp.y - Math.sin(ang) * halfLen,
       x2: sp.x + Math.cos(ang) * halfLen, y2: sp.y + Math.sin(ang) * halfLen,
-      ang, halfLen, r: 30, seed: Math.random() * 100
-    });
-  };
-
-  const addPool = (kind, baseR) => {
-    const sp = pickSpot(235, 190, 230);
-    if (!sp) return;
-    terrains.push({
-      kind, x: sp.x, y: sp.y,
-      r: baseR + Math.round(Math.random() * 16),
-      pulse: Math.random() * 6.28, seed: Math.random() * 100
-    });
-  };
-
-  if (scId === 'foundry') {
-    addPool('lava', 68);
-    addPool('lava', 64);
-    if (wave >= 4) addPool('lava', 60);
-    addChasm();
-  } else if (scId === 'desert') {
-    addChasm();
-    addChasm();
-    addPool('lava', 62);
+      ang, halfLen, r: 32, seed: 1.2 + Math.random() * 60
+    }));
   } else if (scId === 'glacier') {
-    addPool('ice_sheet', 86);
-    addPool('ice_sheet', 80);
-    addChasm();
-  } else if (scId === 'fungal') {
-    addPool('swamp', 78);
-    addPool('swamp', 72);
-    if (wave >= 4) addPool('swamp', 68);
+    // ❄️ 极寒冰窟唯一专属地形：1 片多棱碎晶寒霜冰湖
+    const sp = pickSingleLandmarkSpot(230, 240);
+    terrains.push(ensureTerrainGeometry({
+      kind: 'ice_sheet', x: sp.x, y: sp.y,
+      r: 102 + Math.round(Math.random() * 14),
+      pulse: Math.random() * 6.28, seed: 1.5 + Math.random() * 60
+    }));
+  } else if (scId === 'foundry') {
+    // ⚙️ 机械熔炉唯一专属地形：1 处多瓣玄武岩裂地熔岩火池
+    const sp = pickSingleLandmarkSpot(240, 235);
+    terrains.push(ensureTerrainGeometry({
+      kind: 'lava', x: sp.x, y: sp.y,
+      r: 86 + Math.round(Math.random() * 12),
+      pulse: Math.random() * 6.28, seed: 1.8 + Math.random() * 60
+    }));
   } else {
-    // wasteland
-    addChasm();
-    addPool('swamp', 74);
-    addPool('swamp', 68);
-  }
-
-  // 第 2 波起生成 A ↔ B 双生虚空传送门（紫晶废土与荧光菌丛必出，其余生态 78% 概率出现）
-  const forcePortal = scId === 'wasteland' || scId === 'fungal';
-  if (wave >= 2 && (forcePortal || Math.random() < 0.78)) {
-    const diag = Math.random() < 0.5 ? 1 : -1;
-    const ox = Math.min(460, WORLD.w * 0.25) + (Math.random() - 0.5) * 90;
-    const oy = Math.min(300, WORLD.h * 0.23) + (Math.random() - 0.5) * 70;
-    let p1x = cx - ox, p1y = cy - oy * diag;
-    let p2x = cx + ox, p2y = cy + oy * diag;
-    // 确保传送门不压在裂谷或岩浆上
-    for (let k = 0; k < 10 && isBlockedByTerrain(p1x, p1y, 48); k++) { p1x += 45; p1y += 32 * diag; }
-    for (let k = 0; k < 10 && isBlockedByTerrain(p2x, p2y, 48); k++) { p2x -= 45; p2y -= 32 * diag; }
-    p1x = Math.max(150, Math.min(WORLD.w - 150, p1x));
-    p1y = Math.max(150, Math.min(WORLD.h - 150, p1y));
-    p2x = Math.max(150, Math.min(WORLD.w - 150, p2x));
-    p2y = Math.max(150, Math.min(WORLD.h - 150, p2y));
-    portals.push(
-      { id: 0, label: 'A', x: p1x, y: p1y, r: 34, pulse: 0, color: '#c77dff' },
-      { id: 1, label: 'B', x: p2x, y: p2y, r: 34, pulse: Math.PI, color: '#4cc9f0' }
-    );
+    // 🍄 荧光菌丛唯一专属地形：1 片曲岸荧光毒菇腐殖泥沼
+    const sp = pickSingleLandmarkSpot(235, 240);
+    terrains.push(ensureTerrainGeometry({
+      kind: 'swamp', x: sp.x, y: sp.y,
+      r: 94 + Math.round(Math.random() * 12),
+      pulse: Math.random() * 6.28, seed: 2.1 + Math.random() * 60
+    }));
   }
 }
 
@@ -179,23 +373,26 @@ function hurtTree(tr, rawDmg) {
 }
 
 function pickBossVariant(exclude = '') {
-  const keys = Object.keys(BOSS_DEFS);
+  const defs = getBossDefs();
+  const keys = Object.keys(defs);
   const pool = keys.filter(k => k !== exclude && k !== lastBossVariant);
   const use = pool.length ? pool : keys.filter(k => k !== exclude);
-  return use[Math.floor(Math.random() * use.length)] || 'butcher';
+  return use[Math.floor(Math.random() * use.length)] || keys[0] || 'butcher';
 }
 
 function pickMiniBossVariant(exclude = '') {
-  const keys = Object.keys(MINI_BOSS_DEFS);
+  const defs = getMiniBossDefs();
+  const keys = Object.keys(defs);
   const pool = keys.filter(k => k !== exclude && k !== lastMiniBossVariant);
   const use = pool.length ? pool : keys.filter(k => k !== exclude);
-  return use[Math.floor(Math.random() * use.length)] || 'vanguard';
+  return use[Math.floor(Math.random() * use.length)] || keys[0] || 'vanguard';
 }
 
 // 地图稀有奇遇圣物生成与特殊 Boss 召唤逻辑
 function spawnSpecialRelic(forceId = null) {
   if (relics.length >= 1) return null;
-  const def = forceId ? (SPECIAL_RELICS.find(r => r.id === forceId) || SPECIAL_RELICS[0]) : SPECIAL_RELICS[Math.floor(Math.random() * SPECIAL_RELICS.length)];
+  const relPool = getSpecialRelics();
+  const def = forceId ? (relPool.find(r => r.id === forceId) || relPool[0]) : relPool[Math.floor(Math.random() * relPool.length)];
   let rx = WORLD.w * 0.5, ry = WORLD.h * 0.5;
   for (let tries = 0; tries < 16; tries++) {
     const ang = Math.random() * Math.PI * 2;
@@ -215,42 +412,41 @@ function spawnSpecialRelic(forceId = null) {
 }
 
 // 全屏首领登场 / 隐藏二阶段觉醒切入特写触发器（短暂静止普通怪与倒计时，聚焦展现首领专属立绘）
-function startBossCutscene(mode, variant, title, subtitle, extraTag = '', color = '#ff4d6d', accent = '#ffd166', dur = 1.18) {
-  bossCutscene = { t: dur, maxT: dur, mode, variant, title, subtitle, extraTag, color, accent };
+function startBossCutscene(mode, variant, title, subtitle, extraTag = '', color = '#ff4d6d', accent = '#ffd166', dur = 1.18, extra = null) {
+  bossCutscene = Object.assign({ t: dur, maxT: dur, mode, variant, title, subtitle, extraTag, color, accent }, extra || {});
   if (player) player.invuln = Math.max(player.invuln || 0, dur + 0.35);
 }
 
-// 首领战斗中动态改造战场地形（倾泻熔岩池 / 喷涌毒沼 / 凝结冰湖 / 撕裂断层裂谷）
-function spawnBossTerrain(kind, x, y, baseR = 66) {
+// 首领战斗中动态改造战场地形（严格上限 ≤2 处异形地形，不拥挤不圆形）
+function spawnBossTerrain(kind, x, y, baseR = 68) {
   if (typeof terrains === 'undefined') return;
-  if (terrains.length >= 7) {
-    const rmIdx = terrains.findIndex(t => t.kind !== 'chasm');
-    terrains.splice(rmIdx >= 0 ? rmIdx : 0, 1);
+  while (terrains.length >= 2) {
+    terrains.pop();
   }
-  const cx = Math.max(175, Math.min(WORLD.w - 175, x));
-  const cy = Math.max(175, Math.min(WORLD.h - 175, y));
+  const cx = Math.max(185, Math.min(WORLD.w - 185, x));
+  const cy = Math.max(185, Math.min(WORLD.h - 185, y));
   if (kind === 'chasm') {
     let tx = cx, ty = cy;
-    if (player && Math.hypot(tx - player.x, ty - player.y) < 115) {
+    if (player && Math.hypot(tx - player.x, ty - player.y) < 120) {
       const pushA = Math.atan2(ty - player.y, tx - player.x) || 0;
-      tx = Math.max(190, Math.min(WORLD.w - 190, player.x + Math.cos(pushA) * 135));
-      ty = Math.max(190, Math.min(WORLD.h - 190, player.y + Math.sin(pushA) * 135));
+      tx = Math.max(195, Math.min(WORLD.w - 195, player.x + Math.cos(pushA) * 145));
+      ty = Math.max(195, Math.min(WORLD.h - 195, player.y + Math.sin(pushA) * 145));
     }
     const ang = Math.random() * Math.PI;
-    const halfLen = 72 + Math.random() * 24;
-    terrains.push({
+    const halfLen = 84 + Math.random() * 24;
+    terrains.push(ensureTerrainGeometry({
       kind: 'chasm', x: tx, y: ty,
       x1: tx - Math.cos(ang) * halfLen, y1: ty - Math.sin(ang) * halfLen,
       x2: tx + Math.cos(ang) * halfLen, y2: ty + Math.sin(ang) * halfLen,
-      ang, halfLen, r: 28, seed: Math.random() * 100
-    });
+      ang, halfLen, r: 30, seed: Math.random() * 100
+    }));
     if (rings.length < 40) rings.push({ x: tx, y: ty, r: 95, color: '#c77dff', t: 0.35, maxT: 0.35, fill: true });
-    announce('🕳️ 首领撕裂大地！战场新增【断层裂谷】', '#c77dff', 2.6);
+    announce('🕳️ 首领撕裂大地！战场新增异形【断层裂谷】', '#c77dff', 2.6);
   } else {
     const col = kind === 'lava' ? '#ff6b35' : (kind === 'ice_sheet' ? '#72efdd' : '#a3e635');
-    terrains.push({ kind, x: cx, y: cy, r: baseR, pulse: 0, seed: Math.random() * 100 });
+    terrains.push(ensureTerrainGeometry({ kind, x: cx, y: cy, r: baseR, pulse: 0, seed: Math.random() * 100 }));
     if (rings.length < 40) rings.push({ x: cx, y: cy, r: baseR + 20, color: col, t: 0.35, maxT: 0.35, fill: true });
-    const nameMap = { lava: '🌋 首领倾泻【熔岩火池】改造地形！', swamp: '🧪 首领喷涌【剧毒泥沼】污染地面！', ice_sheet: '🧊 首领凝结【寒霜冰面】冰封战场！' };
+    const nameMap = { lava: '🌋 首领倾泻异形【熔岩火口】改造地形！', swamp: '🧪 首领喷涌异形【剧毒菌沼】污染地面！', ice_sheet: '🧊 首领凝结多棱【寒霜冰镜】冰封战场！' };
     if (nameMap[kind]) announce(nameMap[kind], col, 2.6);
   }
 }
@@ -316,11 +512,12 @@ function beginWave() {
   player.hp = player.maxHp;
   player.shield = player.maxShield;
   player.shieldRegenT = 7;
-  enemies = []; bullets = []; eBullets = []; hazards = []; drops = []; spawns = []; turrets = []; rings = []; trees = [];
+  player.mineCd = 1.25;
+  enemies = []; bullets = []; eBullets = []; hazards = []; drops = []; spawns = []; turrets = []; mines = []; rings = []; trees = [];
   relics = []; sporeZones = []; banners = []; bossCutscene = null; sandGustT = 0;
   texts = []; particles = []; sparks = []; lightnings = []; slashes = []; beams = []; stains = []; shells = [];
 
-  // 生成当前生态专属交互地形（岩浆池 / 毒泥沼 / 断层沟壑 / 极滑冰湖 / 双生传送门）
+  // 生成当前生态唯一专属异形地形（一图仅一处异形特殊地形）
   spawnArenaTerrains();
 
   const tc = document.getElementById('timerCapsule');
@@ -349,34 +546,44 @@ function beginWave() {
   const relicChance = (wave >= 3 && !isBossWave) ? Math.min(0.36, 0.20 + (player.luck || 0) * 0.0025) : 0;
   relicSpawnT = Math.random() < relicChance ? (3.5 + Math.random() * 3.5) : -1;
 
-  const portalNote = portals.length >= 2 ? ' · 🌀双生传送门已开启' : '';
+  const portalNote = portals.length >= 2 ? ' · 🌀双生晶裂门已开启' : '';
   const waveIntro = `${curScene.icon} 第 ${wave} 波：${curScene.name}${activeSceneEvent ? ' · ' + curScene.eventIcon + curScene.eventName : ''}${portalNote}`;
   logInfo('WAVE', `进入第 ${wave} 波 (${waveTime}s) · 场景=${curScene.name}(${curScene.id}) · 地形=${terrains.length}处+传送门=${portals.length} · 专属怪=${sceneMobEnabled} · 异象=${activeSceneEvent || '无'} · 地图=${WORLD.w}x${WORLD.h}`);
   announce(waveIntro, curScene.accent2 || '#ffd166', 3.6);
 
-  // 部署自动防御炮台（机械师天赋 + 便携炮塔道具 + 扳手武器）
+  // 部署自动防御炮台与浮游激光塔（机械师天赋 + 扳手 + 无人机舱 + 工程装备）
   const wrenches = player.weapons.filter(w => w.id === 'wrench');
-  const totalT = player.bonusTurrets + wrenches.length;
+  const droneBays = player.weapons.filter(w => w.id === 'drone_bay');
+  const bulletTurrets = (player.bonusTurrets || 0) + wrenches.length;
+  const laserTurrets = (player.laserTurrets || 0) + droneBays.length;
+  const totalT = bulletTurrets + laserTurrets;
   for (let i = 0; i < totalT; i++) {
     const a = (i / Math.max(1, totalT)) * Math.PI * 2;
-    const dist = 115 + (i % 2) * 50;
-    const tier = i < wrenches.length ? wrenches[i].tier : 1;
+    const dist = 115 + (i % 2) * 52;
+    const isLaser = i >= bulletTurrets;
+    const laserIdx = i - bulletTurrets;
+    const tier = isLaser
+      ? (laserIdx < droneBays.length ? droneBays[laserIdx].tier : 2)
+      : (i < wrenches.length ? wrenches[i].tier : 1);
     turrets.push({
       x: WORLD.w / 2 + Math.cos(a) * dist, y: WORLD.h / 2 + Math.sin(a) * dist,
-      tier, cd: 0.3 + Math.random() * 0.3, angle: 0, recoil: 0
+      kind: isLaser ? 'laser' : 'bullet',
+      tier, cd: 0.25 + Math.random() * 0.3, angle: 0, recoil: 0
     });
   }
 
   // 多样化随机精英统领、虫潮突袭与第 12 波随机主宰 Boss / 异名双王同台降临
+  const bossDefs = getBossDefs();
+  const miniBossDefs = getMiniBossDefs();
   const bossY = Math.max(190, player.y - 320);
   const bossSpread = Math.min(220, WORLD.w * 0.23);
   if (isBossWave) {
     const v1 = pickBossVariant();
     lastBossVariant = v1;
-    const b1 = BOSS_DEFS[v1];
+    const b1 = bossDefs[v1] || FALLBACK_BOSS_DEFS.butcher;
     if (diff.doubleBoss || (endlessMode && wave >= 18)) {
       const v2 = pickBossVariant(v1);
-      const b2 = BOSS_DEFS[v2];
+      const b2 = bossDefs[v2] || FALLBACK_BOSS_DEFS.queen;
       spawnWarning(WORLD.w / 2 - bossSpread, bossY, 'boss', v1);
       spawnWarning(WORLD.w / 2 + bossSpread, bossY, 'boss', v2);
       startBossCutscene('final_boss', v1, `${b1.name} & ${b2.name}`, '👑 终局双王同台降临！', '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
@@ -389,10 +596,10 @@ function beginWave() {
   } else if (isEliteWave) {
     const m1 = pickMiniBossVariant();
     lastMiniBossVariant = m1;
-    const mb1 = MINI_BOSS_DEFS[m1];
+    const mb1 = miniBossDefs[m1] || FALLBACK_MINI_BOSS_DEFS.vanguard;
     if ((diff.dualElite && wave >= 9) || (selectedDiff >= 5 && wave >= 5)) {
       const m2 = pickMiniBossVariant(m1);
-      const mb2 = MINI_BOSS_DEFS[m2];
+      const mb2 = miniBossDefs[m2] || FALLBACK_MINI_BOSS_DEFS.pyro_lord;
       spawnWarning(WORLD.w / 2 - bossSpread * 0.88, bossY, 'mini_boss', m1);
       spawnWarning(WORLD.w / 2 + bossSpread * 0.88, bossY, 'mini_boss', m2);
       announce(`⚔️ 双精英统领夹击：${mb1.name} & ${mb2.name}！`, '#f72585', 3.8);
@@ -535,9 +742,12 @@ function createEnemy(x, y, type, variant = '') {
 
   let ent;
   const mythicRate = Math.min(0.24, 0.14 + (selectedDiff || 0) * 0.016);
+  const bossDefs = getBossDefs();
+  const miniBossDefs = getMiniBossDefs();
+  const specialRelics = getSpecialRelics();
   if (type === 'boss') {
-    const bKey = (variant && BOSS_DEFS[variant]) ? variant : pickBossVariant();
-    const bDef = BOSS_DEFS[bKey];
+    const bKey = (variant && bossDefs[variant]) ? variant : pickBossVariant();
+    const bDef = bossDefs[bKey] || FALLBACK_BOSS_DEFS.butcher;
     const twinScale = (diff.doubleBoss || (endlessMode && wave >= 18)) ? 0.78 : 1;
     const bhp = Math.round((7400 + Math.max(0, wave - MAX_WAVE) * 3200) * endlessMul * diff.hpMul * twinScale);
     ent = {
@@ -547,8 +757,8 @@ function createEnemy(x, y, type, variant = '') {
       burstLeft: 0, burstCd: 0, canPhase2: Math.random() < mythicRate, mythicPhase2: false, mat: 48
     };
   } else if (type === 'mini_boss') {
-    const mKey = (variant && MINI_BOSS_DEFS[variant]) ? variant : pickMiniBossVariant();
-    const mDef = MINI_BOSS_DEFS[mKey];
+    const mKey = (variant && miniBossDefs[variant]) ? variant : pickMiniBossVariant();
+    const mDef = miniBossDefs[mKey] || FALLBACK_MINI_BOSS_DEFS.vanguard;
     const mhp = Math.round((740 + wave * 205 + Math.pow(wave, 2.16) * 15) * endlessMul * diff.hpMul);
     ent = {
       ...base, r: 36, hp: mhp, maxHp: mhp, spd: mDef.spd * sm, dmg: Math.round(8.6 * dm),
@@ -556,7 +766,7 @@ function createEnemy(x, y, type, variant = '') {
       dashT: 2.3, meteorT: 4.6, skillT: 2.1, ringCd: 5.4, mat: 24
     };
   } else if (type === 'special_boss') {
-    const relDef = SPECIAL_RELICS.find(r => r.bossId === variant) || SPECIAL_RELICS[0];
+    const relDef = specialRelics.find(r => r.bossId === variant) || specialRelics[0];
     const shp = Math.round((1260 + wave * 365 + Math.pow(wave, 2.24) * 24) * endlessMul * diff.hpMul);
     const sSpd = relDef.bossId === 'crimson_lord' ? 98 : (relDef.bossId === 'golden_golem' ? 74 : 86);
     ent = {

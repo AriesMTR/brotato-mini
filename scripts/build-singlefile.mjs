@@ -14,11 +14,13 @@ const outPath = argIdx !== -1 && process.argv[argIdx + 1]
 
 const indexHtml = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 
+const stripQuery = u => u.split('?')[0];
+
 // Collect all CSS <link rel="stylesheet" href="...">
 const cssLinks = [...indexHtml.matchAll(/<link\s+rel="stylesheet"\s+href="([^"]+)"\s*>/g)];
 if (!cssLinks.length) throw new Error('No stylesheet links found in index.html');
 const combinedCss = cssLinks
-  .map(m => fs.readFileSync(path.join(ROOT, m[1]), 'utf8').trim())
+  .map(m => fs.readFileSync(path.join(ROOT, stripQuery(m[1])), 'utf8').trim())
   .join('\n\n')
   .split('\n')
   .map(l => (l.length ? `  ${l}` : ''))
@@ -28,7 +30,7 @@ const combinedCss = cssLinks
 const scriptTags = [...indexHtml.matchAll(/<script\s+defer\s+src="([^"]+)"\s*><\/script>/g)];
 if (!scriptTags.length) throw new Error('No deferred script tags found in index.html');
 const combinedJs = scriptTags
-  .map(m => fs.readFileSync(path.join(ROOT, m[1]), 'utf8').trim())
+  .map(m => fs.readFileSync(path.join(ROOT, stripQuery(m[1])), 'utf8').trim())
   .join('\n\n');
 
 // Inline SVG icon as data URI for offline standalone HTML

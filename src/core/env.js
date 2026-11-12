@@ -15,13 +15,22 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: fal
 let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.08, userZoomed = false;
 let isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let bootReady = false;
-const APP_VERSION = 'v1.2.0';
+const APP_VERSION = 'v1.3.0';
 const APP_BUILD_DATE = '2026-11-12';
 
 // 游戏内置版本更新日志数据（供开局主界面「📜 更新日志」弹窗展示）
 const CHANGELOG_HISTORY = [
   {
-    ver: 'v1.2.0', date: '2026-11-12', tag: '当前版本 · 神话觉醒',
+    ver: 'v1.3.0', date: '2026-11-12', tag: '当前版本 · 异形地形与全流派军械',
+    title: '🗺️ 一图一异形地形重塑、32武器/68道具全流派均衡扩充与第5波异常修复',
+    items: [
+      '🗺️ 一图一专属异形地形：精简每张地图仅保留 1 处标志性生态地形，彻底告别规则圆形，重绘多瓣玄武熔岩火口、曲岸蘑菇毒泥沼、多棱碎晶寒霜冰镜、锯齿折线大裂谷与双生菱晶虚空裂隙门。',
+      '⚔️ 全流派武器与装备均衡扩充：扩充至 32 把武器（原始5/精准6/枪械5/重型5/元素6/工程5，六大流派全面均衡）与 68 件被动装备、16 项基因强化，补齐工程地雷/浮游激光塔、护甲反伤盾击、弹跳榴弹、近战剑气波与鲜血新星等体系。',
+      '🛠️ 修复线上第 5 波精英统领刷新偶发 MINI_BOSS_DEFS 未定义异常，并为全模块样式与脚本加入版本号防旧缓存机制。'
+    ]
+  },
+  {
+    ver: 'v1.2.0', date: '2026-11-12', tag: '神话觉醒',
     title: '👑 首领全屏登场立绘、隐藏二阶段神话觉醒、暴伤与冰火毒三系元素、怪物重塑',
     items: [
       '🎬 首领全屏定格立绘动画：奇遇祭坛召唤首领、第 12 波主宰降临与二阶段觉醒时触发全屏静止切入特写与专属精细立绘！',

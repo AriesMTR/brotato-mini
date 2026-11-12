@@ -50,14 +50,12 @@ function update(dt) {
     portals[i].pulse += dt * 3.0;
   }
 
-  // 战场交互地形判定（岩浆池灼烧、毒泥沼阻滞、寒冰滑行加速、虚空传送门跃迁）
+  // 战场异形地形判定（按真实不规则轮廓精确判定岩浆灼烧、毒泥沼阻滞、寒冰滑行加速）
   let onLava = false, onSwamp = false, onIce = false;
   for (let i = 0; i < terrains.length; i++) {
     const tr = terrains[i];
     if (tr.kind === 'chasm') continue;
-    const dxT = player.x - tr.x, dyT = player.y - tr.y;
-    const hitR = (tr.r || 68) + player.r * 0.35;
-    if (dxT * dxT + dyT * dyT < hitR * hitR) {
+    if (isPointInTerrain(tr, player.x, player.y, player.r * 0.35)) {
       if (tr.kind === 'lava') onLava = true;
       else if (tr.kind === 'swamp') onSwamp = true;
       else if (tr.kind === 'ice_sheet') onIce = true;
@@ -380,12 +378,63 @@ function update(dt) {
   }
   if (nearestE) player.lookA = Math.atan2(nearestE.y - player.y, nearestE.x - player.x);
 
-  // 22 把武器自动索敌、攻击范围加成与差异化攻击表现
+  // 32 把武器自动索敌、攻击范围加成与全流派差异化攻击表现
   const setB = getSetBonuses();
   const stickCount = player.weapons.filter(w => w.id === 'stick').length;
-  const effDmg = getEffectiveDmgMul(), effAspd = getEffectiveAtkSpd(), baseCrit = getEffectiveCrit(), elemMul = getElemMul();
+  const effDmg = getEffectiveDmgMul(), effAspd = getEffectiveAtkSpd(), baseCrit = getEffectiveCrit(), elemMul = getElemMul(), techMul = getTechMul();
   const nW = player.weapons.length;
   let maxEquipRange = player.cls === 'bull' ? Math.round(165 * getBlastScale()) : 0;
+
+  // 工程流自动布设感应地雷（螺丝刀武器 + 感应地雷匣 + 欧米茄机械母巢）
+  const screwdrivers = player.weapons.filter(w => w.id === 'screwdriver');
+  const totalMineLayers = screwdrivers.length + (player.mineLayers || 0);
+  if (totalMineLayers > 0 && mines.length < 14) {
+    player.mineCd = (player.mineCd === undefined ? 1.2 : player.mineCd) - dt;
+    if (player.mineCd <= 0) {
+      player.mineCd = Math.max(0.45, 2.30 / (1 + (totalMineLayers - 1) * 0.50) / Math.sqrt(techMul));
+      let maxMineTier = 1;
+      for (let s = 0; s < screwdrivers.length; s++) {
+        if (screwdrivers[s].tier > maxMineTier) maxMineTier = screwdrivers[s].tier;
+      }
+      if ((player.mineLayers || 0) >= 2 && maxMineTier < 3) maxMineTier = 3;
+      const ma = Math.random() * Math.PI * 2, md = 28 + Math.random() * 58;
+      const dummy = {
+        x: Math.max(68, Math.min(WORLD.w - 68, player.x + Math.cos(ma) * md)),
+        y: Math.max(68, Math.min(WORLD.h - 68, player.y + Math.sin(ma) * md)),
+        r: 15
+      };
+      pushOutOfChasms(dummy);
+      mines.push({
+        x: dummy.x, y: dummy.y, r: 15, triggerR: 54,
+        blastR: (86 + (maxMineTier - 1) * 14) * getBlastScale(),
+        dmg: (21 + wave * 3.8) * (1 + (maxMineTier - 1) * 0.45) * effDmg * techMul,
+        armT: 0.24, pulse: Math.random() * 6.28, life: 22
+      });
+      beep(540, 0.03, 'triangle', 0.02);
+    }
+  }
+  for (let mIdx = mines.length - 1; mIdx >= 0; mIdx--) {
+    const m = mines[mIdx];
+    m.pulse += dt * 4.8;
+    m.life -= dt;
+    if (m.armT > 0) m.armT -= dt;
+    if (m.life <= 0) { mines.splice(mIdx, 1); continue; }
+    if (m.armT <= 0) {
+      let triggered = false;
+      for (let eIdx = 0; eIdx < enemies.length; eIdx++) {
+        const e = enemies[eIdx];
+        if (e && e.hp > 0 && !e.primed && Math.hypot(e.x - m.x, e.y - m.y) <= m.triggerR + e.r) {
+          triggered = true; break;
+        }
+      }
+      if (triggered) {
+        const mCrit = player.turretCrit && Math.random() < baseCrit * 0.85;
+        const mDmg = m.dmg * (mCrit ? getEffectiveCritMult(1.85) : 1);
+        mines.splice(mIdx, 1);
+        triggerExplosion(m.x, m.y, m.blastR, mDmg, false, 0, '#4cc9f0', true);
+      }
+    }
+  }
 
   player.weapons.forEach((w, idx) => {
     const tpl = WEAPONS[w.id];
@@ -394,7 +443,7 @@ function update(dt) {
     const orbitA = (idx / Math.max(1, nW)) * Math.PI * 2 + performance.now() * 0.0009;
     const baseWx = player.x + Math.cos(orbitA) * orbitR;
     const baseWy = player.y + Math.sin(orbitA) * (orbitR * 0.9);
-    const rangeAdd = tpl.melee ? Math.round(totalRange * 0.55) : totalRange;
+    const rangeAdd = tpl.melee ? Math.round(totalRange * 0.55 + (player.meleeSweepBonus || 0) * 18) : totalRange;
     const maxR = Math.max(68, tpl.range + rangeAdd + (w.tier - 1) * 16);
     if (maxR > maxEquipRange) maxEquipRange = maxR;
 
@@ -423,16 +472,18 @@ function update(dt) {
       const tierScale = 1 + (w.tier - 1) * 0.55;
       const aspdBonusDmg = tpl.aspdScale ? Math.max(0, effAspd - 1) * 9 : 0;
       const rangeBonusDmg = tpl.rangeScale ? Math.max(0, totalRange) * tpl.rangeScale : 0;
-      const base = (tpl.dmg + aspdBonusDmg + rangeBonusDmg) * tierScale + (w.id === 'stick' ? Math.max(0, stickCount - 1) * 3 : 0);
-      const elemScale = tpl.set === 'elemental' ? elemMul : 1;
-      const finalMul = (effDmg + (tpl.melee ? player.meleeBonus : 0)) * elemScale;
+      const hpBonusDmg = tpl.hpScale ? Math.max(0, player.maxHp) * tpl.hpScale : 0;
+      const armBonusDmg = tpl.armorScale ? Math.max(0, getTotalArmor()) * tpl.armorScale : 0;
+      const base = (tpl.dmg + aspdBonusDmg + rangeBonusDmg + hpBonusDmg + armBonusDmg) * tierScale + (w.id === 'stick' ? Math.max(0, stickCount - 1) * 3 : 0);
+      const archetypeScale = tpl.set === 'elemental' ? elemMul : (tpl.techScale ? techMul : 1);
+      const finalMul = (effDmg + (tpl.melee ? player.meleeBonus : 0)) * archetypeScale;
       const critChance = baseCrit + (tpl.critBonus || 0) + (w.tier - 1) * 0.03;
       const critMult = getEffectiveCritMult(tpl.critMult || 1.95);
       w.cd = tpl.cd / Math.max(0.3, effAspd * (1 + (w.tier - 1) * 0.08));
 
       if (tpl.melee) {
         w.thrust = 1;
-        beep(w.id === 'hammer' || w.id === 'rock' ? 130 : (w.id === 'katana' ? 330 : (w.id === 'knife' || w.id === 'claws' ? 295 : 195)), 0.055, 'triangle', 0.045);
+        beep(w.id === 'hammer' || w.id === 'rock' || w.id === 'spiked_shield' ? 130 : (w.id === 'katana' || w.id === 'magma_blade' ? 330 : (w.id === 'knife' || w.id === 'claws' ? 295 : 195)), 0.055, 'triangle', 0.045);
         const sColor = TIER_COLORS[w.tier] === '#e2deec' ? tpl.arcColor : TIER_COLORS[w.tier];
 
         if (tpl.mode === 'spear') {
@@ -458,15 +509,16 @@ function update(dt) {
             if (Math.hypot(tr.x - px, tr.y - py) <= tr.r + 16) hurtTree(tr, base * finalMul);
           }
         } else {
-          // 刀剑横扫 / 利爪撕裂 / 居合太刀 / 巨石钝击 / 裂地战锤
-          const arcSpan = tpl.mode === 'crescent' ? 1.06 : 0.78;
+          // 刀剑横扫 / 利爪撕裂 / 居合太刀 / 巨石钝击 / 裂地战锤 / 尖刺重盾 / 熔岩重刃
+          const arcSpan = (tpl.mode === 'crescent' ? 1.06 : 0.78) + (player.meleeSweepBonus || 0) * 0.14;
           if (slashes.length < 36) {
             slashes.push({
               x: baseWx + Math.cos(w.angle) * 24, y: baseWy + Math.sin(w.angle) * 24,
-              angle: w.angle, r: maxR * (tpl.mode === 'crescent' ? 0.84 : 0.72), color: sColor,
+              angle: w.angle, r: maxR * (tpl.mode === 'crescent' ? 0.84 : 0.72), color: tpl.burnSlash ? '#ff6b35' : sColor,
               mode: tpl.mode || 'arc', t: 0.16, maxT: 0.16
             });
           }
+          let critChainTriggered = false;
           for (let i = enemies.length - 1; i >= 0; i--) {
             const e = enemies[i];
             if (e.hp <= 0) continue;
@@ -474,7 +526,11 @@ function update(dt) {
             const da = Math.abs(Math.atan2(Math.sin(Math.atan2(e.y - baseWy, e.x - baseWx) - w.angle), Math.cos(Math.atan2(e.y - baseWy, e.x - baseWx) - w.angle)));
             if (d <= maxR + e.r && da < arcSpan) {
               const isCrit = Math.random() < critChance;
-              hurtEnemy(e, base * finalMul * (isCrit ? critMult : 1), isCrit, w.angle, false, { isMelee: true, knockMult: tpl.knockMult || 1 });
+              hurtEnemy(e, base * finalMul * (isCrit ? critMult : 1), isCrit, w.angle, !!tpl.burnSlash, { isMelee: true, knockMult: tpl.knockMult || 1, forceBurn: !!tpl.burnSlash });
+              if (tpl.burnSlash && isCrit && !critChainTriggered && e.hp > 0) {
+                critChainTriggered = true;
+                castChainLightning(e.x, e.y, e, 3, base * finalMul * 0.55, critChance * 0.5);
+              }
             }
           }
           for (let i = trees.length - 1; i >= 0; i--) {
@@ -487,7 +543,7 @@ function update(dt) {
           if (tpl.slam) {
             const hx = baseWx + Math.cos(w.angle) * (maxR * 0.68), hy = baseWy + Math.sin(w.angle) * (maxR * 0.68);
             const sr = 62 * getBlastScale();
-            if (rings.length < 40) rings.push({ x: hx, y: hy, r: sr, color: '#f4a261', t: 0.22, maxT: 0.22 });
+            if (rings.length < 40) rings.push({ x: hx, y: hy, r: sr, color: w.id === 'spiked_shield' ? '#94a3b8' : '#f4a261', t: 0.22, maxT: 0.22 });
             if (stains.length > 100) stains.shift();
             stains.push({ x: hx, y: hy, r: 22, color: '#14101c', kind: 'scorch' });
             for (let i = enemies.length - 1; i >= 0; i--) {
@@ -497,6 +553,18 @@ function update(dt) {
               }
             }
           }
+        }
+        // 【旋风剑气腰带】近战挥砍同步向前方斩出一道穿透剑气波
+        if (player.meleeShockwave && bullets.length < (isTouch ? 180 : 260)) {
+          const wSpd = 540;
+          bullets.push({
+            x: baseWx + Math.cos(w.angle) * 20, y: baseWy + Math.sin(w.angle) * 20,
+            px: baseWx, py: baseWy,
+            vx: Math.cos(w.angle) * wSpd, vy: Math.sin(w.angle) * wSpd,
+            dmg: base * finalMul * 0.48, isCrit: false, angle: w.angle,
+            pierce: 2 + player.pierceBonus, bounces: 0, isWaveArc: true,
+            life: 0.42, maxLife: 0.42, color: '#ffd166', r: 9.5, hit: new Set()
+          });
         }
       } else if (tpl.isChain) {
         // 电击枪：跳跃连锁闪电
@@ -509,16 +577,16 @@ function update(dt) {
         } else {
           castChainLightning(mx, my, best, tpl.chains + (w.tier >= 3 ? 1 : 0), base * finalMul, critChance);
         }
-      } else if (tpl.isBeam || tpl.isSniper) {
-        // 激光枪 / 狙击枪瞬发贯穿射线
+      } else if (tpl.isBeam || tpl.isSniper || tpl.isEmpBeam) {
+        // 激光枪 / 狙击枪 / 电磁轨道炮 瞬发贯穿射线
         w.recoil = 1;
-        beep(tpl.isSniper ? 205 : 720, 0.075, 'sawtooth', tpl.isSniper ? 0.055 : 0.038);
+        beep(tpl.isSniper ? 205 : (tpl.isEmpBeam ? 260 : 720), 0.075, 'sawtooth', tpl.isSniper || tpl.isEmpBeam ? 0.055 : 0.038);
         const ex = baseWx + Math.cos(w.angle) * maxR, ey = baseWy + Math.sin(w.angle) * maxR;
         if (beams.length < 30) {
           beams.push({
             x1: baseWx + Math.cos(w.angle) * 18, y1: baseWy + Math.sin(w.angle) * 18, x2: ex, y2: ey,
-            color: tpl.isSniper ? '#ffe8a3' : TIER_COLORS[Math.max(2, w.tier)],
-            thin: !!tpl.isSniper, t: tpl.isSniper ? 0.19 : 0.15, maxT: tpl.isSniper ? 0.19 : 0.15
+            color: tpl.isEmpBeam ? '#4cc9f0' : (tpl.isSniper ? '#ffe8a3' : TIER_COLORS[Math.max(2, w.tier)]),
+            thin: !!tpl.isSniper, t: tpl.isSniper || tpl.isEmpBeam ? 0.20 : 0.15, maxT: tpl.isSniper || tpl.isEmpBeam ? 0.20 : 0.15
           });
         }
         if (tpl.isSniper && shells.length < 60) {
@@ -526,38 +594,56 @@ function update(dt) {
           shells.push({ x: baseWx, y: baseWy, vx: Math.cos(sa) * 110, vy: Math.sin(sa) * 110 - 35, rot: 0, t: 0.5 });
         }
         const l2 = maxR * maxR;
+        const hitPad = tpl.isEmpBeam ? 15 : 9;
         const cands = [];
         for (const e of enemies) {
           if (e.hp <= 0 || e.primed) continue;
           const proj = Math.max(0, Math.min(1, ((e.x - baseWx) * (ex - baseWx) + (e.y - baseWy) * (ey - baseWy)) / l2));
           const px = baseWx + proj * (ex - baseWx), py = baseWy + proj * (ey - baseWy);
-          if (Math.hypot(e.x - px, e.y - py) <= e.r + 9) cands.push({ e, proj });
+          if (Math.hypot(e.x - px, e.y - py) <= e.r + hitPad) cands.push({ e, proj });
         }
         cands.sort((a, b) => a.proj - b.proj);
         const maxHits = (tpl.pierce || 3) + player.pierceBonus;
+        let lastHitE = null;
         for (let k = 0; k < Math.min(maxHits, cands.length); k++) {
           const isCrit = Math.random() < critChance;
-          hurtEnemy(cands[k].e, base * finalMul * (isCrit ? critMult : 1), isCrit, w.angle, !tpl.isSniper, { knockMult: tpl.isSniper ? 1.8 : 1 });
+          lastHitE = cands[k].e;
+          hurtEnemy(lastHitE, base * finalMul * (isCrit ? critMult : 1), isCrit, w.angle, !tpl.isSniper, {
+            knockMult: tpl.isSniper ? 1.8 : 1.2,
+            forceChill: !!tpl.isEmpBeam
+          });
+        }
+        if (tpl.isEmpBeam && lastHitE) {
+          const empR = 88 * getBlastScale();
+          if (rings.length < 40) rings.push({ x: lastHitE.x, y: lastHitE.y, r: empR, color: '#4cc9f0', t: 0.26, maxT: 0.26 });
+          for (const nb of enemies) {
+            if (nb && nb.hp > 0 && Math.hypot(nb.x - lastHitE.x, nb.y - lastHitE.y) <= empR + nb.r) {
+              nb.chillT = Math.max(nb.chillT || 0, 2.4);
+            }
+          }
         }
         for (let i = trees.length - 1; i >= 0; i--) {
           const tr = trees[i];
           if (tr.hp <= 0) continue;
           const proj = Math.max(0, Math.min(1, ((tr.x - baseWx) * (ex - baseWx) + (tr.y - baseWy) * (ey - baseWy)) / l2));
           const px = baseWx + proj * (ex - baseWx), py = baseWy + proj * (ey - baseWy);
-          if (Math.hypot(tr.x - px, tr.y - py) <= tr.r + 9) hurtTree(tr, base * finalMul);
+          if (Math.hypot(tr.x - px, tr.y - py) <= tr.r + hitPad) hurtTree(tr, base * finalMul);
         }
       } else {
-        // 投射物武器（弹弓、十字弩、手枪、冲锋枪、霰弹枪、加特林、寒冰锥、手里剑、喷火器、电浆炮、火箭筒）
-        w.recoil = tpl.isFlame ? 0.3 : (w.id === 'minigun' ? 0.55 : 1);
+        // 投射物武器（含吹箭筒、左轮手枪、碎裂机炮、榴弹发射器、射钉枪、无人机舱等）
+        w.recoil = tpl.isFlame ? 0.3 : (w.id === 'minigun' || w.id === 'nailgun' ? 0.55 : 1);
+        w.shots = (w.shots || 0) + 1;
+        const sixthShot = !!(tpl.sixthCrit && (w.shots % 6 === 0));
+        if (sixthShot) addText(player.x, player.y - 32, '🎯 第六发必暴!', '#ffd166', 13, 0.85);
         const pellets = tpl.pellets || 1;
-        if ((!tpl.isFlame && w.id !== 'minigun') || Math.random() < 0.35) {
-          beep(tpl.isRocket ? 145 : (tpl.isPlasma ? 310 : (tpl.isFlame ? 110 : (tpl.isStar || tpl.isIce ? 560 : (w.id === 'shotgun' ? 160 : 430)))), 0.04, tpl.isFlame ? 'sawtooth' : 'square', tpl.isFlame ? 0.018 : 0.03);
+        if ((!tpl.isFlame && w.id !== 'minigun' && w.id !== 'nailgun') || Math.random() < 0.35) {
+          beep(tpl.isRocket || tpl.isGrenade ? 145 : (tpl.isPlasma ? 310 : (tpl.isFlame ? 110 : (tpl.isStar || tpl.isIce || tpl.isDart ? 560 : (w.id === 'shotgun' ? 160 : 430)))), 0.04, tpl.isFlame ? 'sawtooth' : 'square', tpl.isFlame ? 0.018 : 0.03);
         }
         const mx = baseWx + Math.cos(w.angle) * 18, my = baseWy + Math.sin(w.angle) * 18;
-        if (!tpl.isStar && !tpl.isFlame && !tpl.isPebble && !tpl.isIce) {
-          particles.push({ x: mx, y: my, vx: 0, vy: 0, r: w.id === 'shotgun' || tpl.isRocket || tpl.isPlasma ? 12 : 8.5, color: tpl.isPlasma ? '#c77dff' : '#ffd166', t: 0.085, maxT: 0.085, muzzle: true, angle: w.angle });
+        if (!tpl.isStar && !tpl.isFlame && !tpl.isPebble && !tpl.isIce && !tpl.isDart) {
+          particles.push({ x: mx, y: my, vx: 0, vy: 0, r: w.id === 'shotgun' || tpl.isRocket || tpl.isGrenade || tpl.isPlasma ? 12 : 8.5, color: tpl.isPlasma ? '#c77dff' : (tpl.techScale ? '#72efdd' : '#ffd166'), t: 0.085, maxT: 0.085, muzzle: true, angle: w.angle });
         }
-        if ((tpl.set === 'gun' || w.id === 'minigun') && shells.length < 60 && (w.id !== 'minigun' || Math.random() < 0.45)) {
+        if ((tpl.set === 'gun' || w.id === 'minigun' || w.id === 'revolver') && shells.length < 60 && (w.id !== 'minigun' || Math.random() < 0.45)) {
           const sa = w.angle - Math.PI * 0.5 + (Math.random() - 0.5) * 0.5;
           shells.push({ x: baseWx, y: baseWy, vx: Math.cos(sa) * 95, vy: Math.sin(sa) * 95 - 30, rot: Math.random() * 6, t: 0.45 });
         }
@@ -565,24 +651,25 @@ function update(dt) {
           if (bullets.length >= (isTouch ? 180 : 260)) break;
           const sp = tpl.spread ? (Math.random() - 0.5) * tpl.spread : 0;
           const a = w.angle + sp;
-          const isCrit = Math.random() < critChance;
+          const isCrit = sixthShot || Math.random() < critChance;
           const bSpd = tpl.spd * (tpl.isFlame ? (0.85 + Math.random() * 0.3) : 1);
           const maxLife = maxR / bSpd + (tpl.isFlame ? 0.02 : 0.07);
-          const extraCritPierce = (w.id === 'crossbow' && isCrit) ? 2 : 0;
+          const extraCritPierce = ((w.id === 'crossbow' && isCrit) ? 2 : 0) + (sixthShot ? 2 : 0);
           bullets.push({
             x: mx, y: my, px: mx, py: my,
             vx: Math.cos(a) * bSpd, vy: Math.sin(a) * bSpd,
             dmg: base * finalMul * (isCrit ? critMult : 1), isCrit, angle: a,
-            pierce: (tpl.pierce || 0) + extraCritPierce + (tpl.isRocket ? 0 : player.pierceBonus),
+            pierce: (tpl.pierce || 0) + extraCritPierce + (tpl.isRocket || tpl.isGrenade ? 0 : player.pierceBonus),
             bounces: (tpl.bounce || 0) + (tpl.isRocket || tpl.isFlame || tpl.isPlasma ? 0 : player.bounceBonus) + (tpl.isStar && isCrit ? 1 : 0),
-            isStar: !!tpl.isStar, isFlame: !!tpl.isFlame, isRocket: !!tpl.isRocket,
+            isStar: !!tpl.isStar, isFlame: !!tpl.isFlame, isRocket: !!tpl.isRocket, isGrenade: !!tpl.isGrenade,
             isPebble: !!tpl.isPebble, isIce: !!tpl.isIce, isPlasma: !!tpl.isPlasma, isBolt: w.id === 'crossbow',
+            isDart: !!tpl.isDart, isNail: !!tpl.isNail, shredBlast: tpl.shredBlast || 0,
             freezeHit: tpl.freezeHit || 0, poisonHit: tpl.poisonHit || 0,
             blastR: tpl.blastR ? tpl.blastR * getBlastScale() : 0,
             spin: Math.random() * 6.28, smokeT: 0,
             life: maxLife, maxLife,
-            color: tpl.isFlame ? '#ff9f1c' : (tpl.isPlasma ? '#c77dff' : (tpl.isIce ? '#72efdd' : (tpl.isPebble ? '#cbd5e1' : (tpl.isStar ? '#e0fbfc' : (isCrit ? '#ffd166' : '#fff3b0'))))),
-            r: tpl.isPlasma ? 8.5 : (tpl.isFlame ? 7 : (tpl.isRocket ? 6 : (tpl.isStar ? 6.5 : (tpl.isPebble ? 5.2 : (w.id === 'shotgun' ? 4.2 : 4.6))))),
+            color: tpl.isFlame ? '#ff9f1c' : (tpl.isPlasma ? '#c77dff' : (tpl.isIce ? '#72efdd' : (tpl.isDart ? '#a3e635' : (tpl.isNail ? '#4cc9f0' : (tpl.isGrenade ? '#f97316' : (tpl.isPebble ? '#cbd5e1' : (tpl.isStar ? '#e0fbfc' : (isCrit ? '#ffd166' : '#fff3b0')))))))),
+            r: tpl.isPlasma ? 8.5 : (tpl.isGrenade ? 6.8 : (tpl.isFlame ? 7 : (tpl.isRocket ? 6 : (tpl.isStar ? 6.5 : (tpl.isPebble ? 5.2 : (w.id === 'shotgun' ? 4.2 : 4.6)))))),
             hit: new Set()
           });
         }
@@ -594,9 +681,8 @@ function update(dt) {
   });
   player._displayRange = maxEquipRange > 0 ? maxEquipRange : Math.max(85, 130 + totalRange);
 
-  // 自动机枪炮台索敌开火（享受工程套装与攻击范围加成）
-  const techMul = 1 + setB.tech;
-  const turretMaxR = Math.max(180, 390 + Math.round(totalRange * 0.5));
+  // 自动机枪炮台与浮游激光塔索敌开火（享受工程套装、工程专精、超算芯片与攻击范围加成）
+  const turretMaxR = Math.max(185, 395 + Math.round(totalRange * 0.5));
   for (const t of turrets) {
     t.cd -= dt;
     if (t.recoil > 0) t.recoil = Math.max(0, t.recoil - dt * 8);
@@ -607,42 +693,66 @@ function update(dt) {
     }
     if (best) {
       t.angle = Math.atan2(best.y - t.y, best.x - t.x);
-      if (t.cd <= 0 && bullets.length < (isTouch ? 180 : 260)) {
-        t.cd = Math.max(0.14, 0.42 / (Math.sqrt(effAspd) * techMul)) / (1 + (t.tier - 1) * 0.15);
-        t.recoil = 1;
-        const tdmg = (7 + wave * 0.85) * (1 + (t.tier - 1) * 0.5) * effDmg * techMul;
-        const bLife = turretMaxR / 690;
-        bullets.push({
-          x: t.x + Math.cos(t.angle) * 16, y: t.y + Math.sin(t.angle) * 16,
-          px: t.x, py: t.y,
-          vx: Math.cos(t.angle) * 690, vy: Math.sin(t.angle) * 690,
-          dmg: tdmg, isCrit: false, angle: t.angle, pierce: t.tier >= 3 ? 1 : 0, bounces: 0,
-          life: bLife, maxLife: bLife, color: '#72efdd', r: 4.2, hit: new Set()
-        });
+      if (t.cd <= 0) {
+        const isCrit = !!(player.turretCrit && Math.random() < baseCrit * 0.85);
+        const cMul = isCrit ? getEffectiveCritMult(1.85) : 1;
+        if (t.kind === 'laser') {
+          t.cd = Math.max(0.24, 0.72 / (Math.sqrt(effAspd) * techMul)) / (1 + (t.tier - 1) * 0.14);
+          t.recoil = 1;
+          const ldmg = (12 + wave * 1.45) * (1 + (t.tier - 1) * 0.45) * effDmg * techMul * cMul;
+          const ex = t.x + Math.cos(t.angle) * turretMaxR, ey = t.y + Math.sin(t.angle) * turretMaxR;
+          if (beams.length < 30) {
+            beams.push({ x1: t.x + Math.cos(t.angle) * 14, y1: t.y + Math.sin(t.angle) * 14, x2: ex, y2: ey, color: isCrit ? '#ffd166' : '#c77dff', thin: true, t: 0.14, maxT: 0.14 });
+          }
+          const l2 = turretMaxR * turretMaxR;
+          let hits = 0, maxH = 2 + (t.tier >= 3 ? 1 : 0);
+          for (const e of enemies) {
+            if (e.hp <= 0 || e.primed || hits >= maxH) continue;
+            const proj = Math.max(0, Math.min(1, ((e.x - t.x) * (ex - t.x) + (e.y - t.y) * (ey - t.y)) / l2));
+            const px = t.x + proj * (ex - t.x), py = t.y + proj * (ey - t.y);
+            if (Math.hypot(e.x - px, e.y - py) <= e.r + 9) {
+              hits++;
+              hurtEnemy(e, ldmg, isCrit, t.angle, true, { noProc: !player.turretElem });
+            }
+          }
+        } else if (bullets.length < (isTouch ? 180 : 260)) {
+          t.cd = Math.max(0.14, 0.42 / (Math.sqrt(effAspd) * techMul)) / (1 + (t.tier - 1) * 0.15);
+          t.recoil = 1;
+          const tdmg = (7 + wave * 0.85) * (1 + (t.tier - 1) * 0.5) * effDmg * techMul * cMul;
+          const bLife = turretMaxR / 690;
+          bullets.push({
+            x: t.x + Math.cos(t.angle) * 16, y: t.y + Math.sin(t.angle) * 16,
+            px: t.x, py: t.y,
+            vx: Math.cos(t.angle) * 690, vy: Math.sin(t.angle) * 690,
+            dmg: tdmg, isCrit, angle: t.angle, pierce: t.tier >= 3 ? 1 : 0, bounces: 0,
+            turretShot: true,
+            life: bLife, maxLife: bLife, color: isCrit ? '#ffd166' : '#72efdd', r: 4.2, hit: new Set()
+          });
+        }
       }
     }
   }
 
-  // 玩家投射物更新（支持火箭尾烟、电浆球脉冲爆、冰锥寒霜、弹弓弹石、火焰扩散、飞镖旋转）
+  // 玩家投射物更新（支持火箭尾烟、榴弹弹跳爆破、电浆球脉冲爆、冰锥寒霜、吹箭剧毒、剑气波）
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     b.px = b.x; b.py = b.y;
     b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
-    if (b.isStar) b.spin += dt * 22;
+    if (b.isStar || b.isGrenade) b.spin += dt * (b.isGrenade ? 14 : 22);
     if (b.isFlame) { b.vx *= (1 - dt * 1.6); b.vy *= (1 - dt * 1.6); b.r += dt * 20; }
-    if (b.isRocket) {
+    if (b.isRocket || b.isGrenade) {
       b.smokeT -= dt;
       if (b.smokeT <= 0) {
-        b.smokeT = 0.035;
+        b.smokeT = b.isGrenade ? 0.055 : 0.035;
         if (particles.length < (isTouch ? 110 : 180)) {
-          particles.push({ x: b.x - Math.cos(b.angle) * 8, y: b.y - Math.sin(b.angle) * 8, vx: (Math.random() - 0.5) * 18, vy: (Math.random() - 0.5) * 18, r: 3.5 + Math.random() * 2.5, color: 'rgba(205, 198, 218, 0.34)', t: 0.24, maxT: 0.24 });
+          particles.push({ x: b.x - Math.cos(b.angle) * 8, y: b.y - Math.sin(b.angle) * 8, vx: (Math.random() - 0.5) * 18, vy: (Math.random() - 0.5) * 18, r: 3.2 + Math.random() * 2.2, color: 'rgba(205, 198, 218, 0.34)', t: 0.22, maxT: 0.22 });
         }
       }
     }
 
     const outBounds = b.x < 0 || b.x > WORLD.w || b.y < 0 || b.y > WORLD.h;
     if (b.life <= 0 || outBounds) {
-      if (b.isRocket) triggerExplosion(b.x, b.y, b.blastR, b.dmg * elemMul, false, 0, '#ff9f1c', true);
+      if (b.isRocket || b.isGrenade) triggerExplosion(b.x, b.y, b.blastR || 76, b.dmg * (b.isGrenade ? 0.85 : elemMul), false, 0, '#ff9f1c', true);
       else if (b.isPlasma) triggerExplosion(b.x, b.y, b.blastR || 82, b.dmg * 0.85 * elemMul, false, 0, '#c77dff', false);
       bullets.splice(i, 1); continue;
     }
@@ -655,8 +765,8 @@ function update(dt) {
       if (tdx * tdx + tdy * tdy < thit * thit) {
         b.hit.add(tr);
         hurtTree(tr, b.dmg);
-        if (b.isRocket) {
-          triggerExplosion(b.x, b.y, b.blastR, b.dmg * elemMul, false, 0, '#ff9f1c', true);
+        if (b.isRocket || (b.isGrenade && b.bounces <= 0)) {
+          triggerExplosion(b.x, b.y, b.blastR || 76, b.dmg * (b.isGrenade ? 0.85 : elemMul), false, 0, '#ff9f1c', true);
           b.life = -1; break;
         }
         if (b.pierce <= 0) { b.life = -1; break; }
@@ -678,17 +788,25 @@ function update(dt) {
           triggerExplosion(b.x, b.y, b.blastR, b.dmg * elemMul, false, 0, '#ff9f1c', true);
           b.life = -1; break;
         }
-        hurtEnemy(e, b.dmg, b.isCrit, b.angle, b.isFlame || b.isPlasma, {
+        hurtEnemy(e, b.dmg, b.isCrit, b.angle, b.isFlame || b.isPlasma || b.isWaveArc, {
+          isMelee: !!b.isWaveArc,
+          noProc: !!(b.turretShot && !player.turretElem),
           forceBurn: b.isFlame,
           forceChill: b.isIce,
           forceFreeze: b.freezeHit > 0 && Math.random() < b.freezeHit,
           forcePoison: b.poisonHit > 0 && Math.random() < b.poisonHit,
           knockMult: b.isFlame ? 0.15 : (b.isBolt ? 1.35 : 1)
         });
+        if (b.shredBlast > 0 && Math.random() < b.shredBlast) {
+          triggerExplosion(b.x, b.y, 64 * getBlastScale(), b.dmg * 0.65, false, 0, '#ff9f1c', true);
+        }
 
-        // 跳弹索敌判定（弹弓圆石 / 手里剑 / 跳弹棱镜）
+        // 跳弹索敌判定（弹弓圆石 / 手里剑 / 榴弹弹跳连环爆 / 跳弹棱镜）
         if (b.bounces > 0) {
-          let nextE = null, nextD = 265;
+          if (b.isGrenade) {
+            triggerExplosion(b.x, b.y, b.blastR || 76, b.dmg * 0.72, false, 0, '#ff9f1c', true);
+          }
+          let nextE = null, nextD = 275;
           for (const cand of enemies) {
             if (cand.hp > 0 && !cand.primed && !b.hit.has(cand)) {
               const cd = Math.hypot(cand.x - b.x, cand.y - b.y);
@@ -702,17 +820,22 @@ function update(dt) {
             b.bounces--;
             b.dmg *= 0.9;
             b.life = Math.max(b.life, 0.44);
-            addSparks(b.x, b.y, na, b.isPebble ? '#e2e8f0' : '#72efdd', 3);
+            addSparks(b.x, b.y, na, b.isGrenade ? '#ff9f1c' : (b.isPebble ? '#e2e8f0' : '#72efdd'), 3);
             beep(b.isPebble ? 490 : 610, 0.025, 'triangle', 0.02);
             break;
           }
         }
-        if (b.pierce <= 0) { b.life = -1; break; }
+        if (b.pierce <= 0) {
+          if (b.isGrenade) triggerExplosion(b.x, b.y, b.blastR || 76, b.dmg * 0.85, false, 0, '#ff9f1c', true);
+          b.life = -1; break;
+        }
         b.pierce--;
       }
     }
-    if (b.life <= 0 && !b.isRocket) {
+    if (b.life <= 0 && !b.isRocket && !b.isGrenade) {
       if (b.isPlasma) triggerExplosion(b.x, b.y, b.blastR || 82, b.dmg * 0.85 * elemMul, false, 0, '#c77dff', false);
+      bullets.splice(i, 1);
+    } else if (b.life <= 0) {
       bullets.splice(i, 1);
     }
   }
@@ -758,9 +881,7 @@ function update(dt) {
     for (let tIdx = 0; tIdx < terrains.length; tIdx++) {
       const tr = terrains[tIdx];
       if (tr.kind === 'chasm') continue;
-      const dxT = e.x - tr.x, dyT = e.y - tr.y;
-      const hitR = (tr.r || 68) + e.r * 0.4;
-      if (dxT * dxT + dyT * dyT < hitR * hitR) {
+      if (isPointInTerrain(tr, e.x, e.y, e.r * 0.38)) {
         if (tr.kind === 'lava') {
           eTerrainSpd = Math.min(eTerrainSpd, 0.82);
           if (!e.burnT || e.burnT < 0.9) {

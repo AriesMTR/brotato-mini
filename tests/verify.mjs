@@ -8,8 +8,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 
 const indexHtml = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
-const cssFiles = [...indexHtml.matchAll(/<link\s+rel="stylesheet"\s+href="([^"]+)"\s*>/g)].map(m => m[1]);
-const jsFiles = [...indexHtml.matchAll(/<script\s+defer\s+src="([^"]+)"\s*><\/script>/g)].map(m => m[1]);
+const rawCssRefs = [...indexHtml.matchAll(/<link\s+rel="stylesheet"\s+href="([^"]+)"\s*>/g)].map(m => m[1]);
+const rawJsRefs = [...indexHtml.matchAll(/<script\s+defer\s+src="([^"]+)"\s*><\/script>/g)].map(m => m[1]);
+assert(rawCssRefs.every(r => r.includes("?v=")), "All stylesheet links in index.html must carry ?v= cache-busting query string");
+assert(rawJsRefs.every(r => r.includes("?v=")), "All deferred script tags in index.html must carry ?v= cache-busting query string");
+const cssFiles = rawCssRefs.map(r => r.split("?")[0]);
+const jsFiles = rawJsRefs.map(r => r.split("?")[0]);
 
 assert.strictEqual(cssFiles.length, 2, "Expected 2 modular stylesheets (base.css + mobile.css)");
 assert.strictEqual(jsFiles.length, 16, "Expected 16 modular script files in index.html");
@@ -221,12 +225,12 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   return { sandbox, els, stats };
 }
 
-// 1. Content Expansion (22 Weapons, 36 Items, 12 Upgrades), Desktop Arena, 5 Scenes & Zero Per-Frame Gradients
+// 1. Content Expansion (32 Weapons, 68 Items, 16 Upgrades), Desktop Arena, 5 Scenes & Zero Per-Frame Gradients
 {
   const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
-  assert.strictEqual(vm.runInContext('Object.keys(WEAPONS).length', s), 22, 'Should have 22 distinct weapons');
-  assert.strictEqual(vm.runInContext('ITEMS.length', s), 52, 'Should have 52 passive items');
-  assert.strictEqual(vm.runInContext('UPGRADES.length', s), 14, 'Should have 14 level-up stat choices');
+  assert.strictEqual(vm.runInContext('Object.keys(WEAPONS).length', s), 32, 'Should have 32 distinct weapons');
+  assert.strictEqual(vm.runInContext('ITEMS.length', s), 68, 'Should have 68 passive items');
+  assert.strictEqual(vm.runInContext('UPGRADES.length', s), 16, 'Should have 16 level-up stat choices');
   assert.strictEqual(vm.runInContext('WORLD.w', s), 2200, 'Desktop WORLD.w should be 2200');
   assert.strictEqual(vm.runInContext('WORLD.h', s), 1500, 'Desktop WORLD.h should be 1500');
   assert.strictEqual(vm.runInContext('uiMode', s), 'desktop', 'PC browser must stay in desktop UI mode');
@@ -409,14 +413,14 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert.strictEqual(vm.runInContext('MONSTER_CODEX.length', s), 31, 'Codex should catalog all 31 monsters, scene-exclusives, bosses & special bosses');
   vm.runInContext('openCodex("weapons");', s);
   assert.strictEqual(els.codexModal.classList.contains('hidden'), false, 'openCodex must show #codexModal');
-  assert.strictEqual(els.codexGrid.children.length, 22, 'Weapons tab must render all 22 weapons');
+  assert.strictEqual(els.codexGrid.children.length, 32, 'Weapons tab must render all 32 weapons');
   vm.runInContext('setCodexFilter("elemental");', s);
-  assert(els.codexGrid.children.length >= 4 && els.codexGrid.children.length < 22, 'Weapon set filter must filter weapon cards');
+  assert(els.codexGrid.children.length >= 5 && els.codexGrid.children.length < 32, 'Weapon set filter must filter weapon cards');
 
   vm.runInContext('setCodexTab("items");', s);
-  assert.strictEqual(els.codexGrid.children.length, 52, 'Items tab must render all 52 items');
+  assert.strictEqual(els.codexGrid.children.length, 68, 'Items tab must render all 68 items');
   vm.runInContext('setCodexFilter("4");', s);
-  assert(els.codexGrid.children.length >= 8 && els.codexGrid.children.length < 52, 'Tier 4 filter must filter item cards (8 unique legendaries)');
+  assert(els.codexGrid.children.length >= 12 && els.codexGrid.children.length < 68, 'Tier 4 filter must filter item cards (12 unique legendaries)');
 
   vm.runInContext('setCodexTab("heroes");', s);
   assert.strictEqual(els.codexGrid.children.length, 8, 'Heroes tab must render all 8 potato classes');
@@ -782,7 +786,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   // 11a. Log Header + Entries + Export Filename must include Date & Code Version
   const curVer = vm.runInContext('APP_VERSION', s);
-  assert.strictEqual(curVer, 'v1.2.0', 'APP_VERSION must be v1.2.0');
+  assert.strictEqual(curVer, 'v1.3.0', 'APP_VERSION must be v1.3.0');
   const logTxt = vm.runInContext('getLogText()', s);
   assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
   assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
@@ -964,7 +968,8 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
     player.x = 1100; player.y = 500;
     pushOutOfChasms(player);
-    const pushedFromChasm = Math.abs(player.y - 500) >= 30 + player.r - 0.5;
+    const chasmClear = closestOnChasm(terrains[2], player.x, player.y);
+    const pushedFromChasm = Math.hypot(player.x - 1100, player.y - 500) > 25 && chasmClear && chasmClear.gap >= player.r - 0.5;
 
     // Persistent callout & banner eviction protection under heavy bullet damage spam
     texts = []; banners = [];
@@ -1004,10 +1009,10 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   // 14a. Start Menu Live Version Pill + Interactive Changelog Modal
   s.document.getElementById('codexModal').classList.add('hidden');
   s.document.getElementById('logModal').classList.add('hidden');
-  assert(els.startVersionPill.textContent.includes('v1.2.0'), '#startVersionPill must display live version v1.2.0 on start screen');
+  assert(els.startVersionPill.textContent.includes('v1.3.0'), '#startVersionPill must display live version v1.3.0 on start screen');
   vm.runInContext('openChangelogModal();', s);
   assert.strictEqual(els.changelogModal.classList.contains('hidden'), false, 'openChangelogModal() must unhide #changelogModal');
-  assert(els.changelogList.children.length >= 6, 'Changelog modal must render >= 6 historical version cards');
+  assert(els.changelogList.children.length >= 7, 'Changelog modal must render >= 7 historical version cards');
   s.window.dispatch('keydown', { key: 'Escape' });
   assert.strictEqual(els.changelogModal.classList.contains('hidden'), true, 'Escape key must close #changelogModal');
 
@@ -1142,6 +1147,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     bossCutscene = null;
 
     // Let Boss execute Terrain Alteration & Minion Summon during Phase 2
+    terrains = [];
     b.terrainCd = 0.02; b.sumT = 0.02;
     const terrainsBefore = terrains.length;
     update(0.05);
@@ -1172,4 +1178,124 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 14 v1.2.0 verification');
 }
 
-console.log(`ALL 14 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+// 15. v1.3.0 One-Unique-Organic-Terrain-Per-Map, Wave 5 MINI_BOSS_DEFS Resilience, 32-Weapon / 68-Item Full Archetypes & All 10 Half-Body Portraits
+{
+  const { sandbox: s, stats } = createEnv(false, 1440, 900, 2);
+
+  const v13Check = vm.runInContext(`(() => {
+    startGame('engineer');
+
+    // 15a. Verify balanced weapon counts across all 6 sets (each set >= 5 weapons!)
+    const setCounts = {};
+    for (const w of Object.values(WEAPONS)) {
+      setCounts[w.set] = (setCounts[w.set] || 0) + 1;
+    }
+
+    // 15b. Verify strictly ONE signature terrain feature per biome & non-circular geometry
+    const biomeReport = {};
+    for (const sc of SCENES) {
+      selectedScene = sc.id;
+      wave = 4;
+      beginWave();
+      const tCount = terrains.length;
+      const pCount = portals.length;
+      let nonCircular = false;
+      if (sc.id === 'wasteland') {
+        nonCircular = (tCount === 0 && pCount === 2 && Array.isArray(portals[0].shards) && portals[0].shards.length >= 5);
+      } else if (tCount === 1 && pCount === 0) {
+        const tr = terrains[0];
+        if (tr.kind === 'chasm') {
+          nonCircular = Array.isArray(tr.spine) && tr.spine.length >= 6 && Array.isArray(tr.outerCliff) && tr.outerCliff.length >= 12;
+        } else if (Array.isArray(tr.verts) && tr.verts.length >= 12) {
+          const dists = tr.verts.map(v => Math.hypot(v.x - tr.x, v.y - tr.y));
+          nonCircular = (Math.max(...dists) - Math.min(...dists)) > 12;
+        }
+      }
+      biomeReport[sc.id] = { tCount, pCount, kind: terrains[0] ? terrains[0].kind : 'portals', nonCircular };
+      draw();
+    }
+
+    // 15c. Regression test for Wave 5 Fungal Elite Wave & MINI_BOSS_DEFS resilience
+    selectedScene = 'fungal';
+    selectedDiff = 2; diff = DIFFS[2];
+    wave = 5;
+    beginWave();
+    const savedMini = globalThis.MINI_BOSS_DEFS;
+    globalThis.MINI_BOSS_DEFS = undefined;
+    const pickedFallback = pickMiniBossVariant();
+    const fallbackMini = createEnemy(600, 600, 'mini_boss', pickedFallback);
+    globalThis.MINI_BOSS_DEFS = savedMini;
+    const wave5Safe = !!(fallbackMini && fallbackMini.hp > 0);
+
+    // 15d. Test new Engineering Landmines, Floating Laser Turrets, Bouncing Grenade, Revolver 6th-Crit, Melee Shockwave & Blood Nova
+    player.weapons = [
+      makeWeapon('screwdriver', 3),
+      makeWeapon('drone_bay', 3),
+      makeWeapon('revolver', 2),
+      makeWeapon('grenade_launcher', 3),
+      makeWeapon('spiked_shield', 3),
+      makeWeapon('magma_blade', 4),
+      makeWeapon('emp_cannon', 4)
+    ];
+    for (const id of ['landmine_pack', 'overseer_chip', 'omega_factory', 'whirlwind_belt', 'crimson_pact', 'titan_heart', 'fortress_plate', 'trinity_orb']) {
+      player.items[id] = 1;
+      ITEMS.find(i => i.id === id).apply(player);
+    }
+    wave = 7;
+    beginWave();
+    const hasLaserTurret = turrets.some(t => t.kind === 'laser');
+    player.mineCd = 0.01;
+    const targetE = createEnemy(player.x + 95, player.y, 'brute');
+    targetE.hp = 20000; targetE.maxHp = 20000;
+    createEnemy(player.x + 150, player.y + 30, 'charger');
+    player.hp = Math.max(1, player.maxHp - 5);
+    for (let step = 0; step < 30; step++) {
+      for (const w of player.weapons) w.cd = 0;
+      update(0.05);
+      draw();
+    }
+    // Detonate a proximity mine directly
+    player.mineCd = 0.01;
+    update(0.05);
+    const spawnedMine = mines.length >= 1;
+    if (mines[0]) {
+      mines[0].armT = 0;
+      const victim = createEnemy(mines[0].x + 10, mines[0].y, 'chaser');
+      victim.hp = 500; victim.maxHp = 500;
+      update(0.05);
+    }
+
+    // 15e. Render all 10 Boss/SpecialBoss/Commander Half-Body Portraits (Normal + Mythic)
+    const all10Portraits = ['butcher', 'frost_queen', 'mech_colossus', 'void_weaver', 'crimson_lord', 'golden_golem', 'abyss_devourer', 'vanguard', 'pyro_lord', 'shadow_stalker'];
+    for (const v of all10Portraits) {
+      drawBossPortrait(v, 400, 300, 1.0, false);
+      drawBossPortrait(v, 400, 300, 1.0, true);
+    }
+
+    return { setCounts, biomeReport, wave5Safe, hasLaserTurret, spawnedMine };
+  })()`, s);
+
+  for (const [setKey, cnt] of Object.entries(v13Check.setCounts)) {
+    assert(cnt >= 5, `Weapon set ${setKey} must have >= 5 weapons for balanced build variety (got ${cnt})`);
+  }
+  for (const [scId, rep] of Object.entries(v13Check.biomeReport)) {
+    assert.strictEqual(rep.nonCircular, true, `Biome ${scId} must spawn strictly 1 non-circular signature terrain (got ${JSON.stringify(rep)})`);
+  }
+  assert.strictEqual(v13Check.wave5Safe, true, 'Wave 5 pickMiniBossVariant & createEnemy must never throw ReferenceError even if global MINI_BOSS_DEFS is stale');
+  assert.strictEqual(v13Check.hasLaserTurret, true, 'Drone Bay / Omega Factory must deploy floating laser turrets');
+  assert.strictEqual(v13Check.spawnedMine, true, 'Screwdriver / Landmine Pack must deploy proximity landmines');
+  assert.strictEqual(stats.radialGradients, 0, 'v1.3.0 organic terrains, mines, laser turrets & 10 portraits must use ZERO radialGradients');
+  assert.strictEqual(stats.shadowBlurs, 0, 'v1.3.0 organic terrains, mines, laser turrets & 10 portraits must use ZERO shadowBlurs');
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 15 v1.3.0 verification');
+
+  // 15f. Verify Standalone Out-of-Game Developer Portrait Showcase HTML exists & compiles cleanly
+  const devShowcasePath = path.join(ROOT, 'tools/dev_portrait_showcase.html');
+  assert(fs.existsSync(devShowcasePath), 'Developer portrait showcase HTML must exist in tools/dev_portrait_showcase.html');
+  const devHtml = fs.readFileSync(devShowcasePath, 'utf8');
+  const scriptMatch = devHtml.match(/<script>([\s\S]*?)<\/script>/);
+  assert(scriptMatch && scriptMatch[1].length > 50000, 'Developer portrait showcase must inline full rendering script');
+  new vm.Script(scriptMatch[1], { filename: 'dev_portrait_showcase.js' });
+  assert(!indexHtml.includes('portraitModal'), 'Main game index.html must stay clean of developer-only portrait modal');
+}
+
+console.log(`ALL 15 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
