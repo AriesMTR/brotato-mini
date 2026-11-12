@@ -22,7 +22,7 @@ function finishWave() {
   for (let i = 0; i < drops.length; i++) {
     if (drops[i].kind === 'mat') leftoverMats += (drops[i].val || 1);
   }
-  const matRate = 0.82 / (1 + Math.max(0, wave - 1) * 0.19);
+  const matRate = 0.94 / (1 + Math.max(0, wave - 1) * 0.19);
   // 自动回收地上 50% 未拾取晶石 + 适度通关津贴 + 【收获】成长分红 + 【理财冠】利息
   const leftover = Math.round(leftoverMats * matRate * 0.50);
   const interestCap = 24 + wave * 9;

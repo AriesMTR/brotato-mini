@@ -218,6 +218,69 @@ function spawnWarning(x, y, type, variant = '') {
   spawns.push({ x, y, type, variant, t: 0.90, maxT: 0.90 });
 }
 
+const RANGED_ENEMY_TYPES = new Set(['shooter', 'sniper_bug', 'mortar', 'spinner', 'rad_scorpion', 'frost_wisp', 'spore_mother']);
+
+function countActiveRangedEnemies() {
+  let c = 0;
+  for (let i = 0; i < enemies.length; i++) {
+    if (enemies[i] && enemies[i].hp > 0 && RANGED_ENEMY_TYPES.has(enemies[i].type)) c++;
+  }
+  for (let i = 0; i < spawns.length; i++) {
+    if (spawns[i] && RANGED_ENEMY_TYPES.has(spawns[i].type)) c++;
+  }
+  return c;
+}
+
+// 独立权重刷怪表（近战追击虫群占 85%+ 绝对主力，严格限制远程怪占比与同屏并发上限，彻底解决前期满屏弹幕）
+function pickWaveEnemyType(wv) {
+  const maxRanged = Math.min(10, 2 + Math.floor(wave * 0.7));
+  const allowRanged = countActiveRangedEnemies() < maxRanged;
+
+  if (sceneMobEnabled && curScene.exclMob && Math.random() < 0.11) {
+    if (!RANGED_ENEMY_TYPES.has(curScene.exclMob) || allowRanged) {
+      return curScene.exclMob;
+    }
+  }
+
+  const table = [
+    ['chaser', 54]
+  ];
+  if (wv >= 2 || (wave === 1 && waveTime < 10)) table.push(['swarmer', wave === 1 ? 12 : 14]);
+  if (wv >= 2) table.push(['stalker', 11]);
+  if (wv >= 3) {
+    table.push(['charger', 8]);
+    table.push(['bomber', 5]);
+  }
+  if (wv >= 4) {
+    table.push(['splitter', 7]);
+    table.push(['shielder', 6]);
+  }
+  if (wv >= 5) {
+    table.push(['brute', 6]);
+    table.push(['summoner', 3.5]);
+  }
+  if (wv >= 6) {
+    table.push(['healer', 3.5]);
+    table.push(['juggernaut', 3]);
+  }
+
+  if (allowRanged) {
+    if (wv >= 2) table.push(['shooter', 5.5]);
+    if (wv >= 3) table.push(['sniper_bug', 3.0]);
+    if (wv >= 4) table.push(['mortar', 3.0]);
+    if (wv >= 5) table.push(['spinner', 2.8]);
+  }
+
+  let totalW = 0;
+  for (let i = 0; i < table.length; i++) totalW += table[i][1];
+  let r = Math.random() * totalW;
+  for (let i = 0; i < table.length; i++) {
+    r -= table[i][1];
+    if (r <= 0) return table[i][0];
+  }
+  return 'chaser';
+}
+
 // 地面高危轰炸预警圈（支持迫击虫、主宰陨石、熔炉地热火柱与紫晶流星）
 function spawnHazard(x, y, r, dmg, delay = 1.22, extra = {}) {
   const cx = Math.max(r + 12, Math.min(WORLD.w - r - 12, x));
@@ -243,7 +306,7 @@ function createEnemy(x, y, type, variant = '') {
   const base = { x, y, hitFlash: 0, phase: Math.random() * 6.28, vx: 0, vy: 0, faceA: 0, burnT: 0, burnTick: 0, burnDmg: 0, chillT: 0, elite: false };
 
   if (type === 'swarmer') {
-    const swCnt = wave >= 7 ? 4 : (wave >= 3 ? 3 : 2);
+    const swCnt = wave >= 8 ? 4 : (wave >= 5 ? 3 : 2);
     for (let k = 0; k < swCnt; k++) {
       const ox = x + (Math.random() - 0.5) * 40, oy = y + (Math.random() - 0.5) * 40;
       enemies.push({ ...base, x: ox, y: oy, r: 9, hp: 5.0 * s, maxHp: 5.0 * s, spd: (146 + wave * 2.2) * sm, dmg: Math.max(2, Math.round(2.2 * dm)), color: '#ffbe0b', type, mat: k === 0 ? 1 : (Math.random() < 0.45 ? 1 : 0) });

@@ -772,12 +772,14 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
   vm.runInContext('startGame("engineer");', s);
 
-  // 11a. Log Header + Entries + Export Filename must include Date & Code Version (v1.1.1)
+  // 11a. Log Header + Entries + Export Filename must include Date & Code Version
+  const curVer = vm.runInContext('APP_VERSION', s);
+  assert.strictEqual(curVer, 'v1.1.2', 'APP_VERSION must be v1.1.2');
   const logTxt = vm.runInContext('getLogText()', s);
-  assert(logTxt.includes('Version: v1.1.1 (BuildDate: 2026-11-12)'), 'Diagnostic log header must include Version & BuildDate');
-  assert(/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \+\d+\.\d+s\] \[v1\.1\.1\]/.test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
+  assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
+  assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
   vm.runInContext('downloadLogs();', s);
-  assert(stats.downloads.length >= 1 && stats.downloads[0].download.includes('v1.1.1') && /\d{4}-\d{2}-\d{2}/.test(stats.downloads[0].download), 'Exported log filename must embed code version and date');
+  assert(stats.downloads.length >= 1 && stats.downloads[0].download.includes(curVer) && /\d{4}-\d{2}-\d{2}/.test(stats.downloads[0].download), 'Exported log filename must embed code version and date');
 
   // 11b. Strict High-Tier Probability Caps even at Wave 18 + 500 Luck (never flooding 100% T4!)
   const rates = vm.runInContext(`(() => {
@@ -854,4 +856,39 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 11 loot, speed & logging verification');
 }
 
-console.log(`ALL 11 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+// 12. v1.1.2 Early-Wave Monster Count Smoothing & Ranged Enemy Spawn Ratio / Concurrent Cap
+{
+  const { sandbox: s } = createEnv(false, 1440, 900, 2);
+  vm.runInContext('selectedDiff = 1; startGame("allrounder");', s);
+
+  const spawnStats = vm.runInContext(`(() => {
+    const checkWave = w => {
+      wave = w; beginWave();
+      enemies = []; spawns = [];
+      let rangedPicks = 0;
+      const N = 600;
+      for (let i = 0; i < N; i++) {
+        const t = pickWaveEnemyType(w);
+        if (RANGED_ENEMY_TYPES.has(t)) rangedPicks++;
+      }
+      // Now verify concurrent ranged cap holds when spawning into spawns[]
+      spawns = []; enemies = [];
+      for (let i = 0; i < 40; i++) {
+        const t = pickWaveEnemyType(w);
+        spawnWarning(200, 200, t);
+      }
+      return { ratio: rangedPicks / N, cappedRanged: countActiveRangedEnemies(), maxAllowed: Math.min(10, 2 + Math.floor(w * 0.7)) };
+    };
+    return { w2: checkWave(2), w3: checkWave(3), w6: checkWave(6) };
+  })()`, s);
+
+  assert(spawnStats.w2.ratio <= 0.14, `Wave 2 ranged spawn ratio must be low <=14% (got ${(spawnStats.w2.ratio * 100).toFixed(1)}%)`);
+  assert(spawnStats.w3.ratio <= 0.16, `Wave 3 ranged spawn ratio must be low <=16% (got ${(spawnStats.w3.ratio * 100).toFixed(1)}%)`);
+  assert(spawnStats.w6.ratio <= 0.22, `Wave 6 ranged spawn ratio must stay controlled <=22% (got ${(spawnStats.w6.ratio * 100).toFixed(1)}%)`);
+  assert(spawnStats.w2.cappedRanged <= spawnStats.w2.maxAllowed, 'Wave 2 concurrent ranged spawns must never exceed cap');
+  assert(spawnStats.w3.cappedRanged <= spawnStats.w3.maxAllowed, 'Wave 3 concurrent ranged spawns must never exceed cap');
+  assert(spawnStats.w6.cappedRanged <= spawnStats.w6.maxAllowed, 'Wave 6 concurrent ranged spawns must never exceed cap');
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 12 spawn pacing & ranged cap verification');
+}
+
+console.log(`ALL 12 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
