@@ -194,6 +194,11 @@ function applyPoison(e, addStacks = 1) {
 // 首领极小概率触发的【隐藏二阶段 · 真红神话觉醒】（回血狂暴 + 补充 60 秒 + 播放隐藏动画 + 必爆传说神装）
 function triggerBossMythicPhase2(e) {
   if (!e || e.mythicPhase2) return false;
+  if (player && (player.mythicAwakenedCount || 0) >= 1) {
+    e.canPhase2 = false;
+    return false;
+  }
+  if (player) player.mythicAwakenedCount = (player.mythicAwakenedCount || 0) + 1;
   e.mythicPhase2 = true;
   e.canPhase2 = false;
   e.maxHp = Math.max(300, Math.round(e.maxHp * 0.74));

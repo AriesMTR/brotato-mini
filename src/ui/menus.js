@@ -291,6 +291,7 @@ function startGame(cls) {
     meleeBossGuard: 0, meleeSweepBonus: 0, meleeShockwave: false, blastChance: 0, explosionScale: 1, napalmBlast: false, bloodNova: false,
     interest: 0, teslaCount: 0, teslaCd: 1.0, healDropBonus: 0, chillSlowT: 0, inSpore: false,
     invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, mythicCratesQueued: 0, recentCrateIds: [],
+    rarePortraitShown: false, mythicAwakenedCount: 0,
     lavaExposure: 0, lavaTick: 0, terrainHintT: 0, terrainSpdMul: 1,
     lv: 1, xp: 0, xpNeed: 10, mats: diff.matBonus, kills: 0, invuln: 0, walkT: 0, dustT: 0, moving: false,
     weapons: [], items: {}
