@@ -359,13 +359,14 @@ function hurtTree(tr, rawDmg) {
     addBurst(tr.x, tr.y - 6, '#5ef29b', 10, 145);
     dropCrystals(tr.x, tr.y, 2 + Math.floor(wave * 0.45));
     const luck = Math.min(90, Math.max(0, (player && player.luck) || 0));
-    const cratesOnMap = drops.filter(d => d.kind === 'crate').length;
+    let cratesOnMap = 0;
+    for (let di = 0; di < drops.length; di++) if (drops[di].kind === 'crate') cratesOnMap++;
     const maxWaveCrates = 1 + (luck >= 60 ? 1 : 0);
     const crateChance = Math.min(0.16, 0.05 + luck * 0.0014);
     if (waveCratesDropped < maxWaveCrates && cratesOnMap < 2 && Math.random() < crateChance) {
       waveCratesDropped++;
       drops.push({ x: tr.x, y: tr.y, kind: 'crate', bob: 0 });
-      addText(tr.x, tr.y - 34, '🎁 战利品箱!', '#ffd166', 16);
+      addText(tr.x, tr.y - 34, '🎁 战利品箱!', '#ffd166', 16, 1.65, true);
     } else if (Math.random() < Math.min(0.80, 0.52 + luck * 0.004)) {
       drops.push({ x: tr.x, y: tr.y, kind: 'heal', bob: 0 });
     }
@@ -525,6 +526,7 @@ function beginWave() {
   player.x = WORLD.w / 2; player.y = WORLD.h / 2;
   player.chillSlowT = 0; player.inSpore = false;
   player.lavaExposure = 0; player.lavaTick = 0; player.terrainHintT = 0; player.terrainSpdMul = 1;
+  player.waveMythicAwakened = false;
   cam.x = player.x; cam.y = player.y;
   clampCam();
   player.hp = player.maxHp;
@@ -750,7 +752,7 @@ function createEnemy(x, y, type, variant = '') {
   const base = {
     x, y, hitFlash: 0, phase: Math.random() * 6.28, vx: 0, vy: 0, faceA: 0,
     burnT: 0, burnTick: 0, burnDmg: 0, chillT: 0, freezeT: 0,
-    poisonT: 0, poisonTick: 0, poisonStacks: 0, exposeT: 0, elite: false
+    poisonT: 0, poisonTick: 0, poisonStacks: 0, exposeT: 0, _blkTxtCd: 0, elite: false
   };
 
   if (type === 'swarmer') {
@@ -764,7 +766,7 @@ function createEnemy(x, y, type, variant = '') {
   }
 
   let ent;
-  const mythicRate = Math.min(0.13, 0.07 + (selectedDiff || 0) * 0.012);
+  const mythicRate = 0.25;
   const bossDefs = getBossDefs();
   const miniBossDefs = getMiniBossDefs();
   const specialRelics = getSpecialRelics();

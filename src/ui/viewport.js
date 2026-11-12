@@ -102,10 +102,12 @@ function syncArenaAndZoom(forceBake = false) {
   const targetW = portraitPhone ? 1180 : (landscapePhone ? 1920 : 2200);
   const targetH = portraitPhone ? 1960 : (landscapePhone ? 1220 : 1500);
   const nextScale = (uiMode !== 'desktop' || isTouch) ? 0.65 : 0.80;
-  const wantKey = `${targetW}x${targetH}_${nextScale}_${curScene.id}_${sceneSeed}`;
+  const activeSceneId = (curScene && curScene.id) ? curScene.id : 'wasteland';
+  const wantKey = `${targetW}x${targetH}_${nextScale}_${activeSceneId}_${sceneSeed}`;
 
   if (forceBake || WORLD.w !== targetW || WORLD.h !== targetH || bakedSceneKey !== wantKey) {
-    const sx = targetW / WORLD.w, sy = targetH / WORLD.h;
+    const prevW = Math.max(1, WORLD.w || targetW), prevH = Math.max(1, WORLD.h || targetH);
+    const sx = targetW / prevW, sy = targetH / prevH;
     const sizeChanged = WORLD.w !== targetW || WORLD.h !== targetH;
     WORLD.w = targetW;
     WORLD.h = targetH;

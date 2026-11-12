@@ -406,6 +406,7 @@ function draw() {
     for (let i = 0; i < sporeZones.length; i++) {
       const sz = sporeZones[i];
       const sr = Math.max(12, sz.r || 86);
+      if (sz.x + sr + 16 < vL || sz.x - sr - 16 > vR || sz.y + sr + 16 < vT || sz.y - sr - 16 > vB) continue;
       const fade = Math.min(1, Math.max(0.15, sz.t / 1.2));
       ctx.save();
       ctx.globalAlpha = 0.16 * fade;
@@ -476,6 +477,7 @@ function draw() {
     for (let i = 0; i < hazards.length; i++) {
       const h = hazards[i];
       const hr = Math.max(4, h.r || 40);
+      if (h.x + hr + 12 < vL || h.x - hr - 12 > vR || h.y + hr + 12 < vT || h.y - hr - 12 > vB) continue;
       const p = Math.max(0, Math.min(1, 1 - (h.t || 0) / Math.max(0.01, h.maxT || 1)));
       const hCol = h.color || '#ff3b6b';
       if (h.innerSafeR && h.innerSafeR > 8 && hr > h.innerSafeR + 6) {
@@ -550,6 +552,7 @@ function draw() {
     // 地面扩散冲击圈与爆破火球（支持中空环形外环爆裂与实心震波）
     for (let i = 0; i < rings.length; i++) {
       const rg = rings[i];
+      if (rg.x + rg.r + 12 < vL || rg.x - rg.r - 12 > vR || rg.y + rg.r + 12 < vT || rg.y - rg.r - 12 > vB) continue;
       const p = Math.max(0, Math.min(1, 1 - rg.t / Math.max(0.01, rg.maxT)));
       const curR = Math.max(1, rg.r * (0.24 + p * 0.76));
       if (rg.innerR && rg.innerR > 4) {
@@ -657,6 +660,7 @@ function draw() {
     }
     for (let i = 0; i < turrets.length; i++) {
       const t = turrets[i];
+      if (t.x + 36 < vL || t.x - 36 > vR || t.y + 36 < vT || t.y - 36 > vB) continue;
       t._rk = 1;
       renderList.push(t);
     }
@@ -680,7 +684,10 @@ function draw() {
     }
 
     // 近战差异化刀光（长矛突刺枪芒 / 匕首寒芒 / 利爪三连撕痕 / 重武器钝击波 / 太刀居合月牙，干净利落零滤镜）
-    for (const sl of slashes) {
+    for (let si = 0; si < slashes.length; si++) {
+      const sl = slashes[si];
+      const slPad = (sl.r || 80) + 20;
+      if (sl.x + slPad < vL || sl.x - slPad > vR || sl.y + slPad < vT || sl.y - slPad > vB) continue;
       const alpha = Math.max(0.05, sl.t / Math.max(0.01, sl.maxT));
       ctx.save();
       ctx.translate(sl.x, sl.y); ctx.rotate(sl.angle);
@@ -954,17 +961,24 @@ function draw() {
     ctx.globalAlpha = 1;
 
     ctx.textAlign = 'center';
+    let lastFontSize = -1;
     for (let i = 0; i < texts.length; i++) {
       const t = texts[i];
       if (t.x < vL || t.x > vR || t.y < vT || t.y > vB) continue;
       const life = Math.max(0, t.t / Math.max(0.01, t.maxT));
       const scale = t.important ? (life > 0.90 ? 1 + (1 - life) * 2.2 : 1) : (life > 0.8 ? 1 + (1 - life) * 1.7 : 1);
       ctx.globalAlpha = t.important ? Math.min(1, life / 0.22) : Math.min(1, life * 1.9);
-      const fSize = Math.round(t.size * scale);
-      ctx.font = `900 ${fSize}px -apple-system, sans-serif`;
+      const fSize = Math.max(9, Math.round(t.size * scale));
+      if (fSize !== lastFontSize) {
+        lastFontSize = fSize;
+        ctx.font = `900 ${fSize}px -apple-system, sans-serif`;
+      }
       if (t.important) {
         const padX = 9, pillH = fSize + 9;
-        const tw = Math.min(340, Math.max(44, ctx.measureText(t.txt).width + padX * 2));
+        if (!(t._baseW > 0)) {
+          t._baseW = ctx.measureText(t.txt).width / Math.max(0.5, scale);
+        }
+        const tw = Math.min(340, Math.max(44, t._baseW * scale + padX * 2));
         ctx.fillStyle = 'rgba(15, 11, 26, 0.78)';
         ctx.strokeStyle = t.color;
         ctx.lineWidth = 1.4;
@@ -993,7 +1007,7 @@ function draw() {
   ctx.restore();
 
   // 屏幕四周电影感暗角（复用离屏预烘焙贴图，零实时渐变开销）
-  const lowHp = player && state === 'wave' && (player.hp / player.maxHp < 0.32);
+  const lowHp = player && state === 'wave' && (player.hp / Math.max(1, player.maxHp) < 0.32);
   ctx.drawImage(lowHp ? vigLowHp : vigNormal, 0, 0, viewW, viewH);
 
   // 屏幕顶部战术事件持久播报横幅（停留 3~4 秒，带剩余时间条，确保玩家不错过任何奇遇/环境异象）
@@ -1013,7 +1027,11 @@ function draw() {
       const alpha = enterP * exitP;
       if (alpha <= 0.02) continue;
       const maxW = Math.max(200, viewW - 28);
-      const tw = Math.min(maxW, Math.max(190, ctx.measureText(b.txt).width + 34));
+      if (!b._tw || b._fSize !== fSize) {
+        b._tw = ctx.measureText(b.txt).width;
+        b._fSize = fSize;
+      }
+      const tw = Math.min(maxW, Math.max(190, b._tw + 34));
       const bh = uiMode === 'desktop' ? 32 : 28;
       const bx = viewW * 0.5 - tw * 0.5;
       const by = baseY + i * (bh + 7) - (1 - enterP) * 8;
@@ -1205,7 +1223,8 @@ function draw() {
       ctx.fillStyle = '#ffffff';
       ctx.fillText(bc.title || '首领降临', textX, cy + 10, Math.max(180, viewW - textX - 36));
       if (bc.extraTag) {
-        const tagW = Math.min(viewW - textX - 40, Math.max(210, ctx.measureText(bc.extraTag).width * 0.45 + 28));
+        if (!bc._tagW) bc._tagW = ctx.measureText(bc.extraTag).width;
+        const tagW = Math.min(viewW - textX - 40, Math.max(210, bc._tagW * 0.45 + 28));
         ctx.fillStyle = isMythic ? 'rgba(217, 4, 41, 0.38)' : 'rgba(255, 255, 255, 0.10)';
         ctx.strokeStyle = accCol;
         ctx.lineWidth = 1.5;
@@ -1234,18 +1253,20 @@ logInfo('BOOT', `引擎启动完成 · view=${viewW}x${viewH}(dpr=${dpr}) · ui=
 last = performance.now();
 function loop(now) {
   requestAnimationFrame(loop);
-  const rawMs = Math.max(0, now - last);
+  const safeNow = Number.isFinite(now) ? now : performance.now();
+  const rawMs = Math.max(0, safeNow - last);
   const dt = Math.min(0.05, rawMs / 1000);
-  last = now;
+  last = safeNow;
 
   if (state === 'wave' && !(typeof document !== 'undefined' && document.hidden) && rawMs > 180 && rawMs < 5000) {
     logSpikeCount++;
     logWarn('STALL', `帧耗时峰值 ${Math.round(rawMs)}ms · w=${wave} E=${enemies.length} B=${bullets.length} P=${particles.length}`);
   }
 
+  const sampleMs = Math.min(250, rawMs);
   fpsFrames++;
-  fpsAcc += rawMs;
-  if (rawMs > maxFrameMsWindow) maxFrameMsWindow = rawMs;
+  fpsAcc += sampleMs;
+  if (rawMs < 5000 && rawMs > maxFrameMsWindow) maxFrameMsWindow = rawMs;
   if (fpsAcc >= 500) {
     fpsVal = Math.max(1, Math.min(240, Math.round((fpsFrames * 1000) / fpsAcc)));
     fpsFrames = 0;

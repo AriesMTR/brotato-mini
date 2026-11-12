@@ -32,7 +32,13 @@ function beep(freq = 440, dur = 0.06, type = 'square', vol = 0.045) {
   if (!actx || actx.state !== 'running') return;
   if (!Number.isFinite(freq) || !Number.isFinite(dur) || dur <= 0) return;
   const now = performance.now();
-  while (voiceExpiries.length && voiceExpiries[0] <= now) voiceExpiries.shift();
+  if (voiceExpiries.length > 0 && voiceExpiries[0] <= now) {
+    let w = 0;
+    for (let i = 0; i < voiceExpiries.length; i++) {
+      if (voiceExpiries[i] > now) voiceExpiries[w++] = voiceExpiries[i];
+    }
+    voiceExpiries.length = w;
+  }
   activeVoices = Math.min(activeVoices, voiceExpiries.length);
   const bucket = Math.round(freq / 60);
   if (now - (beepGate[bucket] || 0) < 52) return;
