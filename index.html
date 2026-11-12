@@ -1748,9 +1748,9 @@ function syncArenaAndZoom(forceBake = false) {
 
   if (!userZoomed) {
     if (portraitPhone) {
-      camZoom = Math.max(0.72, Math.min(0.86, viewW / 500));
+      camZoom = Math.max(0.50, Math.min(0.64, viewW / 700));
     } else if (landscapePhone) {
-      camZoom = Math.max(0.68, Math.min(0.82, viewH / 520));
+      camZoom = Math.max(0.48, Math.min(0.62, viewH / 700));
     } else {
       camZoom = Math.min(viewW, viewH) < 820 ? 0.96 : 1.06;
     }
@@ -1792,7 +1792,7 @@ function resize() {
 window.addEventListener('resize', resize);
 window.addEventListener('wheel', e => {
   userZoomed = true;
-  camZoom = Math.max(0.52, Math.min(1.55, camZoom - e.deltaY * 0.0005));
+  camZoom = Math.max(0.38, Math.min(1.55, camZoom - e.deltaY * 0.0005));
   if (bootReady) clampCam();
 }, { passive: true });
 
@@ -2441,7 +2441,7 @@ if (cv.addEventListener) {
       const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
       if (pinchDist > 10) {
         userZoomed = true;
-        camZoom = Math.max(0.52, Math.min(1.55, camZoom * (d / pinchDist)));
+        camZoom = Math.max(0.38, Math.min(1.55, camZoom * (d / pinchDist)));
         if (bootReady) clampCam();
       }
       pinchDist = d;
