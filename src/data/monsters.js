@@ -22,15 +22,15 @@ const BOSS_DEFS = {
 
 const MINI_BOSS_DEFS = {
   vanguard: {
-    id: 'vanguard', icon: '⚔️', name: '狂厄裂地统领', color: '#f72585', spd: 86,
+    id: 'vanguard', icon: '⚔️', name: '狂厄裂地统领', epithet: '重甲裂地战狂', color: '#f72585', spd: 86,
     desc: '重甲先锋统领：擅长锁定蛮力冲锋震散弹幕，并召唤定点陨石封锁走位。'
   },
   pyro_lord: {
-    id: 'pyro_lord', icon: '🔥', name: '炽焰重炮统领', color: '#fb5607', spd: 80,
+    id: 'pyro_lord', icon: '🔥', name: '炽焰重炮统领', epithet: '熔火轰炸督军', color: '#fb5607', spd: 80,
     desc: '熔火狂热统领：朝前方扇形连射 5 枚烈焰火球，并在脚下引爆延迟火焰新星。'
   },
   shadow_stalker: {
-    id: 'shadow_stalker', icon: '⚡', name: '幽影雷刃统领', color: '#7209b7', spd: 96,
+    id: 'shadow_stalker', icon: '⚡', name: '幽影雷刃统领', epithet: '暗雷瞬刃死神', color: '#7209b7', spd: 96,
     desc: '极速刺客统领：高频残影疾驰突进，瞬发八方电磁飞针环。'
   }
 };

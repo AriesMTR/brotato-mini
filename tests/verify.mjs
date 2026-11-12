@@ -461,7 +461,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   for (const bVar of bossIds) {
     vm.runInContext(`{
-      enemies = []; eBullets = []; hazards = [];
+      bossCutscene = null; enemies = []; eBullets = []; hazards = [];
       const b = createEnemy(player.x + 210, player.y - 120, 'boss', '${bVar}');
       b.hp = b.maxHp * 0.45; // Test enraged phase too!
       for (let step = 0; step < 60; step++) { player.hp = player.maxHp; update(0.05); }
@@ -487,7 +487,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   for (const rId of relicIds) {
     vm.runInContext(`{
       wave = 5; beginWave();
-      relics = []; enemies = []; spawns = []; drops = [];
+      bossCutscene = null; relics = []; enemies = []; spawns = []; drops = [];
       const rel = spawnSpecialRelic('${rId}');
       // Off-screen pointer render check first
       rel.x = WORLD.w - 140; rel.y = WORLD.h - 140;
@@ -499,7 +499,8 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
       for (let k = 0; k < 26; k++) { update(0.05); draw(); }
       globalThis.assertRelicConsumed = relics.length === 0;
       globalThis.assertTimeAdded = waveTime > beforeWaveTime + 15;
-      // Step away while spawnWarning (0.95s) materializes Special Boss so auto-weapons don't kill it early
+      // Step away while spawnWarning (0.90s) materializes Special Boss so auto-weapons don't kill it early
+      bossCutscene = null;
       player.x = 200; player.y = 200;
       for (let k = 0; k < 25; k++) { player.hp = player.maxHp * 0.5; update(0.05); draw(); }
     }`, s);
@@ -786,7 +787,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   // 11a. Log Header + Entries + Export Filename must include Date & Code Version
   const curVer = vm.runInContext('APP_VERSION', s);
-  assert.strictEqual(curVer, 'v1.3.2', 'APP_VERSION must be v1.3.2');
+  assert.strictEqual(curVer, 'v1.3.3', 'APP_VERSION must be v1.3.3');
   const logTxt = vm.runInContext('getLogText()', s);
   assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
   assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
@@ -1009,7 +1010,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   // 14a. Start Menu Live Version Pill + Interactive Changelog Modal
   s.document.getElementById('codexModal').classList.add('hidden');
   s.document.getElementById('logModal').classList.add('hidden');
-  assert(els.startVersionPill.textContent.includes('v1.3.2'), '#startVersionPill must display live version v1.3.2 on start screen');
+  assert(els.startVersionPill.textContent.includes('v1.3.3'), '#startVersionPill must display live version v1.3.3 on start screen');
   vm.runInContext('openChangelogModal();', s);
   assert.strictEqual(els.changelogModal.classList.contains('hidden'), false, 'openChangelogModal() must unhide #changelogModal');
   assert(els.changelogList.children.length >= 7, 'Changelog modal must render >= 7 historical version cards');
@@ -1116,24 +1117,25 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   // 14d. Rare Full-Screen Time-Stop Cutscene + All 7 Boss Portraits + Hidden Mythic Phase 2 (+60s & Guaranteed T4 Mythic Drop)
   const mythicCheck = vm.runInContext(`(() => {
-    // Verify rarity & per-run cap of Boss entrance portrait cutscenes:
-    // Across 120 runs, each summoning 3 Special Bosses + Wave 12 Final Boss, entrance cutscenes must be rare (<35% of runs) and NEVER >1 in the same run!
-    let runsWithIntro = 0;
-    let maxIntrosInSingleRun = 0;
-    for (let r = 0; r < 120; r++) {
+    // Verify 33% per-Boss-variant rate & max 1 per Boss ID cap (not global 1-per-run cap):
+    // Summoning the SAME Special Boss ('crimson_lord') 3 times in a single run must trigger <= 1 time,
+    // while Wave 12 Final Boss (different Boss ID) CAN also trigger in the same run!
+    let maxSameBossInSingleRun = 0;
+    let runsWithBothEarlyAndFinal = 0;
+    for (let r = 0; r < 160; r++) {
       startGame('allrounder');
-      let countThisRun = 0;
+      let crimsonCount = 0;
       for (let k = 0; k < 3; k++) {
         bossCutscene = null;
         const testRel = spawnSpecialRelic('blood_altar');
         summonSpecialBoss(testRel);
-        if (bossCutscene) countThisRun++;
+        if (bossCutscene) crimsonCount++;
       }
+      if (crimsonCount > maxSameBossInSingleRun) maxSameBossInSingleRun = crimsonCount;
       bossCutscene = null;
       wave = 12; beginWave();
-      if (bossCutscene) countThisRun++;
-      if (countThisRun > 0) runsWithIntro++;
-      if (countThisRun > maxIntrosInSingleRun) maxIntrosInSingleRun = countThisRun;
+      const finalShown = !!bossCutscene;
+      if (crimsonCount > 0 && finalShown) runsWithBothEarlyAndFinal++;
     }
 
     startGame('allrounder');
@@ -1189,11 +1191,11 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     for (const d of drops) { d.x = player.x; d.y = player.y; }
     update(0.05);
     showCrateMenu();
-    return { runsWithIntro, maxIntrosInSingleRun, summonCutsceneActive, timerStayedFrozen, awakened, secondMythicBlocked, alteredTerrain, droppedMythic, gotTrophyBuff };
+    return { maxSameBossInSingleRun, runsWithBothEarlyAndFinal, summonCutsceneActive, timerStayedFrozen, awakened, secondMythicBlocked, alteredTerrain, droppedMythic, gotTrophyBuff };
   })()`, s);
 
-  assert(mythicCheck.maxIntrosInSingleRun <= 1, `At most 1 Boss entrance portrait cutscene may trigger per run (got ${mythicCheck.maxIntrosInSingleRun})`);
-  assert(mythicCheck.runsWithIntro > 0 && mythicCheck.runsWithIntro < 68, `Boss entrance portrait cutscenes must remain rare across runs, not every boss spawn (got ${mythicCheck.runsWithIntro}/120 across 4 bosses/run)`);
+  assert(mythicCheck.maxSameBossInSingleRun <= 1, `Same Boss variant must trigger at most 1 portrait cutscene per run (got ${mythicCheck.maxSameBossInSingleRun})`);
+  assert(mythicCheck.runsWithBothEarlyAndFinal > 0, 'Early Boss portrait must NOT block late-game Wave 12 Boss from showing its own portrait');
   assert.strictEqual(mythicCheck.summonCutsceneActive, true, 'Rare/forced Special Boss summon must trigger full-screen time-stop cutscene');
   assert.strictEqual(mythicCheck.timerStayedFrozen, true, 'waveTime must pause during Boss entrance cutscene');
   assert.strictEqual(mythicCheck.awakened, true, 'Boss with canPhase2 must awaken Mythic Phase 2 on lethal hit, restoring HP, adding +60s, and playing hidden cutscene');
@@ -1461,4 +1463,167 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 16 v1.3.2 verification');
 }
 
-console.log(`ALL 16 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+// 17. v1.3.3 33% Per-Boss-Variant Portrait Unlock + Death Wave-Retry & Abandon-From-Scratch Mechanics
+{
+  const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
+
+  const v133Check = vm.runInContext(`(() => {
+    // 1) Verify ~33% empirical portrait probability on fresh Boss encounters (Regular Wave 12 Boss, Wave 5 Elite Commander, Special Boss)
+    let regularHits = 0, eliteHits = 0, specialHits = 0;
+    const N = 450;
+    for (let i = 0; i < N; i++) {
+      startGame('ranger');
+      selectedDiff = 1; diff = DIFFS[1];
+      bossCutscene = null;
+      wave = 5; beginWave();
+      if (bossCutscene && bossCutscene.mode === 'elite_boss') eliteHits++;
+
+      bossCutscene = null;
+      const rel = spawnSpecialRelic('void_cube');
+      summonSpecialBoss(rel, false);
+      if (bossCutscene && bossCutscene.mode === 'summon') specialHits++;
+
+      bossCutscene = null;
+      wave = 12; beginWave();
+      if (bossCutscene && bossCutscene.mode === 'final_boss') regularHits++;
+    }
+
+    // 2) Verify per-Boss-ID cap = 1 & Endless mode unlock:
+    // Force-showing vanguard, crimson_lord, and butcher must block repeats of THOSE 3, while still allowing frost_queen in Endless Wave 15!
+    startGame('allrounder');
+    shouldRollRareBossPortrait('vanguard', true);
+    shouldRollRareBossPortrait('crimson_lord', true);
+    shouldRollRareBossPortrait('butcher', true);
+    let repeatBlocked = true;
+    for (let k = 0; k < 30; k++) {
+      if (shouldRollRareBossPortrait('vanguard', false) || shouldRollRareBossPortrait('crimson_lord', false) || shouldRollRareBossPortrait('butcher', false)) {
+        repeatBlocked = false;
+      }
+    }
+    let endlessFrostTriggered = false;
+    endlessMode = true;
+    for (let k = 0; k < 40; k++) {
+      player.shownBossPortraits.frost_queen = false;
+      bossCutscene = null;
+      wave = 15;
+      beginWave({ isRetry: true, sceneId: 'glacier', waveBossIds: ['frost_queen'] });
+      if (bossCutscene && bossCutscene.variant === 'frost_queen') { endlessFrostTriggered = true; break; }
+    }
+
+    // 3) Verify Death Wave-Retry ('retryFailedWave') restores exact pre-wave checkpoint without leaking mid-wave drops/levels
+    selectedScene = 'random';
+    startGame('brawler');
+    player.lv = 6;
+    player.xp = 18;
+    player.xpNeed = 55;
+    player.mats = 92;
+    player.kills = 110;
+    player.maxHp = 58;
+    player.weapons = [makeWeapon('katana', 3), makeWeapon('spiked_shield', 2)];
+    player.items = { cyber_heart: 1, armor_plate: 2 };
+    shopOffers = [{ kind: 'weapon', id: 'katana', tier: 3, price: 40, locked: true }];
+    wave = 9;
+    beginWave();
+    bossCutscene = null;
+    const preMaxHp = player.maxHp;
+    const preSceneId = curScene.id;
+    const preBossIds = waveCheckpoint && waveCheckpoint.waveBossIds ? waveCheckpoint.waveBossIds.slice() : [];
+    player.shownBossPortraits.pyro_lord = true; // Simulate Boss portrait shown during Attempt 1
+
+    // Mutate state mid-wave before dying
+    player.mats += 44;
+    player.kills += 19;
+    player.lv = 8;
+    player.maxHp += 12;
+    pendingLevels = 2;
+    pendingCrates = 1;
+    player.bossCratesQueued = 1;
+    player.dodge = 0; player.invuln = 0; player.shield = 0; player.armor = 0;
+    hurtPlayer(99999);
+    const deadState = state === 'end' && player.hp === 0;
+    const retryBtnVisibleOnLoss = !document.getElementById('retryWaveBtn').classList.contains('hidden');
+    const abandonBtnVisibleOnLoss = !document.getElementById('abandonRestartBtn').classList.contains('hidden');
+    const retryLabel = document.getElementById('retryWaveBtn').textContent;
+
+    // Trigger Retry Failed Wave!
+    retryFailedWave();
+    bossCutscene = null;
+    const retryRestoredCleanly = (
+      state === 'wave' &&
+      wave === 9 &&
+      player.hp === preMaxHp &&
+      player.maxHp === preMaxHp &&
+      player.lv === 6 &&
+      player.xp === 18 &&
+      player.mats === 92 &&
+      player.kills === 110 &&
+      pendingLevels === 0 &&
+      pendingCrates === 0 &&
+      player.bossCratesQueued === 0 &&
+      player.weapons.length === 2 &&
+      player.weapons[0].id === 'katana' &&
+      player.items.armor_plate === 2 &&
+      shopOffers.length === 1 && shopOffers[0].locked === true &&
+      curScene.id === preSceneId &&
+      JSON.stringify(waveCheckpoint.waveBossIds) === JSON.stringify(preBossIds) &&
+      player.shownBossPortraits.pyro_lord === true &&
+      player.retryCount === 1
+    );
+
+    // 4) Die again and choose 'abandonAndRestart' -> must start fresh from Wave 1!
+    player.dodge = 0; player.invuln = 0;
+    hurtPlayer(99999);
+    const endDescHasRetry = document.getElementById('endDesc').innerHTML.includes('重试');
+    abandonAndRestart();
+    const restartedFromScratch = (
+      state === 'wave' &&
+      wave === 1 &&
+      player.cls === 'brawler' &&
+      player.lv === 1 &&
+      player.kills === 0 &&
+      player.retryCount === 0 &&
+      Object.keys(player.shownBossPortraits).length === 0
+    );
+
+    // 5) Victory screen hides retry/abandon buttons and shows Endless button
+    endGame(true);
+    const winHidesRetry = document.getElementById('retryWaveBtn').classList.contains('hidden') &&
+      document.getElementById('abandonRestartBtn').classList.contains('hidden') &&
+      !document.getElementById('endlessBtn').classList.contains('hidden');
+
+    return {
+      regularRate: regularHits / N,
+      eliteRate: eliteHits / N,
+      specialRate: specialHits / N,
+      repeatBlocked,
+      endlessFrostTriggered,
+      deadState,
+      retryBtnVisibleOnLoss,
+      abandonBtnVisibleOnLoss,
+      retryLabel,
+      retryRestoredCleanly,
+      endDescHasRetry,
+      restartedFromScratch,
+      winHidesRetry
+    };
+  })()`, s);
+
+  assert(v133Check.regularRate >= 0.25 && v133Check.regularRate <= 0.41, `Regular Wave 12 Boss portrait rate must be ~33% (got ${(v133Check.regularRate * 100).toFixed(1)}%)`);
+  assert(v133Check.eliteRate >= 0.25 && v133Check.eliteRate <= 0.41, `Wave 5/9 Elite Boss portrait rate must be ~33% (got ${(v133Check.eliteRate * 100).toFixed(1)}%)`);
+  assert(v133Check.specialRate >= 0.25 && v133Check.specialRate <= 0.41, `Special Boss portrait rate must be ~33% (got ${(v133Check.specialRate * 100).toFixed(1)}%)`);
+  assert.strictEqual(v133Check.repeatBlocked, true, 'Each Boss variant must trigger portrait at most 1 time per run');
+  assert.strictEqual(v133Check.endlessFrostTriggered, true, 'Unseen Boss variants in late-game / Endless waves must still be able to trigger their portrait');
+  assert.strictEqual(v133Check.deadState, true, 'Lethal damage must enter end state');
+  assert.strictEqual(v133Check.retryBtnVisibleOnLoss, true, '#retryWaveBtn must be visible upon defeat');
+  assert.strictEqual(v133Check.abandonBtnVisibleOnLoss, true, '#abandonRestartBtn must be visible upon defeat');
+  assert(v133Check.retryLabel.includes('第 9 波'), `Retry button must display exact failed wave label (got "${v133Check.retryLabel}")`);
+  assert.strictEqual(v133Check.retryRestoredCleanly, true, 'retryFailedWave() must restore exact pre-wave stats, weapons, items, scene & boss without leaking mid-wave gains');
+  assert.strictEqual(v133Check.endDescHasRetry, true, 'Defeat summary must display retry count after retrying');
+  assert.strictEqual(v133Check.restartedFromScratch, true, 'abandonAndRestart() must discard progress and start fresh at Wave 1');
+  assert.strictEqual(v133Check.winHidesRetry, true, 'Victory screen must hide retry/abandon buttons and show Endless button');
+  assert.strictEqual(stats.radialGradients, 0, 'v1.3.3 suite must create ZERO per-frame radial gradients');
+  assert.strictEqual(stats.shadowBlurs, 0, 'v1.3.3 suite must set ZERO shadowBlur');
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 17 v1.3.3 verification');
+}
+
+console.log(`ALL 17 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
