@@ -4,6 +4,25 @@
 
 ---
 
+## [v1.1.0] - 2026-11-12
+### 🏗️ 项目模块化多文件架构重构（告别 7000 行单文件）
+- **样式层与视图层彻底分离**：
+  - `index.html` 精简为约 230 行纯净页面骨架与资源入口。
+  - 样式拆分为 `styles/base.css`（全局视觉主题、桌面端布局与组件）与 `styles/mobile.css`（手机竖屏/横屏 `100dvh` 单屏触控样式）。
+- **逻辑层按职责拆分为 16 个高内聚模块（`src/`）**：
+  - `src/core/`：`env.js`（画布/DPR/色板常量）、`logger.js`（诊断日志与异常监控）、`audio.js`（WebAudio 合成音 + 新增 `AudioBank` 外部 MP3/OGG 音效与 BGM 扩展接口）。
+  - `src/data/`：`scenes.js`（5 大场景配置）、`arsenal.js`（难度/英雄/羁绊/武器/道具/强化数值表）、`monsters.js`（主宰 Boss/统领/奇遇圣物与 31 种怪物图鉴表）。
+  - `src/world/`：`textures.js`（离屏地面、暗角与 3D 土豆材质烘焙器）。
+  - `src/ui/`：`viewport.js`（双端界面模式切换与高挑镜头自适应）、`codex.js`（全息图鉴百科）、`menus.js`（主菜单、虚拟摇杆/双指缩放与暂停控制）、`shop.js`（宝箱、升级与军火商店）。
+  - `src/game/`：`spawner.js`（波次刷怪与奇遇召唤）、`combat.js`（护甲/闪避/连锁闪电/爆炸与掉落结算）、`update.js`（60FPS 核心战斗状态机）。
+  - `src/render/`：`sprites.js`（精细矢量精灵绘制）、`renderer.js`（主相机视锥裁剪渲染与帧循环）。
+- **新增 PWA 桌面应用清单与矢量图标**：新增 `manifest.json` 与 `assets/icon.svg`（土豆战士专属矢量图标），支持手机添加到主屏幕全屏独立启动与浏览器标签页图标显示。
+- **配套开发与构建工具链**：
+  - 新增 `scripts/build-singlefile.mjs`（`npm run build:single`），支持随时零依赖一键合并导出离线单文件版 `brotato_mini.html`。
+  - 新增 `tests/verify.mjs`（`npm test`），包含模块完整性、PWA 清单、音频扩展回退、双端 UI 与高密度战斗渲染等 10 组自动化测试套件，并补充 `README.md` 开发指南。
+
+---
+
 ## [v1.0.2] - 2026-11-12
 ### 🔭 手机端初始战斗视角大幅拉高
 - **竖屏与横屏初始镜头再度拔高（视野面积提升约 95%）**：
