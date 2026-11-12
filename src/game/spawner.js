@@ -77,7 +77,6 @@ function summonSpecialBoss(rel) {
   if (!rel || !rel.def) return;
   const def = rel.def;
   beep(185, 0.26, 'sawtooth', 0.085);
-  shake = Math.max(shake, 12);
   if (rings.length < 40) rings.push({ x: rel.x, y: rel.y, r: 150, color: def.bossColor, t: 0.38, maxT: 0.38, fill: true });
   if (lightnings.length < 35) {
     lightnings.push({ pts: [{ x: rel.x, y: Math.max(20, rel.y - 260) }, { x: rel.x - 16, y: rel.y - 120 }, { x: rel.x + 12, y: rel.y - 50 }, { x: rel.x, y: rel.y }], color: def.color, t: 0.28, maxT: 0.28 });
@@ -96,6 +95,7 @@ function summonSpecialBoss(rel) {
 function beginWave() {
   state = 'wave';
   inHurtPlayer = false;
+  shake = 0;
   resetJoy();
   confirmSellIdx = -1;
   overtime = false;

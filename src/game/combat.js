@@ -78,7 +78,6 @@ function triggerExplosion(x, y, radius, enemyDmg, hurtPlayerToo = false, playerD
       if (stains.length > (isTouch ? 55 : 100)) stains.shift();
       stains.push({ x, y, r: radius * 0.42, color: '#14101c', kind: 'scorch' });
     }
-    shake = Math.max(shake, 7);
     beep(135, 0.13, 'sawtooth', 0.06);
     addBurst(x, y, ringColor, 14, 210);
     addSparks(x, y, Math.random() * 6.28, '#ffd166', 8);
@@ -309,7 +308,6 @@ function killEnemyRewards(e) {
   }
 
   if (e.type === 'boss' || e.type === 'special_boss') {
-    shake = 16;
     const otherBoss = enemies.some(o => o !== e && (o.type === 'boss' || o.type === 'special_boss') && o.hp > 0);
     if (!otherBoss && !spawns.some(s => s.type === 'boss' || s.type === 'special_boss')) {
       if (overtime) {
@@ -383,7 +381,7 @@ function hurtPlayer(rawDmg) {
 
     player.hp -= dmg;
     player.invuln = 0.42 * invScale;
-    shake = 10;
+    shake = 4.5;
     beep(115, 0.15, 'sawtooth', 0.08);
     addBurst(player.x, player.y, '#ff4d6d', 10, 175);
     addText(player.x, player.y - 30, '-' + dmg, '#ff4d6d', 20);

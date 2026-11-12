@@ -774,7 +774,7 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
 
   // 11a. Log Header + Entries + Export Filename must include Date & Code Version
   const curVer = vm.runInContext('APP_VERSION', s);
-  assert.strictEqual(curVer, 'v1.1.2', 'APP_VERSION must be v1.1.2');
+  assert.strictEqual(curVer, 'v1.1.3', 'APP_VERSION must be v1.1.3');
   const logTxt = vm.runInContext('getLogText()', s);
   assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
   assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
@@ -888,7 +888,29 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   assert(spawnStats.w2.cappedRanged <= spawnStats.w2.maxAllowed, 'Wave 2 concurrent ranged spawns must never exceed cap');
   assert(spawnStats.w3.cappedRanged <= spawnStats.w3.maxAllowed, 'Wave 3 concurrent ranged spawns must never exceed cap');
   assert(spawnStats.w6.cappedRanged <= spawnStats.w6.maxAllowed, 'Wave 6 concurrent ranged spawns must never exceed cap');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 12 spawn pacing & ranged cap verification');
+
+  // 12b. v1.1.3 Zero Map Shake on Attacking/Exploding/Killing Monsters; Gentle Shake ONLY on Player Hit
+  const shakeCheck = vm.runInContext(`(() => {
+    startGame('allrounder');
+    wave = 12; beginWave();
+    shake = 0;
+    player.weapons = [makeWeapon('hammer', 4), makeWeapon('rocket', 4)];
+    player.weapons[0].cd = 0; player.weapons[1].cd = 0;
+    const boss = createEnemy(player.x + 85, player.y, 'boss', 'butcher');
+    update(0.05);
+    triggerExplosion(boss.x, boss.y, 120, 500, false, 0, '#ff9f1c', true);
+    hurtEnemy(boss, boss.maxHp + 99999, true);
+    const attackShake = shake;
+
+    // Now deal real HP damage to player -> gentle shake (<= 5)
+    state = 'wave'; player.dodge = 0; player.shield = 0; player.invuln = 0; player.hp = 30;
+    hurtPlayer(5);
+    const hitShake = shake;
+    return { attackShake, hitShake };
+  })()`, s);
+  assert.strictEqual(shakeCheck.attackShake, 0, 'Attacking, exploding, or killing monsters/bosses must NOT shake the map');
+  assert(shakeCheck.hitShake > 0 && shakeCheck.hitShake <= 5, `Player taking HP damage should trigger gentle micro-shake (got ${shakeCheck.hitShake})`);
+  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 12 spawn pacing, ranged cap & shake verification');
 }
 
 console.log(`ALL 12 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);

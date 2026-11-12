@@ -1,7 +1,7 @@
 // 60FPS 核心战术状态机主更新循环（移动、武器开火、投射物、怪物与首领 AI）
 function update(dt) {
   if (state !== 'wave' || !player) return;
-  if (shake > 0) shake = Math.max(0, shake - dt * 32);
+  if (shake > 0) shake = Math.max(0, shake - dt * 36);
   if (player.bullCd > 0) player.bullCd -= dt;
   if (player.shieldHitT > 0) player.shieldHitT -= dt;
   if (player.chillSlowT > 0) player.chillSlowT = Math.max(0, player.chillSlowT - dt);
@@ -363,7 +363,6 @@ function update(dt) {
             if (rings.length < 40) rings.push({ x: hx, y: hy, r: sr, color: '#f4a261', t: 0.22, maxT: 0.22 });
             if (stains.length > 100) stains.shift();
             stains.push({ x: hx, y: hy, r: 22, color: '#14101c', kind: 'scorch' });
-            shake = Math.max(shake, 4.5);
             for (let i = enemies.length - 1; i >= 0; i--) {
               const e = enemies[i];
               if (e.hp > 0 && Math.hypot(e.x - hx, e.y - hy) <= sr + e.r) {
@@ -688,7 +687,6 @@ function update(dt) {
         e.dashT = (e.dashT || 3.4) - dt * bossMult;
         if (e.dashT <= 0) {
           e.dashT = enraged ? 3.1 : 3.9;
-          shake = Math.max(shake, 8);
           if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: 120, color: '#fb5607', t: 0.3, maxT: 0.3 });
           for (let k = 0; k < 8 && eBullets.length < 170; k++) {
             const ba = (k / 8) * Math.PI * 2 + e.phase * 0.4;
@@ -874,7 +872,6 @@ function update(dt) {
         e.shotT = (e.shotT || 2.2) - dt * sbMult;
         if (e.shotT <= 0) {
           e.shotT = enraged ? 2.0 : 2.5;
-          shake = Math.max(shake, 7);
           if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: 96, color: '#ffd166', t: 0.28, maxT: 0.28 });
           const cnt = enraged ? 10 : 8;
           for (let k = 0; k < cnt && eBullets.length < 170; k++) {
