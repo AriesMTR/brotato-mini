@@ -49,6 +49,159 @@ function draw() {
       ctx.restore();
     }
 
+    // 交互式生态地形渲染（熔岩池、剧毒泥沼、寒霜滑冰面、断层裂谷，纯矢量分层零渐变开销）
+    for (let i = 0; i < terrains.length; i++) {
+      const tr = terrains[i];
+      const pad = (tr.halfLen || 0) + (tr.r || 68) + 28;
+      if (tr.x + pad < vL || tr.x - pad > vR || tr.y + pad < vT || tr.y - pad > vB) continue;
+      ctx.save();
+      if (tr.kind === 'chasm') {
+        const cr = Math.max(14, tr.r || 30);
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#453654';
+        ctx.lineWidth = cr * 2 + 10;
+        ctx.beginPath(); ctx.moveTo(tr.x1, tr.y1); ctx.lineTo(tr.x2, tr.y2); ctx.stroke();
+        ctx.strokeStyle = '#1d1528';
+        ctx.lineWidth = cr * 2 + 2;
+        ctx.beginPath(); ctx.moveTo(tr.x1, tr.y1); ctx.lineTo(tr.x2, tr.y2); ctx.stroke();
+        ctx.strokeStyle = '#07050c';
+        ctx.lineWidth = Math.max(8, cr * 2 - 10);
+        ctx.beginPath(); ctx.moveTo(tr.x1, tr.y1); ctx.lineTo(tr.x2, tr.y2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(199, 125, 255, 0.34)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 10]);
+        ctx.beginPath(); ctx.moveTo(tr.x1, tr.y1); ctx.lineTo(tr.x2, tr.y2); ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (tr.kind === 'lava') {
+        const lr = Math.max(20, tr.r || 66);
+        const pls = Math.sin(tr.pulse || 0);
+        ctx.fillStyle = '#2a100d';
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, lr + 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, lr, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, Math.max(8, lr * (0.75 + pls * 0.04)), 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, Math.max(5, lr * (0.40 - pls * 0.04)), 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#fb923c';
+        ctx.lineWidth = 2.2;
+        ctx.setLineDash([10, 7]);
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, lr - 1, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#fef08a';
+        for (let b = 0; b < 3; b++) {
+          const ba = (tr.seed || 0) + b * 2.1 + (tr.pulse || 0) * 0.45;
+          const bd = lr * (0.35 + ((b * 0.23) % 0.4));
+          const br = Math.max(1.5, 3.2 + Math.sin((tr.pulse || 0) * 1.8 + b * 2) * 1.6);
+          ctx.beginPath(); ctx.arc(tr.x + Math.cos(ba) * bd, tr.y + Math.sin(ba) * bd, br, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (tr.kind === 'swamp') {
+        const sr = Math.max(20, tr.r || 72);
+        ctx.fillStyle = '#13261e';
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, sr + 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#1e4635';
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, sr, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(132, 204, 22, 0.32)';
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, Math.max(8, sr * 0.72), 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(163, 230, 53, 0.68)';
+        ctx.lineWidth = 2.2;
+        ctx.setLineDash([9, 7]);
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, sr - 1, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#bef264';
+        ctx.lineWidth = 1.6;
+        for (let b = 0; b < 3; b++) {
+          const ba = (tr.seed || 0) + b * 2.09;
+          const bd = sr * (0.28 + b * 0.18);
+          const cyc = ((tr.pulse || 0) * 0.6 + b * 0.33) % 1;
+          ctx.globalAlpha = Math.max(0.1, 1 - cyc);
+          ctx.beginPath(); ctx.arc(tr.x + Math.cos(ba) * bd, tr.y + Math.sin(ba) * bd, Math.max(1.5, 2.5 + cyc * 6.5), 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      } else if (tr.kind === 'ice_sheet') {
+        const ir = Math.max(22, tr.r || 82);
+        ctx.fillStyle = 'rgba(114, 239, 221, 0.22)';
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, ir, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(224, 242, 254, 0.18)';
+        ctx.beginPath(); ctx.arc(tr.x - ir * 0.12, tr.y - ir * 0.12, Math.max(8, ir * 0.68), 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(186, 230, 253, 0.82)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(tr.x, tr.y, ir, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(tr.x - ir * 0.42, tr.y - ir * 0.18); ctx.lineTo(tr.x - ir * 0.08, tr.y - ir * 0.52);
+        ctx.moveTo(tr.x - ir * 0.12, tr.y + ir * 0.34); ctx.lineTo(tr.x + ir * 0.38, tr.y - ir * 0.16);
+        ctx.stroke();
+      }
+      if (player && Math.hypot(player.x - tr.x, player.y - tr.y) < (tr.halfLen || tr.r || 68) + 165) {
+        const tLabel = tr.kind === 'lava' ? '🌋 熔岩池 (灼烧)' : (tr.kind === 'swamp' ? '🧪 毒泥沼 (减速)' : (tr.kind === 'ice_sheet' ? '🧊 寒冰面 (加速)' : '🕳️ 断层裂谷 (阻挡)'));
+        const ly = tr.kind === 'chasm' ? tr.y - 4 : tr.y - (tr.r || 64) + 16;
+        ctx.font = '800 11.5px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(14, 10, 24, 0.72)';
+        ctx.beginPath(); ctx.roundRect(tr.x - 54, ly - 11, 108, 16, 6); ctx.fill();
+        ctx.fillStyle = '#f1ecff';
+        ctx.fillText(tLabel, tr.x, ly + 1);
+      }
+      ctx.restore();
+    }
+
+    // 双生虚空传送门 A ↔ B 渲染（附带对向门方位角标与充能冷却环）
+    for (let i = 0; i < portals.length; i++) {
+      const p = portals[i];
+      const pr = Math.max(18, p.r || 34);
+      if (p.x + pr + 36 < vL || p.x - pr - 36 > vR || p.y + pr + 36 < vT || p.y - pr - 36 > vB) continue;
+      const partner = portals[i === 0 ? 1 : 0];
+      const cooling = portalPairCd > 0;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.globalAlpha = cooling ? 0.35 : 0.85;
+      ctx.fillStyle = '#140c24';
+      ctx.beginPath(); ctx.arc(0, 0, pr, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = cooling ? 0.22 : 0.34;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(0, 0, Math.max(6, pr * (0.72 + Math.sin(p.pulse) * 0.08)), 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = cooling ? 0.42 : 0.95;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 2.8;
+      ctx.save();
+      ctx.rotate(p.pulse * (cooling ? 0.25 : 0.75));
+      ctx.setLineDash([9, 6]);
+      ctx.beginPath(); ctx.arc(0, 0, pr, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+      if (!cooling) {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(0, 0, Math.max(4, pr * 0.26), 0, Math.PI * 2); ctx.fill();
+      } else {
+        const cdProg = Math.max(0, Math.min(1, 1 - portalPairCd / 4.5));
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = '#ffd166';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath(); ctx.arc(0, 0, pr + 5, -Math.PI / 2, -Math.PI / 2 + cdProg * Math.PI * 2); ctx.stroke();
+      }
+      if (partner) {
+        const linkA = Math.atan2(partner.y - p.y, partner.x - p.x);
+        ctx.save();
+        ctx.rotate(linkA);
+        ctx.globalAlpha = cooling ? 0.35 : 0.9;
+        ctx.fillStyle = partner.color || '#ffd166';
+        ctx.beginPath(); ctx.moveTo(pr + 12, 0); ctx.lineTo(pr + 4, -5); ctx.lineTo(pr + 4, 5); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+      ctx.font = '800 12px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      const pTxt = cooling ? `⏳ 充能 ${portalPairCd.toFixed(1)}s` : `🌀 传送门 ${p.label}`;
+      ctx.fillStyle = 'rgba(14, 10, 24, 0.78)';
+      ctx.beginPath(); ctx.roundRect(-48, -pr - 24, 96, 17, 6); ctx.fill();
+      ctx.fillStyle = cooling ? '#cbd5e1' : '#f8f5ff';
+      ctx.fillText(pTxt, 0, -pr - 11);
+      ctx.restore();
+    }
+
     // 幽光菌林专属异象：治愈孢子灵泉区域渲染
     for (let i = 0; i < sporeZones.length; i++) {
       const sz = sporeZones[i];
@@ -545,11 +698,22 @@ function draw() {
     for (let i = 0; i < texts.length; i++) {
       const t = texts[i];
       if (t.x < vL || t.x > vR || t.y < vT || t.y > vB) continue;
-      const life = t.t / t.maxT;
-      const scale = life > 0.8 ? 1 + (1 - life) * 1.7 : 1;
-      ctx.globalAlpha = Math.min(1, life * 1.9);
+      const life = Math.max(0, t.t / Math.max(0.01, t.maxT));
+      const scale = t.important ? (life > 0.90 ? 1 + (1 - life) * 2.2 : 1) : (life > 0.8 ? 1 + (1 - life) * 1.7 : 1);
+      ctx.globalAlpha = t.important ? Math.min(1, life / 0.22) : Math.min(1, life * 1.9);
       const fSize = Math.round(t.size * scale);
       ctx.font = `900 ${fSize}px -apple-system, sans-serif`;
+      if (t.important) {
+        const padX = 9, pillH = fSize + 9;
+        const tw = Math.min(340, Math.max(44, ctx.measureText(t.txt).width + padX * 2));
+        ctx.fillStyle = 'rgba(15, 11, 26, 0.78)';
+        ctx.strokeStyle = t.color;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.roundRect(t.x - tw * 0.5, t.y - fSize + 1, tw, pillH, 7);
+        ctx.fill();
+        ctx.stroke();
+      }
       if (isTouch) {
         ctx.fillStyle = '#120d18';
         ctx.fillText(t.txt, t.x - 1.5, t.y + 1.5);
@@ -572,6 +736,48 @@ function draw() {
   // 屏幕四周电影感暗角（复用离屏预烘焙贴图，零实时渐变开销）
   const lowHp = player && state === 'wave' && (player.hp / player.maxHp < 0.32);
   ctx.drawImage(lowHp ? vigLowHp : vigNormal, 0, 0, viewW, viewH);
+
+  // 屏幕顶部战术事件持久播报横幅（停留 3~4 秒，带剩余时间条，确保玩家不错过任何奇遇/环境异象）
+  if (state === 'wave' && typeof banners !== 'undefined' && banners.length > 0) {
+    const baseY = uiMode === 'mobile-portrait' ? 148 : (uiMode === 'mobile-landscape' ? 68 : 98);
+    const fSize = uiMode === 'desktop' ? 14 : 12.5;
+    ctx.save();
+    ctx.font = `800 ${fSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < banners.length; i++) {
+      const b = banners[i];
+      const maxT = Math.max(0.2, b.maxT || 3.2);
+      const elapsed = maxT - b.t;
+      const enterP = Math.min(1, elapsed / 0.16);
+      const exitP = Math.min(1, Math.max(0, b.t / 0.45));
+      const alpha = enterP * exitP;
+      if (alpha <= 0.02) continue;
+      const maxW = Math.max(200, viewW - 28);
+      const tw = Math.min(maxW, Math.max(190, ctx.measureText(b.txt).width + 34));
+      const bh = uiMode === 'desktop' ? 32 : 28;
+      const bx = viewW * 0.5 - tw * 0.5;
+      const by = baseY + i * (bh + 7) - (1 - enterP) * 8;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = 'rgba(17, 13, 29, 0.90)';
+      ctx.strokeStyle = b.color || '#ffd166';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, tw, bh, 9);
+      ctx.fill();
+      ctx.stroke();
+      const progW = Math.max(0, (tw - 14) * Math.max(0, Math.min(1, b.t / maxT)));
+      if (progW > 1) {
+        ctx.globalAlpha = alpha * 0.65;
+        ctx.fillStyle = b.color || '#ffd166';
+        ctx.fillRect(bx + 7, by + bh - 3.5, progW, 2);
+      }
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#f8f5ff';
+      ctx.fillText(b.txt, viewW * 0.5, by + bh * 0.5 - 0.5, tw - 18);
+    }
+    ctx.restore();
+  }
 
   // 地图奇遇圣物在视野外时，于屏幕边缘绘制醒目方向指引信标
   if (state === 'wave' && relics.length > 0) {

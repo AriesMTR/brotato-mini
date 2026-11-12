@@ -6,6 +6,91 @@ function update(dt) {
   if (player.shieldHitT > 0) player.shieldHitT -= dt;
   if (player.chillSlowT > 0) player.chillSlowT = Math.max(0, player.chillSlowT - dt);
   if (sandGustT > 0) sandGustT = Math.max(0, sandGustT - dt);
+  if (player.terrainHintT > 0) player.terrainHintT = Math.max(0, player.terrainHintT - dt);
+  if (portalPairCd > 0) portalPairCd = Math.max(0, portalPairCd - dt);
+  for (let i = banners.length - 1; i >= 0; i--) {
+    banners[i].t -= dt;
+    if (banners[i].t <= 0) banners.splice(i, 1);
+  }
+  for (let i = 0; i < terrains.length; i++) {
+    if (terrains[i].pulse !== undefined) terrains[i].pulse += dt * 2.4;
+  }
+  for (let i = 0; i < portals.length; i++) {
+    portals[i].pulse += dt * 3.0;
+  }
+
+  // 战场交互地形判定（岩浆池灼烧、毒泥沼阻滞、寒冰滑行加速、虚空传送门跃迁）
+  let onLava = false, onSwamp = false, onIce = false;
+  for (let i = 0; i < terrains.length; i++) {
+    const tr = terrains[i];
+    if (tr.kind === 'chasm') continue;
+    const dxT = player.x - tr.x, dyT = player.y - tr.y;
+    const hitR = (tr.r || 68) + player.r * 0.35;
+    if (dxT * dxT + dyT * dyT < hitR * hitR) {
+      if (tr.kind === 'lava') onLava = true;
+      else if (tr.kind === 'swamp') onSwamp = true;
+      else if (tr.kind === 'ice_sheet') onIce = true;
+    }
+  }
+  player.terrainSpdMul = onIce ? 1.28 : ((onSwamp && !player.noSlow) ? 0.78 : 1);
+  if (player.terrainHintT <= 0) {
+    if (onIce) {
+      player.terrainHintT = 2.8;
+      addText(player.x, player.y - 36, '🧊 寒冰疾滑 +28%移速!', '#72efdd', 15, 1.8);
+    } else if (onSwamp && !player.noSlow) {
+      player.terrainHintT = 2.8;
+      addText(player.x, player.y - 36, '🧪 毒沼阻滞 -22%移速', '#a3e635', 15, 1.8);
+    }
+  }
+  if (onLava && !player.noSlow) {
+    player.lavaExposure = (player.lavaExposure || 0) + dt;
+    if (player.lavaExposure >= 0.35) {
+      player.lavaTick = (player.lavaTick || 0) - dt;
+      if (player.lavaTick <= 0) {
+        player.lavaTick = 0.70;
+        addText(player.x, player.y - 38, '🌋 岩浆灼烫!', '#ff6b35', 16, 1.6);
+        hurtPlayer(Math.max(2, Math.round(2.5 + wave * 0.45)));
+        if (state !== 'wave') return;
+      }
+    }
+  } else {
+    player.lavaExposure = Math.max(0, (player.lavaExposure || 0) - dt * 2.2);
+    player.lavaTick = 0;
+  }
+
+  // 双生虚空传送门 A ↔ B 折跃判定
+  if (portals.length >= 2 && portalPairCd <= 0) {
+    for (let idx = 0; idx < 2; idx++) {
+      const p = portals[idx];
+      const hitR = (p.r || 34) + player.r * 0.42;
+      const dxP = player.x - p.x, dyP = player.y - p.y;
+      if (dxP * dxP + dyP * dyP < hitR * hitR) {
+        const dest = portals[idx === 0 ? 1 : 0];
+        portalPairCd = 4.5;
+        if (rings.length < 40) rings.push({ x: p.x, y: p.y, r: 68, color: p.color, t: 0.28, maxT: 0.28, fill: true });
+        player.x = dest.x;
+        player.y = dest.y;
+        player.invuln = Math.max(player.invuln || 0, 0.55);
+        cam.x += (dest.x - cam.x) * 0.68;
+        cam.y += (dest.y - cam.y) * 0.68;
+        clampCam();
+        beep(720, 0.12, 'sine', 0.06);
+        if (rings.length < 40) rings.push({ x: dest.x, y: dest.y, r: 115, color: dest.color, t: 0.32, maxT: 0.32, fill: true });
+        addBurst(dest.x, dest.y, dest.color, 12, 180);
+        const warpDmg = (16 + wave * 3) * getEffectiveDmgMul();
+        for (let k = 0; k < enemies.length; k++) {
+          const ce = enemies[k];
+          if (!ce || ce.hp <= 0 || ce.primed) continue;
+          if (Math.hypot(ce.x - dest.x, ce.y - dest.y) <= 115 + ce.r) {
+            hurtEnemy(ce, warpDmg, false, Math.atan2(ce.y - dest.y, ce.x - dest.x), true, { noProc: true, knockMult: 1.8 });
+          }
+        }
+        addText(player.x, player.y - 42, '🌀 虚空跃迁！短暂无敌', '#e0aaff', 18, 2.0);
+        announce(`🌀 虚空传送门 ${p.label} → ${dest.label} 跃迁成功！（充能冷却 4.5s）`, '#e0aaff', 2.8);
+        break;
+      }
+    }
+  }
 
   // 异星晶树随战斗定时生长（拉长生长间隔，配合单波宝箱上限防泛滥）
   if (!overtime && waveTime > 3 && trees.length < 4) {
@@ -74,11 +159,13 @@ function update(dt) {
         const mx = Math.max(110, Math.min(WORLD.w - 110, player.x + (Math.random() - 0.5) * 340));
         const my = Math.max(110, Math.min(WORLD.h - 110, player.y + (Math.random() - 0.5) * 340));
         spawnHazard(mx, my, 82, (8 + wave * 1.1) * diff.dmgMul, 1.35, { enemyDmg: (38 + wave * 7) * diff.hpMul, dropMat: 4, color: '#80ff72' });
-        addText(mx, my - 30, '☄️ 晶簇陨落!', '#80ff72', 14);
+        addText(mx, my - 30, '☄️ 晶簇陨落!', '#80ff72', 15, 2.0);
+        announce('☄️ 辐射晶簇陨石即将坠落！炸伤异虫并掉落晶石', '#80ff72', 2.8);
       } else if (activeSceneEvent === 'sandstorm') {
         sceneEventT = 8.0;
         sandGustT = 3.2;
-        addText(player.x, player.y - 42, '🌪️ 狂沙顺风：移速+14% · 敌弹减速!', '#f4a261', 15);
+        addText(player.x, player.y - 42, '🌪️ 狂沙顺风：移速+14% · 敌弹减速!', '#f4a261', 15, 2.1);
+        announce('🌪️ 环境异象【狂沙顺风】：移速+14%，敌方弹幕减速 22%', '#f4a261', 3.0);
         if (rings.length < 40) rings.push({ x: player.x, y: player.y, r: 95, color: '#f4a261', t: 0.35, maxT: 0.35 });
       } else if (activeSceneEvent === 'blizzard') {
         sceneEventT = 8.2;
@@ -86,7 +173,8 @@ function update(dt) {
           if (e && e.hp > 0) e.chillT = Math.max(e.chillT || 0, 2.5);
         }
         if (rings.length < 40) rings.push({ x: player.x, y: player.y, r: 260, color: '#72efdd', t: 0.4, maxT: 0.4 });
-        addText(player.x, player.y - 42, '❄️ 极寒霜潮：全场异虫冻结减速!', '#72efdd', 15);
+        addText(player.x, player.y - 42, '❄️ 极寒霜潮：全场异虫冻结减速!', '#72efdd', 15, 2.1);
+        announce('❄️ 环境异象【极寒霜潮】：全场异虫集体冻结减速 2.5s！', '#72efdd', 3.0);
       } else if (activeSceneEvent === 'geysers') {
         sceneEventT = 6.8;
         for (let g = 0; g < 2; g++) {
@@ -94,6 +182,7 @@ function update(dt) {
           const gy = Math.max(110, Math.min(WORLD.h - 110, player.y + (Math.random() - 0.5) * 380));
           spawnHazard(gx, gy, 74, (9 + wave * 1.2) * diff.dmgMul, 1.30, { enemyDmg: (45 + wave * 8) * diff.hpMul, color: '#ff6b35' });
         }
+        announce('🔥 环境异象【地脉喷发】：地面熔火间歇泉即将喷涌（可重创虫群）', '#ff6b35', 2.8);
       } else if (activeSceneEvent === 'spore_tide') {
         sceneEventT = 8.5;
         if (sporeZones.length < 2) {
@@ -102,7 +191,8 @@ function update(dt) {
           const sy = Math.max(110, Math.min(WORLD.h - 110, player.y + Math.sin(ang) * dist));
           sporeZones.push({ x: sx, y: sy, r: 86, t: 6.5, maxT: 6.5, pulse: 0, healAcc: 0 });
           if (rings.length < 40) rings.push({ x: sx, y: sy, r: 92, color: '#5ef29b', t: 0.35, maxT: 0.35 });
-          addText(sx, sy - 24, '🍄 治愈灵泉生成!', '#5ef29b', 15);
+          addText(sx, sy - 24, '🍄 治愈灵泉生成!', '#5ef29b', 15, 2.2);
+          announce('🍄 环境异象【治愈灵泉】：站入翠绿孢子法阵可持续回血！', '#5ef29b', 3.2);
         }
       }
     }
@@ -123,7 +213,8 @@ function update(dt) {
       if (!overtime) {
         overtime = true;
         beep(210, 0.25, 'sawtooth', 0.08);
-        addText(player.x, player.y - 54, '💀 超时死斗！首领全面狂暴！', '#ff3b6b', 22);
+        addText(player.x, player.y - 54, '💀 超时死斗！首领全面狂暴！', '#ff3b6b', 22, 2.6);
+        announce('💀 超时死斗开启！击败首领方可过关，小心天降熔星轰炸！', '#ff3b6b', 4.0);
       }
       overtimeMeteorT -= dt;
       if (overtimeMeteorT <= 0) {
@@ -217,17 +308,22 @@ function update(dt) {
     if (Math.abs(dx) > 0.08) player.faceDir = dx > 0 ? 1 : -1;
     const len = Math.hypot(dx, dy) || 1;
     const chillMul = (player.chillSlowT > 0 && !player.noSlow) ? 0.85 : 1;
-    const envSpdMul = (sandGustT > 0 ? 1.14 : 1) * chillMul;
+    const envSpdMul = (sandGustT > 0 ? 1.14 : 1) * chillMul * (player.terrainSpdMul || 1);
     const effSpd = Math.max(player.noSlow ? 1.0 : 0.72, getEffectiveSpdMul() * envSpdMul);
     const v = player.spd * effSpd * moveScale;
-    player.x = Math.max(player.r + 8, Math.min(WORLD.w - player.r - 8, player.x + (dx / len) * v * dt));
-    player.y = Math.max(player.r + 8, Math.min(WORLD.h - player.r - 8, player.y + (dy / len) * v * dt));
+    player.x += (dx / len) * v * dt;
+    player.y += (dy / len) * v * dt;
+    pushOutOfChasms(player);
+    player.x = Math.max(player.r + 8, Math.min(WORLD.w - player.r - 8, player.x));
+    player.y = Math.max(player.r + 8, Math.min(WORLD.h - player.r - 8, player.y));
     player.walkT += dt * 13 * moveScale;
     player.dustT -= dt;
     if (player.dustT <= 0) {
       player.dustT = 0.1;
       particles.push({ x: player.x + (Math.random() - 0.5) * 12, y: player.y + 18, vx: -(dx / len) * 25, vy: -10 - Math.random() * 14, r: 3.5 + Math.random() * 2.5, color: 'rgba(190,180,205,0.38)', t: 0.25, maxT: 0.25 });
     }
+  } else if (terrains.length > 0) {
+    pushOutOfChasms(player);
   }
   const targetCamX = player.x + (dx ? (dx / (Math.hypot(dx, dy) || 1)) * 34 : 0);
   const targetCamY = player.y + (dy ? (dy / (Math.hypot(dx, dy) || 1)) * 28 : 0);
@@ -607,7 +703,29 @@ function update(dt) {
     }
     if (e.chillT > 0) e.chillT -= dt;
     const isBossUnit = e.type === 'boss' || e.type === 'special_boss';
-    const slowFactor = (e.chillT > 0 ? (isBossUnit ? 0.82 : 0.68) : 1) * globalSlow;
+    let eTerrainSpd = 1;
+    for (let tIdx = 0; tIdx < terrains.length; tIdx++) {
+      const tr = terrains[tIdx];
+      if (tr.kind === 'chasm') continue;
+      const dxT = e.x - tr.x, dyT = e.y - tr.y;
+      const hitR = (tr.r || 68) + e.r * 0.4;
+      if (dxT * dxT + dyT * dyT < hitR * hitR) {
+        if (tr.kind === 'lava') {
+          eTerrainSpd = Math.min(eTerrainSpd, 0.82);
+          if (!e.burnT || e.burnT < 0.9) {
+            e.burnT = 1.35;
+            e.burnDmg = Math.max(e.burnDmg || 0, (12 + wave * 2.8) * diff.hpMul);
+            if (!e.burnTick || e.burnTick <= 0) e.burnTick = 0.25;
+          }
+        } else if (tr.kind === 'swamp') {
+          eTerrainSpd = Math.min(eTerrainSpd, 0.62);
+        } else if (tr.kind === 'ice_sheet') {
+          eTerrainSpd = Math.min(eTerrainSpd, 0.85);
+        }
+      }
+    }
+    const terrainFactor = isBossUnit ? Math.max(0.82, eTerrainSpd) : eTerrainSpd;
+    const slowFactor = (e.chillT > 0 ? (isBossUnit ? 0.82 : 0.68) : 1) * globalSlow * terrainFactor;
     const curSpd = e.spd * slowFactor;
 
     e.phase += dt * (e.type === 'swarmer' ? 18 : 7) * slowFactor;
@@ -1063,6 +1181,7 @@ function update(dt) {
       }
     }
 
+    if (!isBossUnit && terrains.length > 0) pushOutOfChasms(e);
     e.x = Math.max(e.r + 6, Math.min(WORLD.w - e.r - 6, e.x));
     e.y = Math.max(e.r + 6, Math.min(WORLD.h - e.r - 6, e.y));
     if (!e.primed && Math.hypot(player.x - e.x, player.y - e.y) < player.r + e.r - 4) {
@@ -1136,13 +1255,14 @@ function update(dt) {
         if (pendingCrates < 3) {
           pendingCrates++;
           if (d.isBoss) player.bossCratesQueued = (player.bossCratesQueued || 0) + 1;
-          addText(player.x, player.y - 34, d.isBoss ? '👑 首领秘宝 +1' : '🎁 宝箱 +1', '#ffd166', 19);
+          addText(player.x, player.y - 34, d.isBoss ? '👑 首领秘宝 +1' : '🎁 宝箱 +1', '#ffd166', 19, 2.0);
+          announce(d.isBoss ? '👑 拾取首领秘宝箱！波次结算时可二选一开启' : '🎁 拾取异星战利品箱！波次结算时可二选一开启', '#ffd166', 2.8);
           beep(880, 0.11, 'triangle', 0.06);
         } else {
           const bonusMat = 16 + wave * 3;
           player.mats += bonusMat;
           player.hp = Math.min(player.maxHp, player.hp + 6);
-          addText(player.x, player.y - 34, `🎁 满载折算 +${bonusMat}💎 +6HP`, '#ffd166', 17);
+          addText(player.x, player.y - 34, `🎁 满载折算 +${bonusMat}💎 +6HP`, '#ffd166', 17, 2.0);
           beep(780, 0.09, 'sine', 0.05);
         }
       } else {
@@ -1173,7 +1293,12 @@ function update(dt) {
     if (s.t <= 0) shells.splice(i, 1);
   }
   for (let i = texts.length - 1; i >= 0; i--) {
-    const t = texts[i]; t.x += t.vx * dt; t.y += t.vy * dt; t.vy += 240 * dt; t.t -= dt;
+    const t = texts[i];
+    t.x += t.vx * dt;
+    t.y += t.vy * dt;
+    if (t.important) t.vy *= Math.max(0, 1 - dt * 1.2);
+    else t.vy += 240 * dt;
+    t.t -= dt;
     if (t.t <= 0) texts.splice(i, 1);
   }
 
