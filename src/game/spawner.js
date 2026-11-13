@@ -1,11 +1,11 @@
 // 异星晶树机制与一图一专属【非规则异形战场地形引擎】（多瓣熔岩池、曲岸毒泥沼、多棱碎晶冰湖、折线大裂谷、菱晶虚空门）
 const FALLBACK_BOSS_DEFS = {
-  butcher: { id: 'butcher', icon: '👑', name: '深渊屠夫虫王', epithet: '腐血母巢暴君', color: '#e63946', spd: 90, desc: '深渊母巢暴君' },
-  frost_queen: { id: 'frost_queen', icon: '❄️', name: '极寒霜晶女皇', epithet: '永冻凛冬神姬', color: '#00bbf9', spd: 84, desc: '冰封王座主宰' },
-  mech_colossus: { id: 'mech_colossus', icon: '⚙️', name: '熔核机械巨像', epithet: '歼星重装泰坦', color: '#f77f00', spd: 78, desc: '重装泰坦兵器' },
-  void_weaver: { id: 'void_weaver', icon: '👁️', name: '虚空织网主宰', epithet: '次元裂隙古神', color: '#9d4edd', spd: 86, desc: '异次元古神' },
-  plague_empress: { id: 'plague_empress', icon: '🦋', name: '碧落腐生毒皇', epithet: '万蛊花嫁神妃', color: '#52b788', spd: 85, desc: '万蛊妖蝶女皇' },
-  solar_seraph: { id: 'solar_seraph', icon: '☀️', name: '炽阳裁决圣女', epithet: '破晓圣焰炽天使', color: '#ff9f1c', spd: 88, desc: '破晓裁决炽天使' }
+  butcher: { id: 'butcher', icon: '🦊', name: '绯红断刃剑姬 · 烬羽', epithet: '一层守桥挚友', color: '#e63946', spd: 90, desc: '一层守桥挚友' },
+  frost_queen: { id: 'frost_queen', icon: '❄️', name: '永冻星使 · 艾丝特莉亚', epithet: '二层冰封王城之主', color: '#00bbf9', spd: 84, desc: '二层冰封之主' },
+  mech_colossus: { id: 'mech_colossus', icon: '⚙️', name: '倒悬机神 · 伽蓝重装态', epithet: '三层钟楼镇守者', color: '#f77f00', spd: 78, desc: '三层重装机神' },
+  void_weaver: { id: 'void_weaver', icon: '🕰️', name: '紫电弦月人偶 · 伽蓝', epithet: '三层星晷断罪少主', color: '#9d4edd', spd: 86, desc: '三层人偶少主' },
+  plague_empress: { id: 'plague_empress', icon: '🍃', name: '残羽魔女 · 青羽试炼影', epithet: '秘境风语守望者', color: '#52b788', spd: 85, desc: '秘境风语魔女' },
+  solar_seraph: { id: 'solar_seraph', icon: '🌑', name: '第999号 · 日蚀圣女', epithet: '终层镜中真我', color: '#ff9f1c', spd: 88, desc: '终层镜中真我' }
 };
 const FALLBACK_MINI_BOSS_DEFS = {
   vanguard: { id: 'vanguard', icon: '⚔️', name: '狂厄裂地统领', epithet: '重甲裂地战狂', color: '#f72585', spd: 86, desc: '重甲先锋统领' },
@@ -379,6 +379,33 @@ function hurtTree(tr, rawDmg) {
   }
 }
 
+// 16 层固定幕守誓首领映射：第 4 / 8 / 12 / 16 层严格固定，绝不随机；无尽模式 (17层+) 按四幕轮转
+const FIXED_ACT_BOSS_BY_WAVE = {
+  4: 'butcher',       // 第一幕终战（第 4 层）：绯红断刃剑姬 · 烬羽
+  8: 'frost_queen',   // 第二幕终战（第 8 层）：永冻星使 · 艾丝特莉亚
+  12: 'void_weaver',  // 第三幕终战（第 12 层）：紫电弦月人偶 · 伽蓝
+  16: 'solar_seraph'  // 第四幕终局（第 16 层）：第999号 · 日蚀圣女
+};
+const ENDLESS_ACT_BOSS_ROTATION = ['butcher', 'frost_queen', 'void_weaver', 'solar_seraph'];
+
+function getFixedActBossForWave(w) {
+  const wn = Math.max(1, Math.floor(w || 1));
+  if (FIXED_ACT_BOSS_BY_WAVE[wn]) return FIXED_ACT_BOSS_BY_WAVE[wn];
+  const cycleIdx = Math.max(0, Math.floor(wn / 4) - 1) % ENDLESS_ACT_BOSS_ROTATION.length;
+  return ENDLESS_ACT_BOSS_ROTATION[cycleIdx];
+}
+
+// 幕中固定先锋统领（第 6 / 10 / 14 层各幕中段试炼固定守备，绝不乱入主线 Boss）
+function getFixedMiniBossForWave(w, secondSlot = false) {
+  const wn = Math.max(1, Math.floor(w || 1));
+  if (wn <= 8) return secondSlot ? 'pyro_lord' : 'glacial_valkyrie';
+  if (wn <= 12) return secondSlot ? 'storm_siren' : 'shadow_stalker';
+  if (wn <= 16) return secondSlot ? 'vanguard' : 'iron_warden';
+  return pickMiniBossVariant(secondSlot ? lastMiniBossVariant : '');
+}
+globalThis.getFixedActBossForWave = getFixedActBossForWave;
+globalThis.getFixedMiniBossForWave = getFixedMiniBossForWave;
+
 function pickBossVariant(exclude = '') {
   const defs = getBossDefs();
   const keys = Object.keys(defs);
@@ -445,9 +472,10 @@ function shouldRollRareBossPortrait(variantKey = '', forceCutscene = false) {
   return false;
 }
 
-function startBossCutscene(mode, variant, title, subtitle, extraTag = '', color = '#ff4d6d', accent = '#ffd166', dur = 1.18, extra = null) {
+function startBossCutscene(mode, variant, title, subtitle, extraTag = '', color = '#ff4d6d', accent = '#ffd166', dur = 3.8, extra = null) {
   bossCutscene = Object.assign({ t: dur, maxT: dur, mode, variant, title, subtitle, extraTag, color, accent }, extra || {});
   if (player) player.invuln = Math.max(player.invuln || 0, dur + 0.35);
+  if (typeof SpireAudio !== 'undefined') SpireAudio.playCutsceneCue(variant, mode === 'mythic_phase2');
 }
 
 // 首领战斗中动态改造战场地形（严格上限 ≤2 处异形地形，不拥挤不圆形）
@@ -507,11 +535,11 @@ function summonSpecialBoss(rel, forceCutscene = false) {
       'summon',
       def.bossId,
       def.bossName,
-      `✨ 稀有真身显圣 · ${def.icon}${def.name}解封`,
-      '⏱️ 战斗延长 +25s · 近身可躲外环大招 · 击败必掉首领秘宝箱！',
+      `🏮 记忆祭坛共鸣 · ${def.icon}${def.name}唤醒`,
+      '⏱️ 轮回延长 +25s · 贴近风眼可躲外环斩 · 击败必掉守誓遗物匣！',
       def.bossColor,
       def.color,
-      1.18
+      4.2
     );
   }
   announce(`${def.bossIcon} 特殊首领【${def.bossName}】已唤醒！本波时间延长 +25s`, '#ffd166', 4.0);
@@ -529,20 +557,29 @@ function beginWave(retryMeta = null) {
   syncSetHp();
 
   const isRetry = !!(retryMeta && retryMeta.isRetry);
-  const isBossWave = (wave === MAX_WAVE) || (endlessMode && wave > MAX_WAVE && wave % 3 === 0);
-  const isEliteWave = !isBossWave && diff.midElite && (wave === 5 || wave === 9 || (endlessMode && wave > MAX_WAVE && wave % 3 === 2));
-  hordeWave = !isBossWave && !isEliteWave && (wave === 4 || wave === 8 || (selectedDiff >= 4 && wave === 11) || (endlessMode && wave % 3 === 1));
+  const isStoryClimb = !endlessMode && wave <= MAX_WAVE;
+  // 严格每 4 层固定首领战（第 4 / 8 / 12 / 16 层，以及无尽模式 4 / 8 / 12 / 16 / 20... 层）
+  const isBossWave = (wave >= 4 && wave % 4 === 0);
+  const isEliteWave = !isBossWave && diff.midElite && (
+    (isStoryClimb && (wave === 6 || wave === 10 || wave === 14)) ||
+    (endlessMode && wave >= 6 && wave % 4 === 2)
+  );
+  hordeWave = !isBossWave && !isEliteWave && (
+    (isStoryClimb && (wave === 3 || wave === 7 || wave === 11 || wave === 15)) ||
+    (endlessMode && wave >= 3 && wave % 4 === 3)
+  );
 
-  // 每波轮换/锁定异星战场生态并烘焙离屏大地图贴图（战败重开本回合时保持同一生态场景）
+  // 按四幕固定锁定异星灰塔生态并烘焙离屏大地图贴图（战败重开本回合时保持同一生态场景）
   if (isRetry && retryMeta.sceneId) {
     curScene = SCENES.find(s => s.id === retryMeta.sceneId) || SCENES[0];
     sceneSeed = (wave * 7919 + curScene.id.charCodeAt(0) * 313 + (Date.now() & 0xffff)) >>> 0;
   } else {
     pickSceneForWave(wave);
   }
+  if (typeof SpireAudio !== 'undefined') SpireAudio.syncScene(curScene.id);
   syncArenaAndZoom(true);
-  // 完全同步原版《土豆兄弟》回合时长：第 1 波 20s，每波 +5s 直至 60s 封顶，最终 Boss 波 90s
-  waveTime = isBossWave ? 90 : Math.min(60, 15 + wave * 5);
+  // 16 层平滑回合时长：第 1 层 20s 起步，逐层递增至 58s，第 4/8/12 层首领战 90s，第 16 层终局决战 95s
+  waveTime = isBossWave ? (wave === MAX_WAVE ? 95 : 90) : Math.min(58, 18 + Math.round(wave * 2.6));
   waveMaxTime = waveTime;
   lastUrgentSec = -1;
   spawnAcc = 0.25;
@@ -591,14 +628,14 @@ function beginWave(retryMeta = null) {
     sceneEventT = 999;
   }
 
-  // 第 3 波起小概率在地图上刷出【奇遇召唤圣物】（激活进入特殊 Boss 战）
-  const relicChance = (wave >= 3 && !isBossWave) ? Math.min(0.36, 0.20 + (player.luck || 0) * 0.0025) : 0;
+  // 1~16 层主线剧情攀登期间禁用随机奇遇首领祭坛（确保首领 100% 仅在第 4/8/12/16 层固定登场，无尽模式开放奇遇祭坛）
+  const relicChance = (endlessMode && wave >= 3 && !isBossWave) ? Math.min(0.36, 0.20 + (player.luck || 0) * 0.0025) : 0;
   relicSpawnT = Math.random() < relicChance ? (3.5 + Math.random() * 3.5) : -1;
 
   const portalNote = portals.length >= 2 ? ' · 🌀双生晶裂门已开启' : '';
-  const waveIntro = `${curScene.icon} 第 ${wave} 波：${curScene.name}${activeSceneEvent ? ' · ' + curScene.eventIcon + curScene.eventName : ''}${portalNote}`;
-  logInfo('WAVE', `进入第 ${wave} 波 (${waveTime}s) · 场景=${curScene.name}(${curScene.id}) · 地形=${terrains.length}处+传送门=${portals.length} · 专属怪=${sceneMobEnabled} · 异象=${activeSceneEvent || '无'} · 地图=${WORLD.w}x${WORLD.h}`);
-  announce(waveIntro, curScene.accent2 || '#ffd166', 3.6);
+  const waveIntro = `${curScene.icon} 第 ${wave} 层：${curScene.name}${activeSceneEvent ? ' · ' + curScene.eventIcon + curScene.eventName : ''}${portalNote}`;
+  logInfo('WAVE', `进入第 ${wave} 层 (${waveTime}s) · 场景=${curScene.name}(${curScene.id}) · 首领层=${isBossWave} · 地形=${terrains.length}处+传送门=${portals.length} · 专属怪=${sceneMobEnabled} · 异象=${activeSceneEvent || '无'} · 地图=${WORLD.w}x${WORLD.h}`);
+  announce(waveIntro, curScene.accent2 || '#ffd166', 3.4);
 
   // 部署自动防御炮台与浮游激光塔（机械师天赋 + 扳手 + 无人机舱 + 工程装备）
   const wrenches = player.weapons.filter(w => w.id === 'wrench');
@@ -621,69 +658,73 @@ function beginWave(retryMeta = null) {
     });
   }
 
-  // 多样化随机精英统领、虫潮突袭与第 12 波 / 无尽主宰 Boss 降临（常规首领同样 33% 概率播放立绘，每种首领单局上限 1 次）
+  // 16 层固定四幕首领（第 4/8/12/16 层非随机单挑守誓之战）与无尽轮回多王挑战
   const bossDefs = getBossDefs();
   const miniBossDefs = getMiniBossDefs();
   const bossY = Math.max(190, player.y - 320);
   const bossSpread = Math.min(220, WORLD.w * 0.23);
   const savedIds = (isRetry && Array.isArray(retryMeta.waveBossIds) && retryMeta.waveBossIds.length > 0) ? retryMeta.waveBossIds : null;
+  const hasDirector = (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.onWaveStart === 'function');
+  let spawnedPrimaryBossId = '';
+
   if (isBossWave) {
-    const v1 = (savedIds && bossDefs[savedIds[0]]) ? savedIds[0] : pickBossVariant();
+    const fixedBossId = getFixedActBossForWave(wave);
+    const v1 = isStoryClimb
+      ? fixedBossId
+      : ((savedIds && bossDefs[savedIds[0]]) ? savedIds[0] : fixedBossId);
+    spawnedPrimaryBossId = v1;
     lastBossVariant = v1;
     const b1 = bossDefs[v1] || FALLBACK_BOSS_DEFS.butcher;
-    if (diff.doubleBoss || (endlessMode && wave >= 18)) {
+    const allowEndlessTwinBoss = !isStoryClimb && (diff.doubleBoss || (endlessMode && wave >= 20));
+    if (allowEndlessTwinBoss) {
       const v2 = (savedIds && savedIds[1] && bossDefs[savedIds[1]]) ? savedIds[1] : pickBossVariant(v1);
       const b2 = bossDefs[v2] || FALLBACK_BOSS_DEFS.frost_queen;
       if (typeof waveCheckpoint !== 'undefined' && waveCheckpoint) waveCheckpoint.waveBossIds = [v1, v2];
       spawnWarning(WORLD.w / 2 - bossSpread, bossY, 'boss', v1);
       spawnWarning(WORLD.w / 2 + bossSpread, bossY, 'boss', v2);
-      let shownVar = '';
-      if (shouldRollRareBossPortrait(v1, false)) shownVar = v1;
-      else if (shouldRollRareBossPortrait(v2, false)) shownVar = v2;
-      if (shownVar) {
-        const bShown = shownVar === v2 ? b2 : b1;
-        startBossCutscene('final_boss', shownVar, `${b1.name} & ${b2.name}`, `✨ 首领真身显圣 · ${bShown.epithet || '终局双王降临'}`, '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', bShown.color, '#ffd166', 1.15);
+      if (!hasDirector) {
+        let shownVar = '';
+        if (shouldRollRareBossPortrait(v1, false)) shownVar = v1;
+        else if (shouldRollRareBossPortrait(v2, false)) shownVar = v2;
+        if (shownVar) {
+          const bShown = shownVar === v2 ? b2 : b1;
+          startBossCutscene('final_boss', shownVar, `${b1.name} & ${b2.name}`, `🕯️ 守誓主宰降临 · ${bShown.epithet || '无尽双主宰同台'}`, '⚔️ 贴近风眼可躲避外环大招 · 抓住破绽窗口斩破封印！', bShown.color, '#ffd166', 4.2);
+        }
       }
-      announce(`👑 终局双王降临：${b1.name} & ${b2.name}！`, '#ff4d6d', 4.2);
+      announce(`👑 无尽双主宰降临：${b1.name} & ${b2.name}！`, '#ff4d6d', 4.0);
     } else {
       if (typeof waveCheckpoint !== 'undefined' && waveCheckpoint) waveCheckpoint.waveBossIds = [v1];
       spawnWarning(WORLD.w / 2, bossY, 'boss', v1);
-      if (shouldRollRareBossPortrait(v1, false)) {
-        startBossCutscene('final_boss', v1, b1.name, `✨ 首领真身显圣 · ${b1.epithet || '终局主宰真身显圣'}`, '⚔️ 贴近风眼可躲避外环轰炸 · 抓住破绽窗口重创主宰！', b1.color, '#ffd166', 1.15);
+      if (!hasDirector && shouldRollRareBossPortrait(v1, isStoryClimb)) {
+        startBossCutscene('final_boss', v1, b1.name, `🕯️ 第 ${wave} 层守誓之主 · ${b1.epithet || '守层主宰降临'}`, '⚔️ 贴近风眼可躲避外环大招 · 抓住破绽窗口斩破封印！', b1.color, '#ffd166', 4.2);
       }
-      announce(`👑 终局主宰【${b1.icon}${b1.name}】降临！`, '#ff4d6d', 4.2);
+      announce(`👑 第 ${wave} 层守誓之主【${b1.icon}${b1.name}】降临！`, '#ff4d6d', 4.0);
     }
   } else if (isEliteWave) {
-    const m1 = (savedIds && miniBossDefs[savedIds[0]]) ? savedIds[0] : pickMiniBossVariant();
+    const m1 = isStoryClimb
+      ? getFixedMiniBossForWave(wave, false)
+      : ((savedIds && miniBossDefs[savedIds[0]]) ? savedIds[0] : pickMiniBossVariant());
     lastMiniBossVariant = m1;
     const mb1 = miniBossDefs[m1] || FALLBACK_MINI_BOSS_DEFS.vanguard;
-    if (diff.dualElite && wave >= 9) {
-      const m2 = (savedIds && savedIds[1] && miniBossDefs[savedIds[1]]) ? savedIds[1] : pickMiniBossVariant(m1);
+    if (diff.dualElite && wave >= 10) {
+      const m2 = isStoryClimb
+        ? getFixedMiniBossForWave(wave, true)
+        : ((savedIds && savedIds[1] && miniBossDefs[savedIds[1]]) ? savedIds[1] : pickMiniBossVariant(m1));
       const mb2 = miniBossDefs[m2] || FALLBACK_MINI_BOSS_DEFS.pyro_lord;
       if (typeof waveCheckpoint !== 'undefined' && waveCheckpoint) waveCheckpoint.waveBossIds = [m1, m2];
       spawnWarning(WORLD.w / 2 - bossSpread * 0.88, bossY, 'mini_boss', m1);
       spawnWarning(WORLD.w / 2 + bossSpread * 0.88, bossY, 'mini_boss', m2);
-      let shownElite = '';
-      if (shouldRollRareBossPortrait(m1, false)) shownElite = m1;
-      else if (shouldRollRareBossPortrait(m2, false)) shownElite = m2;
-      if (shownElite) {
-        const mbShown = shownElite === m2 ? mb2 : mb1;
-        startBossCutscene('elite_boss', shownElite, `${mb1.name} & ${mb2.name}`, `⚔️ 精英统领压境 · ${mbShown.epithet || '双统领夹击'}`, '💡 留意冲锋轴线与地面预警 · 击败必掉首领秘宝箱！', mbShown.color, '#ffd166', 1.08);
-      }
-      announce(`⚔️ 双精英统领夹击：${mb1.name} & ${mb2.name}！`, '#f72585', 3.8);
+      announce(`⚔️ 幕中双统领镇守：${mb1.name} & ${mb2.name}！`, '#f72585', 3.6);
     } else {
       if (typeof waveCheckpoint !== 'undefined' && waveCheckpoint) waveCheckpoint.waveBossIds = [m1];
       spawnWarning(WORLD.w / 2, bossY, 'mini_boss', m1);
-      if (shouldRollRareBossPortrait(m1, false)) {
-        startBossCutscene('elite_boss', m1, mb1.name, `⚔️ 精英统领来袭 · ${mb1.epithet || '重甲先锋'}`, '💡 留意冲锋轴线与地面预警 · 击败必掉首领秘宝箱！', mb1.color, '#ffd166', 1.08);
-      }
-      announce(`⚔️ 精英统领【${mb1.icon}${mb1.name}】来袭！`, '#f72585', 3.8);
+      announce(`⚔️ 幕中先锋统领【${mb1.icon}${mb1.name}】现身！`, '#f72585', 3.6);
     }
   } else if (hordeWave) {
-    announce('⚠️ 高密虫潮突袭波！注意拉扯走位', '#ff9f1c', 3.5);
+    announce('⚠️ 幕末高密残响潮涌！注意拉扯走位', '#ff9f1c', 3.4);
   }
   if (isRetry && player) {
-    addText(player.x, player.y - 46, `⏪ 已回溯至第 ${wave} 波起点！`, '#72efdd', 16, 1.9, true);
+    addText(player.x, player.y - 46, `⏪ 已回溯至第 ${wave} 层起点！`, '#72efdd', 16, 1.9, true);
   }
 
   document.getElementById('shopMenu').classList.add('hidden');
@@ -698,6 +739,11 @@ function beginWave(retryMeta = null) {
   if (bwWrap) {
     bwWrap.classList.remove('mythic');
     bwWrap.classList.toggle('hidden', !(isBossWave || isEliteWave));
+  }
+
+  // 触发《烬塔残响》剧情演出导演：幕间转场 / 首领登场 CG / 左侧半身立绘 AVG 对话
+  if (hasDirector) {
+    SpireDirector.onWaveStart(wave, curScene, spawnedPrimaryBossId, isRetry);
   }
 }
 
@@ -796,10 +842,11 @@ function spawnHazard(x, y, r, dmg, delay = 1.22, extra = {}) {
 function createEnemy(x, y, type, variant = '') {
   const endlessMul = wave > MAX_WAVE ? Math.pow(1.22, wave - MAX_WAVE) : 1;
   const wIdx = Math.max(0, wave - 1);
-  // 平滑前中后期血量与伤害膨胀曲线：前期节奏舒缓不卡手，中后期与终局稳步加压拉满虫潮与首领压迫感
-  const s = (1 + wIdx * 0.20 + Math.pow(Math.max(0, wIdx - 2), 1.82) * 0.16) * endlessMul * diff.hpMul;
-  const dm = (1 + wIdx * 0.135 + Math.max(0, wave - 6) * 0.065) * (wave > MAX_WAVE ? Math.pow(1.10, wave - MAX_WAVE) : 1) * diff.dmgMul;
-  const sm = (1 + Math.min(0.18, wIdx * 0.014)) * diff.spdMul;
+  // 适配 1~16 层四幕成长曲线：前期顺畅破敌，中后期第 8/12/16 层稳步递进，不膨胀卡关
+  const clampedStoryIdx = Math.min(15, wIdx);
+  const s = (1 + clampedStoryIdx * 0.165 + Math.pow(Math.max(0, clampedStoryIdx - 2), 1.66) * 0.115) * endlessMul * diff.hpMul;
+  const dm = (1 + clampedStoryIdx * 0.105 + Math.max(0, Math.min(16, wave) - 7) * 0.048) * (wave > MAX_WAVE ? Math.pow(1.10, wave - MAX_WAVE) : 1) * diff.dmgMul;
+  const sm = (1 + Math.min(0.18, wIdx * 0.012)) * diff.spdMul;
   const base = {
     x, y, hitFlash: 0, phase: Math.random() * 6.28, vx: 0, vy: 0, faceA: 0,
     burnT: 0, burnTick: 0, burnDmg: 0, chillT: 0, freezeT: 0,
@@ -823,23 +870,36 @@ function createEnemy(x, y, type, variant = '') {
   const miniBossDefs = getMiniBossDefs();
   const specialRelics = getSpecialRelics();
   if (type === 'boss') {
-    const bKey = (variant && bossDefs[variant]) ? variant : pickBossVariant();
+    const bKey = (variant && bossDefs[variant]) ? variant : getFixedActBossForWave(wave);
     const bDef = bossDefs[bKey] || FALLBACK_BOSS_DEFS.butcher;
-    const twinScale = (diff.doubleBoss || (endlessMode && wave >= 18)) ? 0.68 : 1;
-    const bhp = Math.round((13200 + Math.max(0, wave - MAX_WAVE) * 3600) * endlessMul * diff.hpMul * twinScale);
+    const isStoryBoss = (!endlessMode && wave <= MAX_WAVE);
+    const twinScale = (!isStoryBoss && (diff.doubleBoss || (endlessMode && wave >= 20))) ? 0.68 : 1;
+    // 四幕固定首领精调血量梯度：第4层烬羽(1150) -> 第8层星使(3400) -> 第12层伽蓝(7600) -> 第16层日蚀圣女(12600 + 必进二阶段真我觉醒)
+    let baseBossHp = 13600;
+    if (wave <= 4) baseBossHp = 1150;
+    else if (wave <= 8) baseBossHp = 3400;
+    else if (wave <= 12) baseBossHp = 7600;
+    else if (wave <= 16) baseBossHp = 12600;
+    else baseBossHp = 14800 + Math.max(0, wave - MAX_WAVE) * 3600;
+    const bhp = Math.round(baseBossHp * endlessMul * diff.hpMul * twinScale);
+    const bossDmgBase = wave <= 4 ? 7.8 : (wave <= 8 ? 9.6 : (wave <= 12 ? 11.2 : 12.6));
+    const phase2Chance = (wave === 16 && bKey === 'solar_seraph')
+      ? 1.0 // 第 16 层日蚀圣女 100% 触发二阶段【真我破茧】演出！
+      : (isStoryBoss ? (selectedDiff >= 3 ? 0.30 : 0) : mythicRate);
     ent = {
-      ...base, r: 48, hp: bhp, maxHp: bhp, spd: bDef.spd * sm, dmg: Math.round(12.8 * dm),
+      ...base, r: 48, hp: bhp, maxHp: bhp, spd: bDef.spd * sm, dmg: Math.round(bossDmgBase * dm),
       color: bDef.color, type: 'boss', variant: bKey, bossTitle: `${bDef.icon} ${bDef.name}`,
       dashT: 2.5, sumT: 5.8, meteorT: 4.1, skillT: 2.2, terrainCd: 6.0, ringCd: 4.9,
-      burstLeft: 0, burstCd: 0, canPhase2: Math.random() < mythicRate, mythicPhase2: false, mat: 48
+      burstLeft: 0, burstCd: 0, canPhase2: Math.random() < phase2Chance, mythicPhase2: false,
+      mat: wave <= 4 ? 26 : (wave <= 8 ? 34 : (wave <= 12 ? 42 : 52))
     };
   } else if (type === 'mini_boss') {
-    const mKey = (variant && miniBossDefs[variant]) ? variant : pickMiniBossVariant();
+    const mKey = (variant && miniBossDefs[variant]) ? variant : getFixedMiniBossForWave(wave, false);
     const mDef = miniBossDefs[mKey] || FALLBACK_MINI_BOSS_DEFS.vanguard;
-    const twinMiniScale = (diff.dualElite && wave >= 9) ? 0.70 : 1;
-    const mhp = Math.round((520 + wave * 115 + Math.pow(Math.max(0, wave - 3), 2.25) * 42) * endlessMul * diff.hpMul * twinMiniScale);
+    const twinMiniScale = (diff.dualElite && wave >= 10) ? 0.70 : 1;
+    const mhp = Math.round((460 + wave * 95 + Math.pow(Math.max(0, Math.min(16, wave) - 3), 2.05) * 32) * endlessMul * diff.hpMul * twinMiniScale);
     ent = {
-      ...base, r: 36, hp: mhp, maxHp: mhp, spd: mDef.spd * sm, dmg: Math.round(8.8 * dm),
+      ...base, r: 36, hp: mhp, maxHp: mhp, spd: mDef.spd * sm, dmg: Math.round(8.4 * dm),
       color: mDef.color, type: 'mini_boss', variant: mKey, bossTitle: `${mDef.icon} ${mDef.name}`,
       dashT: 2.3, meteorT: 4.6, skillT: 2.1, ringCd: 5.4, mat: 24
     };

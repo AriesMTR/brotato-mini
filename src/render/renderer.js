@@ -304,6 +304,7 @@ function drawSinglePortal(p, partner, cooling, cdRemain) {
 
 // 战场主相机裁剪渲染、首领预警提示、悬浮摇杆绘制与 RAF 主循环
 function draw() {
+  if (typeof _frameNow !== 'undefined') _frameNow = performance.now();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = (curScene && curScene.voidBg) || '#110e17';
   ctx.fillRect(0, 0, viewW, viewH);
@@ -534,6 +535,94 @@ function draw() {
         ctx.moveTo(e.x, e.y);
         ctx.lineTo(e.x + Math.cos(e.aimA) * 390, e.y + Math.sin(e.aimA) * 390);
         ctx.stroke();
+        ctx.restore();
+      } else if ((e.sigWindupT || 0) > 0) {
+        // v2.5.0 四幕固定守誓首领标志性杀招几何预警法阵（0渐变0滤镜，几何辨识度极高）
+        const sProg = Math.max(0.05, Math.min(1, 1 - e.sigWindupT / Math.max(0.1, e.sigMaxW || 0.88)));
+        const baseA = Number.isFinite(e.sigBaseA) ? e.sigBaseA : 0;
+        ctx.save();
+        ctx.lineCap = 'round';
+        if (e.sigKind === 'frost_prism') {
+          // 艾丝特莉亚 · 六棱极光冰晶阵
+          ctx.strokeStyle = `rgba(125, 211, 252, ${0.30 + sProg * 0.55})`;
+          ctx.lineWidth = 2.4;
+          ctx.beginPath(); ctx.arc(e.x, e.y, 172 * sProg, 0, Math.PI * 2); ctx.stroke();
+          for (let tri = 0; tri < 2; tri++) {
+            ctx.beginPath();
+            for (let k = 0; k < 3; k++) {
+              const pa = baseA + tri * (Math.PI / 3) + (k * Math.PI * 2) / 3;
+              const px = e.x + Math.cos(pa) * 172, py = e.y + Math.sin(pa) * 172;
+              k === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+            }
+            ctx.closePath(); ctx.stroke();
+          }
+          ctx.fillStyle = `rgba(56, 189, 248, ${0.18 + sProg * 0.25})`;
+          for (let k = 0; k < 6; k++) {
+            const ha = baseA + (k / 6) * Math.PI * 2;
+            ctx.beginPath(); ctx.arc(e.x + Math.cos(ha) * 172, e.y + Math.sin(ha) * 172, 18 + sProg * 14, 0, Math.PI * 2); ctx.fill();
+          }
+        } else if (e.sigKind === 'chrono_dial') {
+          // 伽蓝 · 十二刻星晷逆时针法盘
+          const dialR = 168;
+          ctx.strokeStyle = `rgba(253, 230, 138, ${0.34 + sProg * 0.52})`;
+          ctx.lineWidth = 2.4;
+          ctx.beginPath(); ctx.arc(e.x, e.y, dialR, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(e.x, e.y, Math.max(8, dialR * sProg), 0, Math.PI * 2); ctx.stroke();
+          for (let k = 0; k < 12; k++) {
+            const ta = baseA + (k / 12) * Math.PI * 2;
+            ctx.strokeStyle = k % 3 === 0 ? '#fde68a' : 'rgba(192, 132, 252, 0.75)';
+            ctx.lineWidth = k % 3 === 0 ? 3.0 : 1.8;
+            ctx.beginPath();
+            ctx.moveTo(e.x + Math.cos(ta) * (dialR - 16), e.y + Math.sin(ta) * (dialR - 16));
+            ctx.lineTo(e.x + Math.cos(ta) * (dialR + 8), e.y + Math.sin(ta) * (dialR + 8));
+            ctx.stroke();
+          }
+          const handA = baseA - sProg * Math.PI * 2;
+          ctx.strokeStyle = '#fde68a'; ctx.lineWidth = 3.2;
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(handA) * (dialR - 12), e.y + Math.sin(handA) * (dialR - 12)); ctx.stroke();
+        } else if (e.sigKind === 'eclipse_lances') {
+          // 日蚀圣女 · 黑日圣枪外环锁定信标
+          const tx = Number.isFinite(e.sigTargetX) ? e.sigTargetX : e.x;
+          const ty = Number.isFinite(e.sigTargetY) ? e.sigTargetY : e.y;
+          ctx.strokeStyle = `rgba(253, 230, 138, ${0.28 + sProg * 0.55})`;
+          ctx.lineWidth = 2.0;
+          ctx.setLineDash([9, 7]);
+          ctx.beginPath(); ctx.arc(tx, ty, 230, 0, Math.PI * 2); ctx.stroke();
+          for (let k = 0; k < 6; k++) {
+            const ba = baseA + (k / 6) * Math.PI * 2;
+            const sx = Math.max(48, Math.min(WORLD.w - 48, tx + Math.cos(ba) * 230));
+            const sy = Math.max(48, Math.min(WORLD.h - 48, ty + Math.sin(ba) * 230));
+            const fireA = Math.atan2(ty - sy, tx - sx) + (k % 2 === 0 ? 0.22 : -0.22);
+            ctx.strokeStyle = 'rgba(253, 230, 138, 0.72)';
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(sx + Math.cos(fireA) * 320 * sProg, sy + Math.sin(fireA) * 320 * sProg);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#fde68a';
+            ctx.beginPath(); ctx.arc(sx, sy, 7.5, 0, Math.PI * 2); ctx.fill();
+            ctx.setLineDash([9, 7]);
+          }
+          ctx.setLineDash([]);
+        } else {
+          // 烬羽 · 断刃·千雨十字裂
+          const ways = (e.hp < e.maxHp * 0.55 || overtime || e.mythicPhase2) ? 8 : 4;
+          for (let k = 0; k < ways; k++) {
+            const ba = baseA + (k / ways) * Math.PI * 2;
+            const ex = e.x + Math.cos(ba) * 225, ey = e.y + Math.sin(ba) * 225;
+            ctx.strokeStyle = `rgba(251, 113, 133, ${0.16 + sProg * 0.22})`;
+            ctx.lineWidth = 16;
+            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+            ctx.strokeStyle = '#fda4af';
+            ctx.lineWidth = 2.4;
+            ctx.setLineDash([8, 6]);
+            ctx.beginPath();
+            ctx.moveTo(e.x, e.y);
+            ctx.lineTo(e.x + Math.cos(ba) * 225 * sProg, e.y + Math.sin(ba) * 225 * sProg);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        }
         ctx.restore();
       } else if (e.lockedAim !== undefined && !e.dashing) {
         // 冲锋怪/统领/首领蓄力锁定预警走廊 + 蓄力推进条 + 精准落点箭头（预警多长就实打实冲多远！）
@@ -899,64 +988,69 @@ function draw() {
       }
     }
 
-    // 敌方差异化投射物（腐蚀液滴 / 穿刺骨针 / 寒冰黄金棱晶 / 旋转十字飞盘 / 烈焰火球 / 能量圆弹，清爽高辨识度）
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6;
+    // 敌方高辨识度清爽弹幕系统（统一规范：2.2px 深曜黑外描边 + 高饱和主色弹体 + 纯白高亮内芯，丝毫不乱且与己方青金弹幕一眼区分）
+    ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.2;
     for (let i = 0; i < eBullets.length; i++) {
       const b = eBullets[i];
       if (b.x < vL || b.x > vR || b.y < vT || b.y > vB) continue;
-      const bCol = b.color || '#ff4d6d';
-      const br = Math.max(1.5, b.r || 5);
+      const bCol = b.color || '#ff3b6b';
+      const br = Math.max(1.8, b.r || 5.2);
       const shp = b.shape;
       if (shp === 'disc') {
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(b.rot || 0);
-        ctx.fillStyle = bCol; ctx.strokeStyle = '#1d1422'; ctx.lineWidth = 1.6;
+        ctx.fillStyle = bCol; ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.2;
         ctx.beginPath();
         for (let k = 0; k < 4; k++) {
           const a = k * Math.PI * 0.5;
-          ctx.lineTo(Math.cos(a) * (br * 1.35), Math.sin(a) * (br * 1.35));
-          ctx.lineTo(Math.cos(a + 0.45) * (br * 0.48), Math.sin(a + 0.45) * (br * 0.48));
+          ctx.lineTo(Math.cos(a) * (br * 1.38), Math.sin(a) * (br * 1.38));
+          ctx.lineTo(Math.cos(a + 0.45) * (br * 0.50), Math.sin(a + 0.45) * (br * 0.50));
         }
         ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.arc(0, 0, Math.max(1.2, br * 0.28), 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, 0, Math.max(1.4, br * 0.34), 0, Math.PI * 2); ctx.fill();
         ctx.restore();
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6;
       } else if (shp === 'needle') {
         const ang = Math.atan2(b.vy, b.vx);
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(ang);
-        ctx.fillStyle = bCol;
+        ctx.fillStyle = bCol; ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.0;
         ctx.beginPath();
-        ctx.moveTo(br * 2.1, 0); ctx.lineTo(-br * 1.4, -br * 0.65); ctx.lineTo(-br * 0.8, 0); ctx.lineTo(-br * 1.4, br * 0.65);
+        ctx.moveTo(br * 2.15, 0); ctx.lineTo(-br * 1.35, -br * 0.68); ctx.lineTo(-br * 0.75, 0); ctx.lineTo(-br * 1.35, br * 0.68);
         ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.moveTo(br * 1.35, 0); ctx.lineTo(-br * 0.35, -br * 0.25); ctx.lineTo(-br * 0.35, br * 0.25); ctx.closePath(); ctx.fill();
         ctx.restore();
       } else if (shp === 'shard') {
         const ang = Math.atan2(b.vy, b.vx);
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(ang);
-        ctx.fillStyle = bCol;
+        ctx.fillStyle = bCol; ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.0;
         ctx.beginPath();
-        ctx.moveTo(br * 1.6, 0); ctx.lineTo(0, -br * 0.95); ctx.lineTo(-br * 1.4, 0); ctx.lineTo(0, br * 0.95);
+        ctx.moveTo(br * 1.65, 0); ctx.lineTo(0, -br * 0.98); ctx.lineTo(-br * 1.4, 0); ctx.lineTo(0, br * 0.98);
         ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(br * 0.15, 0, Math.max(1.2, br * 0.36), 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       } else if (shp === 'acid' || shp === 'fire') {
         const ang = Math.atan2(b.vy, b.vx);
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(ang);
-        ctx.globalAlpha = 0.32;
-        ctx.fillStyle = bCol;
-        ctx.beginPath(); ctx.moveTo(-br * 2.2, 0); ctx.lineTo(0, -br * 0.9); ctx.lineTo(0, br * 0.9); ctx.closePath(); ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.beginPath(); ctx.arc(br * 0.2, 0, br * 0.95, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.restore();
-      } else {
         ctx.globalAlpha = 0.28;
         ctx.fillStyle = bCol;
-        ctx.beginPath(); ctx.arc(b.x, b.y, br * 1.55, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-br * 2.2, 0); ctx.lineTo(0, -br * 0.88); ctx.lineTo(0, br * 0.88); ctx.closePath(); ctx.fill();
         ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.1;
+        ctx.beginPath(); ctx.arc(br * 0.2, 0, br * 0.98, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(br * 0.28, 0, Math.max(1.3, br * 0.42), 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else {
+        ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.2;
         ctx.fillStyle = bCol;
-        ctx.beginPath(); ctx.arc(b.x, b.y, br, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(b.x, b.y, br * 1.05, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(1.4, br * 0.44), 0, Math.PI * 2); ctx.fill();
       }
     }
 
@@ -1003,7 +1097,11 @@ function draw() {
       const t = texts[i];
       if (t.x < vL || t.x > vR || t.y < vT || t.y > vB) continue;
       const life = Math.max(0, t.t / Math.max(0.01, t.maxT));
-      const scale = t.important ? (life > 0.90 ? 1 + (1 - life) * 2.2 : 1) : (life > 0.8 ? 1 + (1 - life) * 1.7 : 1);
+      const scale = t.important
+        ? (life > 0.90 ? 1 + (1 - life) * 2.2 : 1)
+        : (t.isCritPop
+            ? (life > 0.76 ? 1 + Math.sin(((1 - life) / 0.24) * Math.PI) * 0.42 : 1)
+            : (life > 0.8 ? 1 + (1 - life) * 1.7 : 1));
       ctx.globalAlpha = t.important ? Math.min(1, life / 0.22) : Math.min(1, life * 1.9);
       const fSize = Math.max(9, Math.round(t.size * scale));
       if (fSize !== lastFontSize) {
@@ -1042,6 +1140,48 @@ function draw() {
   }
 
   ctx.restore();
+
+  // v2.5.0 四幕层域实时动态微粒音景氛围层（黑铁雨丝 / 极光飘雪 / 发条金尘 / 日蚀余烬，0分配0渐变）
+  if (state === 'wave' && viewW > 40 && viewH > 40) {
+    const scId = (curScene && curScene.id) || 'foundry';
+    const wt = ((typeof _frameNow !== 'undefined' ? _frameNow : performance.now()) * 0.001);
+    const moteCnt = isTouch ? 12 : 20;
+    ctx.save();
+    if (scId === 'foundry') {
+      ctx.strokeStyle = 'rgba(251, 113, 133, 0.22)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      for (let i = 0; i < moteCnt; i++) {
+        const mx = ((i * 173 + wt * 110) % (viewW + 60)) - 30;
+        const my = ((i * 97 + wt * 390) % (viewH + 60)) - 30;
+        ctx.moveTo(mx, my);
+        ctx.lineTo(mx - 7, my + 20);
+      }
+      ctx.stroke();
+    } else if (scId === 'glacier') {
+      ctx.fillStyle = 'rgba(186, 230, 253, 0.34)';
+      for (let i = 0; i < moteCnt; i++) {
+        const mx = ((i * 157 + Math.sin(wt * 1.3 + i) * 26 + wt * 28) % viewW + viewW) % viewW;
+        const my = ((i * 113 + wt * 68) % viewH);
+        ctx.beginPath(); ctx.arc(mx, my, 1.6 + (i % 3) * 0.6, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (scId === 'clockwork') {
+      ctx.fillStyle = 'rgba(253, 230, 138, 0.28)';
+      for (let i = 0; i < moteCnt; i++) {
+        const mx = ((i * 149 + Math.cos(wt + i) * 20) % viewW + viewW) % viewW;
+        const my = viewH - ((i * 89 + wt * 46) % viewH);
+        ctx.fillRect(mx, my, 2.4, 2.4);
+      }
+    } else {
+      ctx.fillStyle = 'rgba(246, 211, 121, 0.26)';
+      for (let i = 0; i < moteCnt; i++) {
+        const mx = ((i * 163 + Math.sin(wt * 0.9 + i) * 24) % viewW + viewW) % viewW;
+        const my = viewH - ((i * 101 + wt * 54) % viewH);
+        ctx.beginPath(); ctx.arc(mx, my, 1.5 + (i % 2) * 0.8, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
 
   // 屏幕四周电影感暗角（复用离屏预烘焙贴图，零实时渐变开销）
   const lowHp = player && state === 'wave' && (player.hp / Math.max(1, player.maxHp) < 0.32);
@@ -1159,137 +1299,229 @@ function draw() {
     ctx.restore();
   }
 
-  // 首领召唤 / 终局降临 / 隐藏二阶段觉醒 全屏时停登场立绘演出（纯矢量无渐变零开销）
+  // 《烬塔残响》四幕暗黑作画剧场演出 & 首领真身显圣时停特写（0 实时渐变，0 滤镜，零盖章标签）
   if (state === 'wave' && typeof bossCutscene !== 'undefined' && bossCutscene && bossCutscene.t > 0) {
     const bc = bossCutscene;
-    const maxT = Math.max(0.25, bc.maxT || 1.25);
+    const maxT = Math.max(0.25, bc.maxT || 3.8);
     const elapsed = maxT - bc.t;
-    const enterP = Math.min(1, elapsed / 0.18);
-    const exitP = Math.min(1, Math.max(0, bc.t / 0.22));
+    const enterP = Math.min(1, elapsed / 0.22);
+    const exitP = Math.min(1, Math.max(0, bc.t / 0.25));
     const alpha = enterP * exitP;
     const isMythic = bc.mode === 'mythic_phase2';
-    const mainCol = bc.color || '#ff3b6b';
-    const accCol = bc.accent || '#ffd166';
+    const mainCol = bc.color || '#e11d48';
+    const accCol = bc.accent || '#f6d379';
     const portraitPortrait = viewW < 620;
+    const storyPack = (typeof getSpireCutscenePack === 'function') ? getSpireCutscenePack(bc.variant) : null;
+    const prog = Math.max(0, Math.min(0.999, elapsed / maxT));
+    const beatIdx = storyPack && storyPack.lines ? Math.min(storyPack.lines.length - 1, Math.floor(prog * storyPack.lines.length)) : 0;
+    const activeFrame = (storyPack && storyPack.imgs) ? (storyPack.imgs[beatIdx] || storyPack.imgs[0]) : null;
 
     ctx.save();
-    // 1. 全屏戏剧暗化与银白瞬闪
-    ctx.globalAlpha = 0.74 * alpha;
-    ctx.fillStyle = isMythic ? '#14060d' : '#080512';
+    // 1. 全屏暗黑剧场遮罩与刀光瞬闪
+    ctx.globalAlpha = 0.86 * alpha;
+    ctx.fillStyle = isMythic ? '#12050b' : '#060913';
     ctx.fillRect(0, 0, viewW, viewH);
     if (elapsed < 0.09) {
-      ctx.globalAlpha = (1 - elapsed / 0.09) * 0.42;
-      ctx.fillStyle = isMythic ? '#ffd166' : '#ffffff';
+      ctx.globalAlpha = (1 - elapsed / 0.09) * 0.38;
+      ctx.fillStyle = isMythic ? '#f6d379' : '#ffffff';
       ctx.fillRect(0, 0, viewW, viewH);
     }
 
-    // 2. 宽银幕上下黑边封幅
-    const barH = Math.round(Math.min(54, viewH * 0.085) * enterP);
-    ctx.globalAlpha = 0.95 * exitP;
-    ctx.fillStyle = '#05030a';
+    // 2. 宽银幕电影院黑边封幅与鎏金细线
+    const barH = Math.round(Math.min(56, viewH * 0.085) * enterP);
+    ctx.globalAlpha = 0.96 * exitP;
+    ctx.fillStyle = '#04060c';
     ctx.fillRect(0, 0, viewW, barH);
     ctx.fillRect(0, viewH - barH, viewW, barH);
     ctx.fillStyle = accCol;
-    ctx.fillRect(0, barH - 2, viewW, 2);
-    ctx.fillRect(0, viewH - barH, viewW, 2);
+    ctx.fillRect(0, barH - 1.5, viewW, 1.5);
+    ctx.fillRect(0, viewH - barH, viewW, 1.5);
 
-    // 3. 斜向贯穿动漫感战幕横幅 + 速度流线
     const cy = viewH * 0.5;
-    const bandH = portraitPortrait ? 236 : 186;
-    const slant = portraitPortrait ? 22 : 38;
-    ctx.globalAlpha = 0.94 * alpha;
-    ctx.fillStyle = '#120b22';
-    ctx.beginPath();
-    ctx.moveTo(-20, cy - bandH * 0.5 + slant);
-    ctx.lineTo(viewW + 20, cy - bandH * 0.5 - slant);
-    ctx.lineTo(viewW + 20, cy + bandH * 0.5 - slant);
-    ctx.lineTo(-20, cy + bandH * 0.5 + slant);
-    ctx.closePath();
-    ctx.fill();
+    const isShortLand = !portraitPortrait && viewH < 500;
+    if (activeFrame && !portraitPortrait) {
+      // 3A. 16:9 暗黑热血作画过场三镜动态剧场（适配桌面端与手机横屏紧凑比例）
+      const stageW = Math.min(viewW - (isShortLand ? 48 : 96), Math.round((viewH - barH * 2 - (isShortLand ? 20 : 44)) * (16 / 9)));
+      const stageH = Math.round(stageW * (9 / 16));
+      const sx = Math.round((viewW - stageW) * 0.5);
+      const sy = Math.round((viewH - stageH) * 0.5 - (isShortLand ? 2 : 6));
 
-    ctx.strokeStyle = mainCol;
-    ctx.lineWidth = 3.5;
-    ctx.stroke();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#080c16';
+      ctx.strokeStyle = accCol;
+      ctx.lineWidth = 2.4;
+      ctx.fillRect(sx - 3, sy - 3, stageW + 6, stageH + 6);
+      ctx.strokeRect(sx - 3, sy - 3, stageW + 6, stageH + 6);
 
-    // 横幅内高速电芒切线
-    ctx.globalAlpha = 0.35 * alpha;
-    ctx.strokeStyle = accCol;
-    ctx.lineWidth = 2;
-    for (let s = 0; s < 5; s++) {
-      const sy = cy - bandH * 0.38 + s * (bandH * 0.19);
-      const sxOff = ((elapsed * 420 + s * 130) % (viewW * 0.8));
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(sxOff, sy);
-      ctx.lineTo(sxOff + 140, sy - (slant / Math.max(1, viewW)) * 140);
-      ctx.stroke();
-    }
+      ctx.rect(sx, sy, stageW, stageH);
+      ctx.clip();
+      const zoom = 1.02 + (prog % 0.34) * 0.14;
+      const dw = stageW * zoom, dh = stageH * zoom;
+      ctx.drawImage(activeFrame, sx - (dw - stageW) * 0.5, sy - (dh - stageH) * 0.5, dw, dh);
 
-    // 4. 二次元美少女夏装半身立绘破框切入与称号排印
-    ctx.globalAlpha = alpha;
-    const slideOffset = (1 - enterP) * 56;
-    const personaSpec = (typeof BOSS_PORTRAIT_DATA !== 'undefined' && BOSS_PORTRAIT_DATA) ? BOSS_PORTRAIT_DATA[bc.variant] : null;
-    if (portraitPortrait) {
-      const pScale = Math.min(0.86, viewW / 450);
-      drawBossPortrait(bc.variant, viewW * 0.5 - slideOffset, cy - 42, pScale, isMythic);
-      ctx.textAlign = 'center';
-      ctx.font = '800 13px -apple-system, sans-serif';
-      ctx.fillStyle = accCol;
-      ctx.fillText(bc.subtitle || '⚠️ 强敌降临', viewW * 0.5, cy + 54, viewW - 32);
-      ctx.font = '900 24px -apple-system, sans-serif';
-      ctx.strokeStyle = '#090512';
-      ctx.lineWidth = 5;
-      ctx.strokeText(bc.title || '首领降临', viewW * 0.5, cy + 80, viewW - 28);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(bc.title || '首领降临', viewW * 0.5, cy + 80, viewW - 28);
-      if (bc.extraTag) {
-        ctx.font = '800 12px -apple-system, sans-serif';
-        ctx.fillStyle = isMythic ? '#ffd166' : '#e0fbfc';
-        ctx.fillText(bc.extraTag, viewW * 0.5, cy + 102, viewW - 28);
-      }
-    } else {
-      const portX = Math.max(164, viewW * 0.285) - slideOffset;
-      const textX = portX + 136 + slideOffset * 1.35;
-      drawBossPortrait(bc.variant, portX, cy - 2, 1.24, isMythic);
-      ctx.textAlign = 'left';
-      ctx.font = '800 15px -apple-system, sans-serif';
-      ctx.fillStyle = accCol;
-      const skinLabel = personaSpec
-        ? (isMythic
-          ? `【🔥隐藏换装 · ${personaSpec.personaName.split(' · ')[0]}·${personaSpec.mythicTitle || personaSpec.summerTitle}】`
-          : `【${personaSpec.personaName.split(' · ')[0]}·${personaSpec.summerTitle}】`)
-        : '';
-      const subTxt = skinLabel
-        ? `${bc.subtitle || '⚠️ 强敌降临'} · ${skinLabel}`
-        : (bc.subtitle || '⚠️ 强敌降临');
-      ctx.fillText(subTxt, textX, cy - 32, Math.max(180, viewW - textX - 36));
-      ctx.font = '900 34px -apple-system, sans-serif';
-      ctx.strokeStyle = '#090512';
-      ctx.lineWidth = 6;
-      ctx.strokeText(bc.title || '首领降临', textX, cy + 10, Math.max(180, viewW - textX - 36));
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(bc.title || '首领降临', textX, cy + 10, Math.max(180, viewW - textX - 36));
-      if (bc.extraTag) {
-        if (!bc._tagW) bc._tagW = ctx.measureText(bc.extraTag).width;
-        const tagW = Math.min(viewW - textX - 40, Math.max(210, bc._tagW * 0.45 + 28));
-        ctx.fillStyle = isMythic ? 'rgba(217, 4, 41, 0.38)' : 'rgba(255, 255, 255, 0.10)';
-        ctx.strokeStyle = accCol;
-        ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.28 * alpha;
+      ctx.strokeStyle = storyPack.actKey === 'act2' ? '#bae6fd' : (storyPack.actKey === 'act3' ? '#d8b4fe' : '#fda4af');
+      ctx.lineWidth = 1.5;
+      for (let r = 0; r < 14; r++) {
+        const rx = sx + ((r * 97 + elapsed * 260) % stageW);
+        const ry = sy + ((r * 61 + (storyPack.actKey === 'act3' ? -elapsed * 220 + 900 : elapsed * 310)) % stageH);
         ctx.beginPath();
-        ctx.roundRect(textX, cy + 24, tagW, 28, 7);
-        ctx.fill();
+        ctx.moveTo(rx, ry);
+        ctx.lineTo(rx - 8, ry + (storyPack.actKey === 'act3' ? -22 : 24));
         ctx.stroke();
-        ctx.font = '800 13.5px -apple-system, sans-serif';
-        ctx.fillStyle = isMythic ? '#ffd166' : '#f8f5ff';
-        ctx.fillText(bc.extraTag, textX + 12, cy + 43, Math.max(160, viewW - textX - 56));
+      }
+      ctx.restore();
+
+      ctx.globalAlpha = alpha;
+      const chapH = isShortLand ? 24 : 30;
+      ctx.fillStyle = 'rgba(7, 10, 18, 0.86)';
+      ctx.strokeStyle = 'rgba(229, 184, 105, 0.55)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect(sx + 12, sy + 10, Math.min(390, stageW - 24), chapH, 7);
+      ctx.fill(); ctx.stroke();
+      ctx.font = `800 ${isShortLand ? 11.5 : 13}px -apple-system, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#f6d379';
+      ctx.fillText(`${storyPack.chapter}  ·  0${beatIdx + 1}/03`, sx + 22, sy + 10 + chapH * 0.70, Math.min(370, stageW - 44));
+
+      const subH = isShortLand ? 68 : 92;
+      const subY = sy + stageH - subH;
+      ctx.fillStyle = 'rgba(6, 9, 17, 0.90)';
+      ctx.fillRect(sx, subY, stageW, subH);
+      ctx.fillStyle = accCol;
+      ctx.fillRect(sx, subY, stageW, 1.8);
+
+      drawBossPortrait(bc.variant, sx + (isShortLand ? 46 : 66), subY + (isShortLand ? 12 : 18), isShortLand ? 0.46 : 0.62, isMythic);
+
+      const tx = sx + (isShortLand ? 96 : 136);
+      const maxTxtW = Math.max(120, stageW - (isShortLand ? 112 : 156));
+      ctx.font = `900 ${isShortLand ? 13 : 15}px -apple-system, sans-serif`;
+      ctx.fillStyle = isMythic ? '#fda4af' : '#72efdd';
+      ctx.fillText(`${storyPack.speaker}  ·  ${bc.title || ''}`, tx, subY + (isShortLand ? 22 : 28), maxTxtW);
+
+      const fullLine = (storyPack.lines && storyPack.lines[beatIdx]) || bc.extraTag || '';
+      const beatLen = maxT / Math.max(1, storyPack.lines.length);
+      const localElapsed = Math.max(0, elapsed - beatIdx * beatLen);
+      const shownChars = Math.min(fullLine.length, Math.max(6, Math.floor((localElapsed / Math.max(0.35, beatLen * 0.62)) * fullLine.length)));
+      ctx.font = `800 ${isShortLand ? 14 : 17}px "Songti SC", "PingFang SC", serif`;
+      ctx.fillStyle = '#fbf6eb';
+      ctx.fillText(fullLine.slice(0, shownChars), tx, subY + (isShortLand ? 44 : 58), maxTxtW);
+
+      ctx.font = `700 ${isShortLand ? 11 : 12}px -apple-system, sans-serif`;
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillText(bc.extraTag || '', tx, subY + (isShortLand ? 61 : 80), maxTxtW);
+    } else if (activeFrame && portraitPortrait) {
+      // 3B-1. 手机竖屏 16:9 保真画框 + 下置特写台词席（不裁切左右人物、不压扁字体）
+      const stageW = viewW - 28;
+      const stageH = Math.round(stageW * (9 / 16));
+      const sx = 14;
+      const sy = Math.round(cy - stageH * 0.66);
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#080c16';
+      ctx.strokeStyle = accCol;
+      ctx.lineWidth = 2.0;
+      ctx.fillRect(sx - 2, sy - 2, stageW + 4, stageH + 4);
+      ctx.strokeRect(sx - 2, sy - 2, stageW + 4, stageH + 4);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(sx, sy, stageW, stageH);
+      ctx.clip();
+      const zoom = 1.02 + (prog % 0.34) * 0.10;
+      const dw = stageW * zoom, dh = stageH * zoom;
+      ctx.drawImage(activeFrame, sx - (dw - stageW) * 0.5, sy - (dh - stageH) * 0.5, dw, dh);
+      ctx.restore();
+
+      const infoY = sy + stageH + 14;
+      ctx.fillStyle = 'rgba(8, 12, 24, 0.92)';
+      ctx.strokeStyle = 'rgba(229, 184, 105, 0.44)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.roundRect(sx, infoY, stageW, 96, 12);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.font = '800 12px -apple-system, sans-serif';
+      ctx.fillStyle = accCol;
+      ctx.fillText(bc.subtitle || storyPack.chapter || '🕯️ 守誓主宰降临', viewW * 0.5, infoY + 24, stageW - 20);
+      ctx.font = '900 19px -apple-system, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(bc.title || '守层主宰', viewW * 0.5, infoY + 51, stageW - 20);
+      const lineTxt = (storyPack && storyPack.lines && storyPack.lines[beatIdx]) ? storyPack.lines[beatIdx] : (bc.extraTag || '');
+      ctx.font = '700 13px "Songti SC", "PingFang SC", serif';
+      ctx.fillStyle = '#e0fbfc';
+      ctx.fillText(lineTxt.slice(0, 24), viewW * 0.5, infoY + 78, stageW - 20);
+    } else {
+      // 3B-2. 奇遇首领立绘徽章特写横幅（无任何盖章框，干净凌厉）
+      const bandH = portraitPortrait ? 236 : 190;
+      const slant = portraitPortrait ? 20 : 34;
+      ctx.globalAlpha = 0.95 * alpha;
+      ctx.fillStyle = '#0d1322';
+      ctx.beginPath();
+      ctx.moveTo(-20, cy - bandH * 0.5 + slant);
+      ctx.lineTo(viewW + 20, cy - bandH * 0.5 - slant);
+      ctx.lineTo(viewW + 20, cy + bandH * 0.5 - slant);
+      ctx.lineTo(-20, cy + bandH * 0.5 + slant);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = mainCol;
+      ctx.lineWidth = 3.2;
+      ctx.stroke();
+
+      ctx.globalAlpha = alpha;
+      const slideOffset = (1 - enterP) * 52;
+      const lineTxt = (storyPack && storyPack.lines && storyPack.lines[beatIdx]) ? storyPack.lines[beatIdx] : (bc.extraTag || '');
+      if (portraitPortrait) {
+        const pScale = Math.min(0.86, viewW / 450);
+        drawBossPortrait(bc.variant, viewW * 0.5 - slideOffset, cy - 44, pScale, isMythic);
+        ctx.textAlign = 'center';
+        ctx.font = '800 12.5px -apple-system, sans-serif';
+        ctx.fillStyle = accCol;
+        ctx.fillText(bc.subtitle || '🕯️ 守誓主宰降临', viewW * 0.5, cy + 52, viewW - 28);
+        ctx.font = '900 21px -apple-system, sans-serif';
+        ctx.strokeStyle = '#060913'; ctx.lineWidth = 5;
+        ctx.strokeText(bc.title || '守层主宰', viewW * 0.5, cy + 78, viewW - 24);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(bc.title || '守层主宰', viewW * 0.5, cy + 78, viewW - 24);
+        ctx.font = '700 12px -apple-system, sans-serif';
+        ctx.fillStyle = '#e0fbfc';
+        ctx.fillText(lineTxt.slice(0, 26), viewW * 0.5, cy + 101, viewW - 24);
+      } else {
+        const portX = Math.max(164, viewW * 0.285) - slideOffset;
+        const textX = portX + 136 + slideOffset * 1.25;
+        drawBossPortrait(bc.variant, portX, cy - 2, 1.24, isMythic);
+        ctx.textAlign = 'left';
+        ctx.font = '800 15px -apple-system, sans-serif';
+        ctx.fillStyle = accCol;
+        ctx.fillText(bc.subtitle || '🕯️ 守誓主宰显圣', textX, cy - 34, Math.max(180, viewW - textX - 36));
+        ctx.font = '900 32px -apple-system, sans-serif';
+        ctx.strokeStyle = '#060913'; ctx.lineWidth = 6;
+        ctx.strokeText(bc.title || '守层主宰', textX, cy + 6, Math.max(180, viewW - textX - 36));
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(bc.title || '守层主宰', textX, cy + 6, Math.max(180, viewW - textX - 36));
+        ctx.font = '800 15px "Songti SC", "PingFang SC", serif';
+        ctx.fillStyle = '#e0fbfc';
+        ctx.fillText(lineTxt, textX, cy + 38, Math.max(180, viewW - textX - 36));
+        if (bc.extraTag) {
+          ctx.font = '700 12.5px -apple-system, sans-serif';
+          ctx.fillStyle = '#f6d379';
+          ctx.fillText(bc.extraTag, textX, cy + 62, Math.max(180, viewW - textX - 36));
+        }
       }
     }
 
     if (elapsed > 0.35) {
-      ctx.globalAlpha = 0.65 * exitP;
+      ctx.globalAlpha = 0.74 * exitP;
       ctx.font = '700 12px -apple-system, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillStyle = '#cbd5e1';
-      ctx.fillText('按 空格 / 点击屏幕 可跳过演出', viewW * 0.5, viewH - barH - 14);
+      const skipMsg = (uiMode !== 'desktop' || isTouch) ? '轻触屏幕跳过演出 ▸' : '按 空格 / 点击屏幕 可跳过过场演出';
+      ctx.fillText(skipMsg, viewW * 0.5, viewH - barH - 14);
     }
     ctx.restore();
   }
@@ -1338,6 +1570,13 @@ function loop(now) {
   } catch (err) {
     logError('DRAW_ERR', err);
     try { ctx.restore(); } catch (_) {}
+  }
+  if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.render === 'function') {
+    try {
+      SpireDirector.render();
+    } catch (err) {
+      logError('DIRECTOR_DRAW_ERR', err);
+    }
   }
 }
 requestAnimationFrame(loop);

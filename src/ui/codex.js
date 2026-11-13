@@ -1,5 +1,14 @@
-// 📖 全息图鉴百科交互与渲染引擎
+// 📖 《烬塔残响》圣典全图鉴交互与原画展示引擎（全面接入角色立绘、分层域 Q 版怪物贴图与层域全景图）
 let codexTab = 'weapons', codexFilter = 'all', codexPrevState = 'menu';
+
+function _spireImgUrl(relPath) {
+  if (!relPath) return '';
+  if (typeof SpireAssets !== 'undefined' && typeof SpireAssets.resolve === 'function') {
+    return SpireAssets.resolve(relPath);
+  }
+  return relPath;
+}
+
 function openCodex(initialTab) {
   if (state === 'wave') pauseGame();
   if (state !== 'codex') codexPrevState = state;
@@ -44,17 +53,19 @@ function renderCodex() {
   if (!tabsEl || !gridEl) return;
 
   const tabs = [
-    { id: 'weapons',  label: `⚔️ 武器 (${Object.keys(WEAPONS).length})` },
-    { id: 'items',    label: `🎒 装备 (${ITEMS.length})` },
-    { id: 'heroes',   label: `🥔 角色 (${CLASSES.length})` },
-    { id: 'monsters', label: `👾 怪物与Boss (${MONSTER_CODEX.length})` },
-    { id: 'world',    label: `🌍 场景与奇遇 (${SCENES.length + (typeof TERRAIN_CODEX !== 'undefined' ? TERRAIN_CODEX.length : 0) + SPECIAL_RELICS.length})` }
+    { id: 'weapons',  roman: 'I',   title: '守誓兵装', count: Object.keys(WEAPONS).length },
+    { id: 'items',    roman: 'II',  title: '记忆遗物', count: ITEMS.length },
+    { id: 'heroes',   roman: 'III', title: '誓约角色', count: CLASSES.length },
+    { id: 'monsters', roman: 'IV',  title: '层域魔物', count: MONSTER_CODEX.length },
+    { id: 'world',    roman: 'V',   title: '世界生态', count: SCENES.length + (typeof TERRAIN_CODEX !== 'undefined' ? TERRAIN_CODEX.length : 0) + SPECIAL_RELICS.length }
   ];
   tabsEl.innerHTML = '';
   tabs.forEach(t => {
     const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
     b.className = 'codex-tab' + (codexTab === t.id ? ' active' : '');
-    b.textContent = t.label;
+    b.innerHTML = `<span class="ct-roman">${t.roman}</span><span class="ct-title">${t.title}</span><span class="ct-count">${t.count}</span>`;
     b.onclick = () => setCodexTab(t.id);
     tabsEl.appendChild(b);
   });
@@ -67,6 +78,7 @@ function renderCodex() {
   const buildFilterBar = opts => {
     opts.forEach(o => {
       const fb = document.createElement('button');
+      fb.type = 'button';
       fb.className = 'codex-filter' + (codexFilter === o.id ? ' active' : '');
       fb.textContent = o.label;
       fb.onclick = () => setCodexFilter(o.id);
@@ -76,13 +88,13 @@ function renderCodex() {
 
   if (codexTab === 'weapons') {
     buildFilterBar([
-      { id: 'all', label: '全部武器' },
-      { id: 'melee', label: '🗡️ 近战' },
-      { id: 'ranged', label: '🔫 远程' },
-      ...Object.entries(SET_DEFS).map(([k, v]) => ({ id: k, label: v.label }))
+      { id: 'all', label: '全部兵装' },
+      { id: 'melee', label: '近战斩击' },
+      { id: 'ranged', label: '远程魂弹' },
+      ...Object.entries(SET_DEFS).map(([k, v]) => ({ id: k, label: v.label.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '') }))
     ]);
     bannerEl.innerHTML = Object.values(SET_DEFS)
-      .map(s => `<span class="set-pill"><b>${s.label}</b> ${s.desc}</span>`).join('');
+      .map(s => `<span class="set-pill"><b>${s.label.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '')}</b> ${s.desc}</span>`).join('');
     Object.entries(WEAPONS).forEach(([id, w]) => {
       if (codexFilter === 'melee' && !w.melee) return;
       if (codexFilter === 'ranged' && w.melee) return;
@@ -96,17 +108,17 @@ function renderCodex() {
           <div class="card-meta">
             <div class="codex-card-title">${w.name}</div>
             <div class="card-badges">
-              <span class="tag">${SET_DEFS[w.set].label}</span>
+              <span class="tag">${SET_DEFS[w.set].label.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '')}</span>
               <span class="tag">${w.melee ? '近战挥砍' : '远程射击'}</span>
-              ${minT > 1 ? `<span class="tag t${minT}">最低${['','白','蓝','紫','红'][minT]}品</span>` : ''}
+              ${minT > 1 ? `<span class="tag t${minT}">最低${['','普通','精良','史诗','传说'][minT]}</span>` : ''}
             </div>
           </div>
         </div>
         <div class="stat-chips">
-          <span class="stat-chip">⚔️ 伤害 ${w.dmg}${w.pellets ? '×' + w.pellets : ''}</span>
-          <span class="stat-chip">⚡ 冷却 ${w.cd}s</span>
-          <span class="stat-chip">📏 范围 ${w.range}</span>
-          <span class="stat-chip">💎 基准 ${w.cost}</span>
+          <span class="stat-chip">伤害 ${w.dmg}${w.pellets ? '×' + w.pellets : ''}</span>
+          <span class="stat-chip">冷却 ${w.cd}s</span>
+          <span class="stat-chip">范围 ${w.range}</span>
+          <span class="stat-chip">基准 ◇${w.cost}</span>
         </div>
         <div class="codex-card-desc">${w.desc}</div>`;
       gridEl.appendChild(card);
@@ -114,15 +126,15 @@ function renderCodex() {
   } else if (codexTab === 'items') {
     buildFilterBar([
       { id: 'all', label: '全部品质' },
-      { id: '1', label: '⬜ T1 普通' },
-      { id: '2', label: '🟦 T2 精良' },
-      { id: '3', label: '🟪 T3 史诗' },
-      { id: '4', label: '🟥 T4 传说' }
+      { id: '1', label: 'T1 · 普通' },
+      { id: '2', label: 'T2 · 精良' },
+      { id: '3', label: 'T3 · 史诗' },
+      { id: '4', label: 'T4 · 传说' }
     ]);
-    bannerEl.innerHTML = `<span>💡 提示：击碎战场上的 <b>🌳 异星晶树</b> 或击败 <b>✨ 金色精英 / 首领</b> 可掉落免费战利品宝箱！</span>`;
+    bannerEl.innerHTML = `<span>◆ 击碎层域中的<b>石灯笼 / 寒冰晶簇 / 齿轮断柱 / 黑曜方碑</b>或击败<b>蚀日精英 / 守层主宰</b>，均可获赠免费守誓遗物匣。</span>`;
     ITEMS.forEach(it => {
       if (codexFilter !== 'all' && String(it.tier) !== codexFilter) return;
-      const tNames = ['', '普通 T1', '精良 T2', '史诗 T3', '传说 T4'];
+      const tNames = ['', 'T1 普通', 'T2 精良', 'T3 史诗', 'T4 传说'];
       const card = document.createElement('div');
       card.className = `codex-card t${it.tier}`;
       card.innerHTML = `
@@ -132,8 +144,8 @@ function renderCodex() {
             <div class="codex-card-title">${it.name}</div>
             <div class="card-badges">
               <span class="tag t${it.tier}">${tNames[it.tier]}</span>
-              ${it.maxCount ? `<span class="tag tag-merge">${it.maxCount === 1 ? '唯一' : '限×' + it.maxCount}</span>` : ''}
-              <span class="tag">💎 基准售价 ${it.cost}</span>
+              ${it.maxCount ? `<span class="tag tag-merge">${it.maxCount === 1 ? '唯一' : '上限 ×' + it.maxCount}</span>` : ''}
+              <span class="tag">基准 ◇${it.cost}</span>
             </div>
           </div>
         </div>
@@ -141,46 +153,55 @@ function renderCodex() {
       gridEl.appendChild(card);
     });
   } else if (codexTab === 'heroes') {
-    bannerEl.innerHTML = `<span>🥔 每位土豆战士拥有独特的起手武器与专属战斗机制，合理搭配套装羁绊威力倍增！</span>`;
+    bannerEl.innerHTML = `<span>◆ 六位誓约者均配备设定集高清半身立绘与实机四帧动态精灵，并拥有各自独立的【青焰瞬步】主动残响战技。</span>`;
     CLASSES.forEach(c => {
+      const portSrc = _spireImgUrl(c.portrait);
+      const chibiSrc = _spireImgUrl(c.chibi);
       const card = document.createElement('div');
       card.className = 'codex-card t2';
       card.innerHTML = `
         <div class="codex-card-top">
-          <div class="cls-avatar">${c.icon}</div>
-          <div class="card-meta">
+          <div class="codex-thumb-wrap">
+            ${portSrc ? `<img src="${portSrc}" alt="${c.name}" class="codex-thumb-img">` : c.icon}
+          </div>
+          <div class="card-meta" style="flex:1">
             <div class="codex-card-title">${c.name}</div>
             <div class="card-badges">
-              <span class="tag tag-merge">${c.tag}流派</span>
-              <span class="tag">起手: ${c.loadout}</span>
+              <span class="tag tag-merge">${c.tag}</span>
+              <span class="tag">起手 · ${c.loadout}</span>
+              ${c.dashName ? `<span class="tag t2">${c.dashName}</span>` : ''}
             </div>
           </div>
+          ${chibiSrc ? `<img src="${chibiSrc}" alt="${c.name} 实机精灵" class="codex-chibi-mini">` : ''}
         </div>
-        <div class="codex-card-desc">${c.perks}</div>`;
+        <div class="codex-card-desc">${c.perks}${c.dashDesc ? `<br><span style="color:#dfc084;font-weight:700">${c.dashName}：</span><span style="color:#cbd5e1">${c.dashDesc}</span>` : ''}</div>`;
       gridEl.appendChild(card);
     });
   } else if (codexTab === 'monsters') {
     buildFilterBar([
-      { id: 'all', label: '全部图鉴' },
-      { id: 'normal', label: '🪲 常规异虫' },
-      { id: 'scene', label: '🗺️ 场景专属怪' },
-      { id: 'boss', label: '👑 随机统领&主宰' },
-      { id: 'special', label: '🔮 奇遇召唤Boss' }
+      { id: 'all', label: '全部魔物' },
+      { id: 'normal', label: '层域傀儡' },
+      { id: 'scene', label: '层域精英' },
+      { id: 'boss', label: '统领与守誓主宰' },
+      { id: 'special', label: '无尽祭坛首领' }
     ]);
-    bannerEl.innerHTML = `<span>👑 终局主宰与精英统领每局<b>随机轮换登场</b>；场景专属怪自第 3 波起按轮次概率出没（非必出）。</span>`;
+    bannerEl.innerHTML = `<span>◆ 第 6 / 10 / 14 层固定刷新先锋统领，第 4 / 8 / 12 / 16 层固定迎战四幕守誓主宰并触发宽银幕过场与救赎谢幕。</span>`;
     MONSTER_CODEX.forEach(m => {
       if (codexFilter !== 'all' && m.cat !== codexFilter) return;
       const tierCls = m.cat === 'special' ? 't4' : (m.cat === 'boss' ? 't3' : (m.cat === 'scene' ? 't2' : 't1'));
+      const sprUrl = _spireImgUrl(m.sprite);
       const card = document.createElement('div');
       card.className = `codex-card ${tierCls}`;
       card.innerHTML = `
         <div class="codex-card-top">
-          <div class="item-emblem ${tierCls}">${m.icon}</div>
+          <div class="item-emblem ${tierCls}" style="overflow:hidden;padding:2px">
+            ${sprUrl ? `<img src="${sprUrl}" alt="${m.name}" style="width:100%;height:100%;object-fit:contain">` : m.icon}
+          </div>
           <div class="card-meta">
             <div class="codex-card-title">${m.name}</div>
             <div class="card-badges">
               <span class="tag ${tierCls}">${m.badge}</span>
-              <span class="tag">⏱ ${m.wave}</span>
+              <span class="tag">${m.wave}</span>
             </div>
           </div>
         </div>
@@ -191,40 +212,42 @@ function renderCodex() {
   } else if (codexTab === 'world') {
     buildFilterBar([
       { id: 'all', label: '全部奇观' },
-      { id: 'scene', label: '🗺️ 五大生态' },
-      { id: 'terrain', label: '🌋 地形机关' },
-      { id: 'relic', label: '🔮 奇遇圣物' }
+      { id: 'scene', label: '四大烬塔层域' },
+      { id: 'terrain', label: '层域标志机关' },
+      { id: 'relic', label: '无尽共鸣祭坛' }
     ]);
-    bannerEl.innerHTML = `<span>🌍 各生态拥有独特<b>交互地形（岩浆/毒沼/裂谷/冰湖/传送门）</b>，第 3 波起还会概率触发<b>环境异象</b>与<b>奇遇召唤圣物</b>！</span>`;
+    bannerEl.innerHTML = `<span>◆ 随登塔进度依次穿越<b>雨夜长桥 → 永冻冰窟 → 倒悬钟楼 → 日蚀镜界</b>，每层均配备独立机关、环境音景与可破坏封魂器物。</span>`;
     if (codexFilter === 'all' || codexFilter === 'scene') {
       SCENES.forEach(sc => {
+        const vistaUrl = _spireImgUrl(sc.vistaImg);
         const card = document.createElement('div');
         card.className = 'codex-card t2';
         card.innerHTML = `
+          ${vistaUrl ? `<div class="codex-scene-banner"><img src="${vistaUrl}" alt="${sc.name}"></div>` : ''}
           <div class="codex-card-top">
             <div class="item-emblem t2">${sc.icon}</div>
             <div class="card-meta">
               <div class="codex-card-title">${sc.name}</div>
               <div class="card-badges">
-                <span class="tag t2">${sc.eventIcon} 异象: ${sc.eventName}</span>
-                <span class="tag">专属怪: ${sc.exclMobName}</span>
+                <span class="tag t2">${sc.eventIcon} ${sc.eventName}</span>
+                <span class="tag">${sc.exclMobName}</span>
               </div>
             </div>
           </div>
-          <div class="stat-chips"><span class="stat-chip">地形：${sc.terrainSummary || ''}</span></div>
-          <div class="codex-card-desc">${sc.eventDesc}<br><b>专属生态怪：</b>${sc.exclMobName}（第 3 波起随波次概率刷出，非强制出现）</div>`;
+          <div class="stat-chips"><span class="stat-chip">${sc.terrainSummary || ''}</span></div>
+          <div class="codex-card-desc">${sc.eventDesc}</div>`;
         gridEl.appendChild(card);
       });
     }
     if ((codexFilter === 'all' || codexFilter === 'terrain') && typeof TERRAIN_CODEX !== 'undefined') {
       TERRAIN_CODEX.forEach(tr => {
         const card = document.createElement('div');
-        card.className = 'codex-card t3';
+        card.className = `codex-card t3`;
         card.innerHTML = `
           <div class="codex-card-top">
             <div class="item-emblem t3">${tr.icon}</div>
             <div class="card-meta">
-              <div class="codex-card-title">【地形】${tr.name}</div>
+              <div class="codex-card-title">【层域机关】${tr.name}</div>
               <div class="card-badges">
                 <span class="tag t3">${tr.badge}</span>
                 <span class="tag">${tr.scenes}</span>
@@ -243,27 +266,26 @@ function renderCodex() {
           <div class="codex-card-top">
             <div class="item-emblem t4">${rel.icon}</div>
             <div class="card-meta">
-              <div class="codex-card-title">【奇遇圣物】${rel.name}</div>
+              <div class="codex-card-title">【记忆祭坛】${rel.name}</div>
               <div class="card-badges">
-                <span class="tag t4">小概率刷出</span>
-                <span class="tag tag-merge">召唤 ${rel.bossIcon} ${rel.bossName}</span>
+                <span class="tag t4">小概率现世</span>
+                <span class="tag tag-merge">唤醒 ${rel.bossIcon} ${rel.bossName}</span>
               </div>
             </div>
           </div>
-          <div class="codex-card-desc">第 3 波起小概率在地图上现世（屏幕边缘会有方向指引）。<b>踏入圣物法阵驻留 1.1 秒</b>即可解封召唤特殊首领进入 Boss 战（全屏定格登场特写，回合延长 +25s）！<br><b>${rel.rewardDesc}</b></div>`;
+          <div class="codex-card-desc">第 17 层无尽试炼起概率在层域中现世（屏幕边缘显示方位信标，主线 1~16 层绝不乱入）。<b>踏入祭坛驻留 1.1 秒</b>即可唤醒记忆首领（回合延长 +25s）！<br><b>${rel.rewardDesc}</b></div>`;
         gridEl.appendChild(card);
       });
     }
   }
 }
 
-// 📜 开局界面与局内可查阅的版本更新日志弹窗
 function openChangelogModal() {
   if (state === 'wave') pauseGame();
   beep(510, 0.045, 'triangle', 0.04);
   const titleEl = document.getElementById('changelogTitle');
   if (titleEl && typeof APP_VERSION !== 'undefined') {
-    titleEl.textContent = `📜 版本更新日志 · 当前 ${APP_VERSION}`;
+    titleEl.textContent = `烬塔纪元志  ·  ${APP_VERSION}`;
   }
   const listEl = document.getElementById('changelogList');
   if (listEl && typeof CHANGELOG_HISTORY !== 'undefined') {
@@ -275,7 +297,7 @@ function openChangelogModal() {
         <div class="cl-head">
           <span class="cl-ver">${entry.ver}</span>
           <span class="cl-tag">${entry.tag || '版本更新'}</span>
-          <span class="cl-date">📅 ${entry.date}</span>
+          <span class="cl-date">${entry.date}</span>
         </div>
         <div class="cl-title">${entry.title}</div>
         <ul class="cl-items">${(entry.items || []).map(line => `<li>${line}</li>`).join('')}</ul>`;

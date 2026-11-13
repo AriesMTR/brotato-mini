@@ -1,39 +1,246 @@
-// 主菜单配置、键鼠/虚拟摇杆/双指缩放输入、运行时状态池与暂停控制
-function initMenuUI() {
-  refreshUIPrefControls();
-  const vp = document.getElementById('startVersionPill');
-  if (vp && typeof APP_VERSION !== 'undefined') {
-    vp.textContent = `🥔 BROTATO MINI · 当前版本 ${APP_VERSION}`;
+// 《烬塔残响：第999次救赎》黑曜镌金主殿、人物选择选项卡、档案/整备多维选项卡与输入控制
+let menuStage = 'home'; // 'home' | 'story' | 'endless'
+let selectedEndlessCls = 'brawler';
+let heroDossierTab = 'traits'; // 'traits' | 'combat'
+let endlessPrepTab = 'diff';   // 'diff' | 'scene'
+
+const HERO_SHORT_NAMES = {
+  allrounder: '零号·白衣',
+  brawler: '烬羽',
+  ranger: '艾丝特莉亚',
+  engineer: '伽蓝',
+  ghost: '青羽',
+  multitasker: '日蚀圣女'
+};
+
+function _menuAssetUrl(relPath) {
+  if (!relPath) return '';
+  if (typeof SpireAssets !== 'undefined' && typeof SpireAssets.resolve === 'function') {
+    return SpireAssets.resolve(relPath);
   }
-  const dt = document.getElementById('diffTabs');
+  return relPath;
+}
+
+function setHeroDossierTab(tab) {
+  heroDossierTab = tab === 'combat' ? 'combat' : 'traits';
+  beep(470, 0.03, 'triangle', 0.025);
+  initMenuUI();
+}
+
+function setEndlessPrepTab(tab) {
+  endlessPrepTab = tab === 'scene' ? 'scene' : 'diff';
+  beep(490, 0.035, 'triangle', 0.028);
+  initMenuUI();
+}
+
+function _renderDiffButtons(containerId, descId) {
+  const dt = document.getElementById(containerId);
   if (dt) {
     dt.innerHTML = '';
     DIFFS.forEach(d => {
       const b = document.createElement('button');
-      b.className = 'diff-btn' + (d.id === selectedDiff ? ' active' : '');
-      b.textContent = d.badge;
+      b.type = 'button';
+      b.className = `diff-btn tone-${d.tone || 'gold'}${d.id === selectedDiff ? ' active' : ''}`;
+      b.innerHTML = `
+        <span class="diff-btn-top">
+          <span class="diff-dot"></span>
+          <span class="diff-code">${d.code || ('D' + d.id)}</span>
+          <span class="diff-roman">${d.roman || ''}</span>
+        </span>
+        <span class="diff-name">${d.short || d.name}</span>`;
       b.onclick = () => { selectedDiff = d.id; beep(480, 0.04, 'triangle'); initMenuUI(); };
       dt.appendChild(b);
     });
   }
-  const dd = document.getElementById('diffDesc');
+  const dd = document.getElementById(descId);
   const activeDiff = DIFFS[selectedDiff] || DIFFS[1] || DIFFS[0];
-  if (dd && activeDiff) dd.textContent = activeDiff.desc;
+  if (dd && activeDiff) {
+    dd.innerHTML = `<span class="desc-title">${activeDiff.badge} · ${activeDiff.name}</span><span class="desc-body">${activeDiff.desc}</span>`;
+  }
+}
+
+function _renderHeroSpotlight(containerId, clsObj, isStoryLocked) {
+  const box = document.getElementById(containerId);
+  if (!box || !clsObj) return;
+  const portUrl = _menuAssetUrl(clsObj.portrait);
+  const chibiUrl = _menuAssetUrl(clsObj.chibi);
+  const roleTag = isStoryLocked ? '唯一主角 · 提灯人' : clsObj.tag;
+  const traitsArr = Array.isArray(clsObj.traits) ? clsObj.traits : [];
+  const negTxt = clsObj.negTrait || '';
+  const bioTxt = isStoryLocked
+    ? '第九百九十九次于塔底石棺苏醒的白衣提灯人。唯有亲自执灯登临十六层四幕高塔，方能依次唤醒并救赎昔日守誓挚友。'
+    : (clsObj.bio || '');
+  const weaponsArr = Array.isArray(clsObj.weaponsList) ? clsObj.weaponsList : [clsObj.loadout || ''];
+  const isTraitsTab = heroDossierTab !== 'combat';
+
+  const traitChipsHtml = traitsArr.map(t => `<span class="trait-chip pos">${t}</span>`).join('') +
+    (negTxt ? `<span class="trait-chip neg">${negTxt}</span>` : '');
+  const weaponChipsHtml = weaponsArr.map(w => `<span class="weapon-spec-pill">◆ ${w}</span>`).join('');
+
+  box.innerHTML = `
+    <div class="spotlight-art-col">
+      <img src="${portUrl}" alt="${clsObj.name}" class="spotlight-portrait" loading="eager" decoding="async">
+      <div class="spotlight-art-shade"></div>
+      <div class="spotlight-chibi-frame" title="实机战斗精灵形态">
+        <img src="${chibiUrl}" alt="${clsObj.name} 实机精灵" class="spotlight-chibi" loading="eager" decoding="async">
+        <span class="chibi-cap">实机形态</span>
+      </div>
+    </div>
+    <div class="spotlight-info-col">
+      <div class="spotlight-header-block">
+        <div class="spotlight-role-row">
+          <span class="spotlight-en">${clsObj.enTitle || clsObj.code || ''}</span>
+          <span class="spotlight-tag">${roleTag}</span>
+        </div>
+        <div class="spotlight-name">${clsObj.name}</div>
+      </div>
+
+      <div class="dossier-tabs" role="tablist" aria-label="角色档案选项卡">
+        <button type="button" class="dossier-tab${isTraitsTab ? ' active' : ''}" onclick="setHeroDossierTab('traits')">契约特质</button>
+        <button type="button" class="dossier-tab${!isTraitsTab ? ' active' : ''}" onclick="setHeroDossierTab('combat')">兵装与瞬步</button>
+      </div>
+
+      ${isTraitsTab ? `
+        <div class="dossier-pane">
+          <div class="trait-chip-grid">${traitChipsHtml}</div>
+          <p class="spotlight-bio">${bioTxt}</p>
+          <div class="spotlight-quick-strip">
+            <span class="sq-item"><b>初始兵装</b> ${clsObj.loadout}</span>
+            ${clsObj.dashName ? `<span class="sq-item"><b>主动战技</b> ${clsObj.dashName}</span>` : ''}
+          </div>
+        </div>
+      ` : `
+        <div class="dossier-pane">
+          <div class="combat-spec-box">
+            <div class="cs-label">STARTING ARMAMENTS  ·  初始随身兵装</div>
+            <div class="weapon-spec-row">${weaponChipsHtml}</div>
+          </div>
+          ${clsObj.dashName ? `
+          <div class="combat-spec-box dash-box">
+            <div class="cs-label">SOUL DASH [SPACE / 右键]  ·  ${clsObj.dashName}</div>
+            <div class="cs-desc">${clsObj.dashDesc || ''}</div>
+          </div>` : ''}
+        </div>
+      `}
+    </div>`;
+}
+
+function openMenuStage(stage) {
+  menuStage = (stage === 'story' || stage === 'endless') ? stage : 'home';
+  const sm = document.getElementById('startMenu');
+  if (sm && sm.setAttribute) sm.setAttribute('data-stage', menuStage);
+  const hv = document.getElementById('menuHomeView');
+  const sv = document.getElementById('menuStoryView');
+  const ev = document.getElementById('menuEndlessView');
+  if (hv) hv.classList.toggle('hidden', menuStage !== 'home');
+  if (sv) sv.classList.toggle('hidden', menuStage !== 'story');
+  if (ev) ev.classList.toggle('hidden', menuStage !== 'endless');
+  const keyArtEl = document.getElementById('heroKeyArtBg');
+  if (keyArtEl) {
+    const bgRel = menuStage === 'endless' ? 'assets/spire/logo_banner.jpg' : 'assets/spire/cut_intro_1.jpg';
+    keyArtEl.style.backgroundImage = `url('${_menuAssetUrl(bgRel)}')`;
+  }
+  beep(menuStage === 'home' ? 420 : 520, 0.04, 'triangle', 0.035);
+  initMenuUI();
+}
+
+function selectEndlessHero(clsId) {
+  if (!CLASSES.some(c => c.id === clsId)) return;
+  selectedEndlessCls = clsId;
+  beep(500, 0.035, 'triangle', 0.03);
+  initMenuUI();
+}
+
+function startStoryMode() {
+  selectedScene = 'random';
+  startGame('allrounder', { mode: 'story' });
+}
+
+function startEndlessMode(clsId) {
+  const target = (clsId && CLASSES.some(c => c.id === clsId)) ? clsId : (selectedEndlessCls || 'brawler');
+  startGame(target, { mode: 'endless' });
+}
+
+function initMenuUI() {
+  refreshUIPrefControls();
+  const vp = document.getElementById('startVersionPill');
+  if (vp && typeof APP_VERSION !== 'undefined') {
+    vp.textContent = `ECHOES OF THE ASHEN SPIRE  ·  ${APP_VERSION}`;
+  }
+  const appIconEl = document.getElementById('brandAppIcon');
+  if (appIconEl) appIconEl.src = _menuAssetUrl('assets/spire/app_icon.jpg');
+  const keyArtEl = document.getElementById('heroKeyArtBg');
+  if (keyArtEl) {
+    const bgRel = menuStage === 'endless' ? 'assets/spire/logo_banner.jpg' : 'assets/spire/cut_intro_1.jpg';
+    keyArtEl.style.backgroundImage = `url('${_menuAssetUrl(bgRel)}')`;
+  }
+
+  if (typeof SpireAudio !== 'undefined') SpireAudio.refreshButtons();
+
+  // 剧情模式与无尽模式同步 3×2 对称厄度选项卡
+  _renderDiffButtons('storyDiffTabs', 'storyDiffDesc');
+  _renderDiffButtons('diffTabs', 'diffDesc');
+
+  // 剧情模式：严格仅展示唯一主角「零号·白衣」
+  const zeroObj = CLASSES.find(c => c.id === 'allrounder') || CLASSES[0];
+  _renderHeroSpotlight('storyHeroShowcase', zeroObj, true);
+
+  // 无尽模式：试炼整备双栏选项卡状态同步（轮回厄度 vs 起始层域）
+  const diffTabBtn = document.getElementById('prepTabDiffBtn');
+  const sceneTabBtn = document.getElementById('prepTabSceneBtn');
+  const diffPane = document.getElementById('endlessDiffPane');
+  const scenePane = document.getElementById('endlessScenePane');
+  if (diffTabBtn) diffTabBtn.classList.toggle('active', endlessPrepTab !== 'scene');
+  if (sceneTabBtn) sceneTabBtn.classList.toggle('active', endlessPrepTab === 'scene');
+  if (diffPane) diffPane.classList.toggle('hidden', endlessPrepTab === 'scene');
+  if (scenePane) scenePane.classList.toggle('hidden', endlessPrepTab !== 'scene');
+
+  const activeDiffObj = DIFFS[selectedDiff] || DIFFS[1] || DIFFS[0];
+  const prepDiffTag = document.getElementById('prepDiffSummaryTag');
+  if (prepDiffTag && activeDiffObj) prepDiffTag.textContent = activeDiffObj.badge;
+
+  // 无尽模式：层域生态 1 + 2×2 原画选项卡
+  const sceneOpts = [
+    { id: 'random', code: 'ALL ACTS', name: '四幕轮转', sub: '循序踏入四大层域生态演进', vistaImg: 'assets/spire/logo_banner.jpg', wide: true },
+    ...SCENES.map((s, idx) => ({
+      id: s.id,
+      code: `ACT ${['I', 'II', 'III', 'IV'][idx] || (idx + 1)}`,
+      name: s.name.replace(/^.+·/, ''),
+      sub: s.terrainSummary ? s.terrainSummary.replace(/^[^\s]+\s*/, '') : s.bossHint,
+      vistaImg: s.vistaImg,
+      wide: false
+    }))
+  ];
+  const activeSceneOpt = sceneOpts.find(x => x.id === selectedScene) || sceneOpts[0];
+  const prepSceneTag = document.getElementById('prepSceneSummaryTag');
+  if (prepSceneTag && activeSceneOpt) prepSceneTag.textContent = activeSceneOpt.name;
 
   const st = document.getElementById('sceneTabs');
   if (st) {
     st.innerHTML = '';
-    const sceneOpts = [{ id: 'random', icon: '🎲', name: '随机轮换' }, ...SCENES];
     sceneOpts.forEach(sc => {
       const b = document.createElement('button');
-      b.className = 'scene-btn' + (sc.id === selectedScene ? ' active' : '');
-      b.textContent = `${sc.icon} ${sc.name}`;
+      b.type = 'button';
+      b.className = `scene-btn${sc.wide ? ' wide' : ''}${sc.id === selectedScene ? ' active' : ''}`;
+      const bgUrl = _menuAssetUrl(sc.vistaImg);
+      b.innerHTML = `
+        <span class="scene-btn-bg" style="background-image:url('${bgUrl}')"></span>
+        <span class="scene-btn-txt">
+          <span class="scene-code">${sc.code}</span>
+          <span class="scene-name">${sc.name}</span>
+        </span>`;
       b.onclick = () => {
         selectedScene = sc.id;
         if (sc.id !== 'random') {
           curScene = SCENES.find(x => x.id === sc.id) || SCENES[0];
           sceneSeed = (1009 + sc.id.charCodeAt(0) * 271) >>> 0;
           if (bootReady) syncArenaAndZoom(true);
+          if (typeof SpireAudio !== 'undefined') SpireAudio.syncScene(sc.id);
+        } else {
+          curScene = SCENES[0];
+          sceneSeed = 1024;
+          if (bootReady) syncArenaAndZoom(true);
+          if (typeof SpireAudio !== 'undefined') SpireAudio.syncScene('foundry');
         }
         beep(510, 0.04, 'triangle');
         initMenuUI();
@@ -41,25 +248,48 @@ function initMenuUI() {
       st.appendChild(b);
     });
   }
+  const sd = document.getElementById('sceneDesc');
+  if (sd && activeSceneOpt) {
+    sd.innerHTML = `<span class="desc-title">${activeSceneOpt.code} · ${activeSceneOpt.name}</span><span class="desc-body">${activeSceneOpt.sub}</span>`;
+  }
 
+  // 无尽模式：6 位誓约者高定人物选择选项卡 + 角色档案舞台
   const cg = document.getElementById('classGrid');
-  if (cg && !cg.children.length) {
-    CLASSES.forEach(c => {
-      const el = document.createElement('div');
-      el.className = 'cls-card';
-      el.innerHTML = `
-        <div class="cls-head">
-          <div class="cls-avatar">${c.icon}</div>
-          <div class="cls-title-wrap">
-            <h3><span>${c.name}</span><span class="cls-role">${c.tag}</span></h3>
-            <div class="cls-loadout">${c.loadout}</div>
-          </div>
-        </div>
-        <div class="cls-perks">${c.perks}</div>
-        <div class="cls-go">选择出战 ▸</div>`;
-      el.onclick = () => startGame(c.id);
-      cg.appendChild(el);
+  if (cg) {
+    cg.innerHTML = '';
+    CLASSES.forEach((c, idx) => {
+      const isAct = c.id === selectedEndlessCls;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', isAct ? 'true' : 'false');
+      btn.className = 'roster-avatar' + (isAct ? ' active' : '');
+      const portUrl = _menuAssetUrl(c.portrait);
+      const shortLbl = HERO_SHORT_NAMES[c.id] || c.name;
+      btn.innerHTML = `
+        <span class="ctab-head">
+          <span class="ctab-code">${c.code || ('0' + (idx + 1))}</span>
+          <span class="ctab-role">${c.shortRole || c.tag}</span>
+        </span>
+        <span class="ctab-port-wrap">
+          <img src="${portUrl}" alt="${c.name}" class="roster-avatar-img" loading="eager" decoding="async">
+          <span class="ctab-shade"></span>
+        </span>
+        <span class="roster-avatar-name"><span class="ctab-gem">◆</span>${shortLbl}</span>`;
+      btn.onclick = () => selectEndlessHero(c.id);
+      cg.appendChild(btn);
     });
+  }
+  const activeEndlessHero = CLASSES.find(c => c.id === selectedEndlessCls) || CLASSES[1] || CLASSES[0];
+  _renderHeroSpotlight('endlessHeroShowcase', activeEndlessHero, false);
+  const shortHeroName = activeEndlessHero ? (HERO_SHORT_NAMES[activeEndlessHero.id] || activeEndlessHero.name) : '烬羽';
+  const sumLine = document.getElementById('endlessSummaryLine');
+  if (sumLine && activeDiffObj && activeSceneOpt) {
+    sumLine.textContent = `出击契约：${shortHeroName}  ·  ${activeDiffObj.badge}  ·  ${activeSceneOpt.name}`;
+  }
+  const goBtn = document.getElementById('startEndlessBtn');
+  if (goBtn) {
+    goBtn.textContent = `◆  以「${shortHeroName}」开启无尽试炼  →`;
   }
 }
 initMenuUI();
@@ -75,6 +305,25 @@ window.addEventListener('keydown', e => {
     if (clm && !clm.classList.contains('hidden')) { if (e.preventDefault) e.preventDefault(); closeChangelogModal(); return; }
     const lm = document.getElementById('logModal');
     if (lm && !lm.classList.contains('hidden')) { if (e.preventDefault) e.preventDefault(); closeLogModal(); return; }
+    if (state === 'menu' && menuStage !== 'home') { if (e.preventDefault) e.preventDefault(); openMenuStage('home'); return; }
+  }
+  // 无尽模式人物选择选项卡支持左右方向键与数字键 1-6 快速切换角色
+  if (state === 'menu' && menuStage === 'endless') {
+    const cm = document.getElementById('codexModal');
+    const modalOpen = cm && !cm.classList.contains('hidden');
+    if (!modalOpen) {
+      if (k === 'arrowleft' || k === 'arrowright') {
+        const curIdx = Math.max(0, CLASSES.findIndex(c => c.id === selectedEndlessCls));
+        const nextIdx = (curIdx + (k === 'arrowright' ? 1 : -1) + CLASSES.length) % CLASSES.length;
+        selectEndlessHero(CLASSES[nextIdx].id);
+        return;
+      }
+      if (k >= '1' && k <= '6') {
+        const idx = parseInt(k, 10) - 1;
+        if (CLASSES[idx]) selectEndlessHero(CLASSES[idx].id);
+        return;
+      }
+    }
   }
   if ((k === ' ' || k === 'enter') && bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
     bossCutscene.t = Math.min(bossCutscene.t, 0.08);
@@ -83,7 +332,15 @@ window.addEventListener('keydown', e => {
   if (k === 'escape' || k === 'p') {
     if (state === 'wave' || state === 'paused') { if (e.preventDefault) e.preventDefault(); togglePause(); return; }
   } else if (k === ' ' && state === 'paused') {
-    e.preventDefault(); resumeGame(); return;
+    if (e.preventDefault) e.preventDefault();
+    resumeGame();
+    return;
+  }
+  if ((k === ' ' || k === 'shift') && state === 'wave' && player && !bossCutscene &&
+      !(typeof SpireDirector !== 'undefined' && SpireDirector && SpireDirector.isBlockingGameplay())) {
+    if (e.preventDefault) e.preventDefault();
+    if (typeof triggerSoulDash === 'function') triggerSoulDash();
+    return;
   }
   keys[k] = true;
 });
@@ -119,6 +376,14 @@ if (cv.addEventListener) {
   cv.addEventListener('mousedown', () => {
     if (bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
       bossCutscene.t = Math.min(bossCutscene.t, 0.08);
+    }
+  });
+  cv.addEventListener('contextmenu', e => {
+    if (state === 'wave') {
+      if (e.preventDefault) e.preventDefault();
+      if (player && !bossCutscene && !(typeof SpireDirector !== 'undefined' && SpireDirector && SpireDirector.isBlockingGameplay()) && typeof triggerSoulDash === 'function') {
+        triggerSoulDash();
+      }
     }
   });
   cv.addEventListener('touchstart', e => {
@@ -164,7 +429,6 @@ if (cv.addEventListener) {
           const ang = Math.atan2(ry, rx);
           joy.cx = joy.ox + Math.cos(ang) * clamped;
           joy.cy = joy.oy + Math.sin(ang) * clamped;
-          // 摇杆圆心若被拖出太远则柔和跟随拇指，转向更跟手
           if (dist > joy.maxR * 1.35) {
             joy.ox += (t.clientX - joy.cx) * 0.45;
             joy.oy += (t.clientY - joy.cy) * 0.45;
@@ -244,7 +508,6 @@ function _tierOfSet(c, steps) {
   return c >= steps[2] ? 3 : (c >= steps[1] ? 2 : (c >= steps[0] ? 1 : 0));
 }
 
-// 计算当前武器套装数量与动态属性加成（带零分配槽位签名缓存，单帧数百次查询 0 GC 开销）
 function getSetBonuses() {
   if (!player || !Array.isArray(player.weapons)) return _EMPTY_SET_BONUSES;
   const ws = player.weapons;
@@ -328,15 +591,28 @@ function syncSetHp() {
 
 let waveCratesDropped = 0, waveCheckpoint = null;
 
-function startGame(cls) {
+function startGame(cls, opts) {
+  const options = opts || {};
+  const reqMode = options.mode ? options.mode : ((cls && cls !== 'allrounder') ? 'endless' : 'story');
+  const runEndless = reqMode === 'endless' || !!options.endless;
+  // 严格规则：剧情模式只能使用主角「零号·白衣」(allrounder)，无尽模式可自由选择其他角色及全员
+  const resolvedCls = runEndless
+    ? (CLASSES.some(c => c.id === cls) ? cls : (selectedEndlessCls || 'brawler'))
+    : 'allrounder';
+  if (!runEndless) selectedScene = 'random';
+  cls = resolvedCls;
+
   beep(520, 0.08, 'triangle');
   diff = DIFFS[selectedDiff] || DIFFS[1] || DIFFS[0];
   inHurtPlayer = false;
   player = {
     cls, x: WORLD.w / 2, y: WORLD.h / 2, r: 21, faceDir: 1, lookA: 0,
+    vx: 0, vy: 0, _leanA: 0, _hsCd: 0,
+    dashCd: 0, dashMaxCd: cls === 'ghost' ? 2.5 : 3.2, dashT: 0, dashVx: 0, dashVy: 0,
+    dashHasteT: 0, turretOverclockT: 0, magnetPulseT: 0,
     hp: 30, maxHp: 30, _setHp: 0, regen: 0.5, regenAcc: 0, noRegen: false, lifesteal: 0,
     armor: 0, maxShield: 0, shield: 0, shieldRegenT: 0, shieldHitT: 0,
-    spd: 182, spdMul: 1, dmgMul: 1, meleeBonus: 0, elemBonus: 0, techBonus: 0, atkSpd: 0.88, crit: 0.06, critDmg: 0,
+    spd: 194, spdMul: 1, dmgMul: 1, meleeBonus: 0, elemBonus: 0, techBonus: 0, atkSpd: 0.90, crit: 0.06, critDmg: 0,
     dodge: 0, dodgeCap: 0.80, maxSlots: 6, bonusTurrets: 0, laserTurrets: 0, mineLayers: 0, mineCd: 1.4, turretCrit: false, turretElem: false, bullCd: 0,
     magnet: 130, harvest: 1, harvestFlat: 0, luck: 0, rangeBonus: 0, _displayRange: 140,
     pierceBonus: 0, bounceBonus: 0, shopDiscount: 0, freeRerolls: 0, bonusTrees: 0,
@@ -355,39 +631,48 @@ function startGame(cls) {
     player.weapons.push(makeWeapon('pistol', 1), makeWeapon('stick', 1));
   } else if (cls === 'ranger') {
     player.spdMul += 0.08; player.dodge += 0.06; player.atkSpd += 0.20; player.crit += 0.12; player.rangeBonus += 65;
-    player.weapons.push(makeWeapon('smg', 1), makeWeapon('slingshot', 1));
+    player.weapons.push(makeWeapon('smg', 1), makeWeapon('icicle', 1));
   } else if (cls === 'brawler') {
     player.maxHp += 8; player.hp += 8; player.armor += 1; player.regen += 1.1; player.meleeBonus = 0.12; player.rangeBonus -= 10;
-    player.weapons.push(makeWeapon('stick', 1), makeWeapon('stick', 1));
+    player.weapons.push(makeWeapon('katana', 1), makeWeapon('stick', 1));
   } else if (cls === 'engineer') {
     player.armor += 2; player.regen += 1.8; player.techBonus = 0.15; player.bonusTurrets = 2;
     player.weapons.push(makeWeapon('wrench', 1), makeWeapon('pistol', 1));
-  } else if (cls === 'vampire') {
-    player.regen = 0; player.noRegen = true; player.lifesteal = 0.13; player.dodge = 0.06;
-    player.weapons.push(makeWeapon('knife', 1), makeWeapon('knife', 1));
   } else if (cls === 'multitasker') {
     player.maxSlots = 12;
     player.weapons.push(makeWeapon('stick', 1), makeWeapon('stick', 1), makeWeapon('pistol', 1));
-  } else if (cls === 'bull') {
-    player.maxSlots = 0; player.maxHp += 30; player.hp += 30; player.regen += 4.5; player.armor += 3; player.spdMul += 0.12; player.r = 24;
   } else if (cls === 'ghost') {
     player.maxHp -= 6; player.hp -= 6; player.dodgeCap = 0.80; player.dodge = 0.28; player.luck += 8;
     player.weapons.push(makeWeapon('knife', 1), makeWeapon('shuriken', 1));
+  } else {
+    player.weapons.push(makeWeapon('pistol', 1), makeWeapon('stick', 1));
   }
   syncSetHp();
-  wave = 1; endlessMode = false; pendingLevels = 0; pendingCrates = 0; freeRerollsLeft = 0; anvilUpgradedMsg = ''; shopOffers = []; waveCheckpoint = null;
-  logInfo('GAME', `开局 ver=${typeof APP_VERSION !== 'undefined' ? APP_VERSION : '-'}, cls=${cls}, diff=${diff.badge}, sceneMode=${selectedScene}, ui=${uiMode}, world=${WORLD.w}x${WORLD.h}`);
+  wave = 1; endlessMode = runEndless; pendingLevels = 0; pendingCrates = 0; freeRerollsLeft = 0; anvilUpgradedMsg = ''; shopOffers = []; waveCheckpoint = null;
+  logInfo('GAME', `开局 ver=${typeof APP_VERSION !== 'undefined' ? APP_VERSION : '-'}, mode=${runEndless ? 'endless' : 'story'}, cls=${cls}, diff=${diff.badge}, sceneMode=${selectedScene}, ui=${uiMode}, world=${WORLD.w}x${WORLD.h}`);
   document.getElementById('startMenu').classList.add('hidden');
   document.getElementById('endMenu').classList.add('hidden');
   document.getElementById('pauseMenu').classList.add('hidden');
   const cm = document.getElementById('crateMenu');
   if (cm) cm.classList.add('hidden');
+  if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.resetForNewRun === 'function') {
+    SpireDirector.resetForNewRun();
+  }
   beginWave();
+}
+
+function replayOpeningCutscene() {
+  if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.playOpeningSequence === 'function') {
+    SpireDirector.playOpeningSequence(true);
+  }
 }
 
 function showStart() {
   state = 'menu';
   resetJoy();
+  if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.resetForNewRun === 'function') {
+    SpireDirector.resetForNewRun();
+  }
   document.getElementById('endMenu').classList.add('hidden');
   document.getElementById('pauseMenu').classList.add('hidden');
   document.getElementById('shopMenu').classList.add('hidden');
@@ -404,6 +689,7 @@ function showStart() {
   const sm = document.getElementById('startMenu');
   sm.classList.remove('hidden');
   sm.scrollTop = 0;
+  openMenuStage('home');
 }
 
 function renderBuildSummary(statsId, setsId) {
@@ -421,28 +707,28 @@ function renderBuildSummary(statsId, setsId) {
   const stEl = document.getElementById(statsId);
   if (stEl) {
     stEl.innerHTML =
-      `<span>❤️ 生命 <b>${Math.max(0, Math.ceil(player.hp))}/${player.maxHp}</b>${player.maxShield ? ` <small style="color:#72efdd">(+${Math.ceil(player.shield)}/${player.maxShield}盾)</small>` : ''}</span>` +
-      `<span>🪨 护甲 <b>${arm}</b> <small>(${mit >= 0 ? '-' : '+'}${Math.abs(mit)}%伤)</small></span>` +
-      `<span>🌿 再生 <b>${player.regen.toFixed(1)}/s</b></span>` +
-      `<span>🩸 吸血 <b>${Math.round(player.lifesteal * 100)}%</b></span>` +
-      `<span>💪 伤害 <b>${dmgPct}%</b></span>` +
-      `<span>⚡ 攻速 <b>${aspdPct}%</b></span>` +
-      `<span>📏 范围 <b>${rngTxt}</b></span>` +
-      `<span>🎯 暴击 <b>${critPct}%</b> <small style="color:#ffd166">(${critDmgPct}%伤)</small></span>` +
-      `<span>💨 闪避 <b>${Math.round(Math.min(player.dodgeCap || 0.80, player.dodge) * 100)}%</b></span>` +
-      `<span>👟 移速 <b>${Math.round(getEffectiveSpdMul() * 100)}%</b></span>` +
-      `<span>🍀 幸运 <b>${player.luck || 0}</b></span>` +
-      `<span>🌾 收获 <b>${harv}</b></span>`;
+      `<span>生命 <b>${Math.max(0, Math.ceil(player.hp))}/${player.maxHp}</b>${player.maxShield ? ` <small style="color:#89c4d4">(+${Math.ceil(player.shield)}护盾)</small>` : ''}</span>` +
+      `<span>护甲 <b>${arm}</b> <small>(${mit >= 0 ? '-' : '+'}${Math.abs(mit)}%伤)</small></span>` +
+      `<span>再生 <b>${player.regen.toFixed(1)}/s</b></span>` +
+      `<span>汲血 <b>${Math.round(player.lifesteal * 100)}%</b></span>` +
+      `<span>伤害 <b>${dmgPct}%</b></span>` +
+      `<span>攻速 <b>${aspdPct}%</b></span>` +
+      `<span>范围 <b>${rngTxt}</b></span>` +
+      `<span>暴击 <b>${critPct}%</b> <small style="color:#dfc084">(${critDmgPct}%)</small></span>` +
+      `<span>闪避 <b>${Math.round(Math.min(player.dodgeCap || 0.80, player.dodge) * 100)}%</b></span>` +
+      `<span>移速 <b>${Math.round(getEffectiveSpdMul() * 100)}%</b></span>` +
+      `<span>幸运 <b>${player.luck || 0}</b></span>` +
+      `<span>收获 <b>${harv}</b></span>`;
   }
   const mqEl = document.getElementById('mobQuickStats');
   if (mqEl) {
     mqEl.innerHTML =
-      `<span>❤️<b>${Math.max(0, Math.ceil(player.hp))}/${player.maxHp}</b></span>` +
-      `<span>🪨<b>${arm}</b></span>` +
-      `<span>💪<b>${dmgPct}%</b></span>` +
-      `<span>⚡<b>${aspdPct}%</b></span>` +
-      `<span>📏<b>${rngTxt}</b></span>` +
-      `<span>🎯<b>${critPct}%</b></span>`;
+      `<span>生命 <b>${Math.max(0, Math.ceil(player.hp))}/${player.maxHp}</b></span>` +
+      `<span>护甲 <b>${arm}</b></span>` +
+      `<span>伤害 <b>${dmgPct}%</b></span>` +
+      `<span>攻速 <b>${aspdPct}%</b></span>` +
+      `<span>范围 <b>${rngTxt}</b></span>` +
+      `<span>暴击 <b>${critPct}%</b></span>`;
   }
   const srEl = document.getElementById(setsId);
   if (srEl) {
@@ -474,10 +760,10 @@ function pauseGame() {
   resetJoy();
   beep(360, 0.05, 'triangle', 0.04);
   const clsObj = CLASSES.find(c => c.id === player.cls);
-  const waveTag = endlessMode ? `无尽第 ${wave} 波` : `第 ${wave} / ${MAX_WAVE} 波`;
+  const waveTag = endlessMode ? `无尽第 ${wave} 层` : `第 ${wave} / ${MAX_WAVE} 层`;
   const timeTxt = overtime ? '超时死斗' : `剩余 ${Math.ceil(waveTime)}s`;
   document.getElementById('pauseInfo').innerHTML =
-    `<b>${diff.badge}</b> · 场景：<b>${curScene.icon} ${curScene.name}</b> · 角色：<b>${clsObj ? clsObj.name : ''}</b> · 进度：<b>${waveTag}（${timeTxt}）</b> · 等级：<b>Lv.${player.lv}</b> · 晶石：<b style="color:#5ef29b">💎 ${player.mats}</b>`;
+    `<b>${diff.badge}</b>  ·  层域：<b>${curScene.name}</b>  ·  登塔者：<b>${clsObj ? clsObj.name : ''}</b>  ·  进度：<b>${waveTag}（${timeTxt}）</b>  ·  等级：<b>Lv.${player.lv}</b>  ·  晶石：<b style="color:#dfc084">◇ ${player.mats}</b>`;
   renderBuildSummary('pauseStats', 'pauseSets');
   refreshUIPrefControls();
   const pm = document.getElementById('pauseMenu');
@@ -502,7 +788,7 @@ function togglePause() {
 
 function restartRun() {
   document.getElementById('pauseMenu').classList.add('hidden');
-  if (player && player.cls) startGame(player.cls);
+  if (player && player.cls) startGame(player.cls, { mode: endlessMode ? 'endless' : 'story' });
   else showStart();
 }
 
@@ -531,7 +817,7 @@ function saveWaveCheckpoint(extraMeta = null) {
     endlessMode,
     selectedDiff,
     selectedScene,
-    sceneId: curScene ? curScene.id : 'wasteland',
+    sceneId: curScene ? curScene.id : 'foundry',
     lastBossVariant,
     lastMiniBossVariant,
     rerollCost,
@@ -546,7 +832,7 @@ function saveWaveCheckpoint(extraMeta = null) {
 
 function retryFailedWave() {
   if (!waveCheckpoint || !waveCheckpoint.player) {
-    if (player && player.cls) startGame(player.cls);
+    if (player && player.cls) startGame(player.cls, { mode: endlessMode ? 'endless' : 'story' });
     else showStart();
     return;
   }
@@ -613,6 +899,6 @@ function abandonAndRestart() {
   last = performance.now();
   document.getElementById('endMenu').classList.add('hidden');
   logInfo('RESTART', `放弃当前进度并从第 1 波重头开始 · cls=${targetCls || '-'}`);
-  if (targetCls) startGame(targetCls);
+  if (targetCls) startGame(targetCls, { mode: endlessMode ? 'endless' : 'story' });
   else showStart();
 }

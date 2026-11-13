@@ -197,7 +197,7 @@ function showCrateMenu() {
   const isBossCrate = isMythicCrate || (player.bossCratesQueued || 0) > 0;
   const ct = document.getElementById('crateTitle');
   if (ct) {
-    ct.textContent = `${isMythicCrate ? '⚡ 开启神话二阶段秘宝舱！（必出传说）' : (isBossCrate ? '👑 开启首领秘宝舱！' : '🎁 开启异星战术补给箱！')}（剩余 ${pendingCrates} 个）`;
+    ct.textContent = `${isMythicCrate ? '开启神骸二阶段秘匣 · 必得传说' : (isBossCrate ? '开启守誓主宰秘匣' : '开启守誓遗物匣')}（剩余 ${pendingCrates}）`;
   }
 
   const luck = player.luck || 0;
@@ -297,33 +297,33 @@ function showCrateMenu() {
   choices.forEach(c => {
     const el = document.createElement('div');
     el.className = `card t${c.tier}`;
-    let icon = '🎁', title = '', badgesHtml = '', descHtml = '';
-    if (isMythicCrate) badgesHtml += `<span class="tag t4">⚡ 神话二阶段</span>`;
-    else if (isBossCrate) badgesHtml += `<span class="tag tag-merge">👑 首领秘宝</span>`;
+    let icon = '🏮', title = '', badgesHtml = '', descHtml = '';
+    if (isMythicCrate) badgesHtml += `<span class="tag t4">神骸二阶段</span>`;
+    else if (isBossCrate) badgesHtml += `<span class="tag tag-merge">主宰秘宝</span>`;
 
     if (c.kind === 'item') {
       const it = c.item;
       const ownedCnt = (player.items && player.items[it.id]) || 0;
       icon = it.icon;
       title = it.name;
-      badgesHtml += `<span class="tag t${it.tier}">${TIER_NAMES[it.tier]}道具</span>`;
-      if (it.maxCount) badgesHtml += `<span class="tag">${it.maxCount === 1 ? '唯一' : '限×' + it.maxCount}</span>`;
-      if (ownedCnt > 0) badgesHtml += `<span class="tag tag-owned">已拥有 ×${ownedCnt}</span>`;
+      badgesHtml += `<span class="tag t${it.tier}">${TIER_NAMES[it.tier]}遗物</span>`;
+      if (it.maxCount) badgesHtml += `<span class="tag">${it.maxCount === 1 ? '唯一' : '上限×' + it.maxCount}</span>`;
+      if (ownedCnt > 0) badgesHtml += `<span class="tag tag-owned">已持有 ×${ownedCnt}</span>`;
       descHtml = `<div class="card-desc">${it.desc}</div>`;
     } else if (c.kind === 'weapon') {
       const tpl = c.tpl;
-      const setLabel = (SET_DEFS[tpl.set] && SET_DEFS[tpl.set].label) || '';
+      const setLabel = ((SET_DEFS[tpl.set] && SET_DEFS[tpl.set].label) || '').replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '');
       icon = tpl.icon;
-      title = `${tpl.name} Lv${c.tier}`;
-      badgesHtml += `<span class="tag t${c.tier}">⚔️ ${TIER_NAMES[c.tier]}空投</span>`;
+      title = `${tpl.name} · 阶${c.tier}`;
+      badgesHtml += `<span class="tag t${c.tier}">${TIER_NAMES[c.tier]}兵装</span>`;
       if (setLabel) badgesHtml += `<span class="tag">${setLabel}</span>`;
-      if (c.canMergeNow) badgesHtml += `<span class="tag tag-merge">⬆️ 可直接合成</span>`;
+      if (c.canMergeNow) badgesHtml += `<span class="tag tag-merge">可共鸣升阶</span>`;
       descHtml = `<div class="card-desc">${tpl.desc}</div>`;
     } else if (c.kind === 'supply') {
       const sup = c.supply;
       icon = sup.icon;
       title = sup.name;
-      badgesHtml += `<span class="tag t${c.tier}">⚡ 战术补给核</span>`;
+      badgesHtml += `<span class="tag t${c.tier}">魂灯秘髓</span>`;
       descHtml = `<div class="card-desc">${sup.desc}</div>`;
     }
 
@@ -338,8 +338,8 @@ function showCrateMenu() {
       <div class="card-body">
         ${descHtml}
         <div class="crate-btns">
-          <button class="btn take-btn" style="justify-content:center">🎁 选此补给</button>
-          <button class="btn btn-sec recycle-btn" style="justify-content:center">♻️ 熔炼 (+${c.recycleVal}💎)</button>
+          <button class="btn take-btn" style="justify-content:center">◆ 收归行囊</button>
+          <button class="btn btn-sec recycle-btn" style="justify-content:center">熔炼 (+◇${c.recycleVal})</button>
         </div>
       </div>`;
 
@@ -374,7 +374,7 @@ function showLevelUp() {
   const lm = document.getElementById('levelMenu');
   lm.classList.remove('hidden');
   lm.scrollTop = 0;
-  document.getElementById('lvlTitle').textContent = `✨ 升级强化（剩余 ${pendingLevels} 次）`;
+  document.getElementById('lvlTitle').textContent = `魂灯共鸣 · 择定记忆刻印（余 ${pendingLevels} 次）`;
   const pool = [...UPGRADES].sort(() => Math.random() - 0.5).slice(0, 4);
   const box = document.getElementById('lvlCards');
   box.innerHTML = '';
@@ -386,12 +386,12 @@ function showLevelUp() {
         <div class="item-emblem t2">${u.icon}</div>
         <div class="card-meta">
           <div class="card-title">${u.name}</div>
-          <div class="card-badges"><span class="tag t2">🧬 基因强化</span></div>
+          <div class="card-badges"><span class="tag t2">记忆刻印</span></div>
         </div>
       </div>
       <div class="card-body">
         <div class="card-desc">${u.desc}</div>
-        <div class="card-actions"><button class="btn" style="justify-content:center">⚡ 激活强化</button></div>
+        <div class="card-actions"><button class="btn" style="justify-content:center">◆ 铭刻共鸣</button></div>
       </div>`;
     const pick = () => {
       u.apply(player); syncSetHp(); beep(580, 0.07, 'triangle');
@@ -517,16 +517,54 @@ function mergeSlot(idx) {
 
 function renderShop() {
   renderBuildSummary('statsRow', 'setRow');
+  const witchImgEl = document.getElementById('shopMerchantPortrait');
+  if (witchImgEl) {
+    if (typeof SpireAssets !== 'undefined' && typeof SpireAssets.resolve === 'function') {
+      const resolvedSrc = SpireAssets.resolve('assets/spire/port_qingyu.jpg');
+      if (witchImgEl._resolvedSrc !== resolvedSrc) {
+        witchImgEl.src = resolvedSrc;
+        witchImgEl._resolvedSrc = resolvedSrc;
+      }
+    }
+    if (!witchImgEl._chatBound) {
+      witchImgEl._chatBound = true;
+      witchImgEl.style.cursor = 'pointer';
+      witchImgEl.title = '点击与残羽魔女·青羽交谈';
+      const bonusTalks = [
+        '「风羽替你探过路啦——按【Space / Shift / 右键】就能发动你专属的青焰瞬步，穿弹超帅的！」',
+        '「每登到第 4、8、12、16 层，守誓同伴都会咏唱她们的成名绝学，看清地上法阵再瞬步切入破绽吧！」',
+        '「同名同阶的守誓兵装买回来会自动共鸣升阶，凑齐羁绊比盲目堆数量更锋利哦。」',
+        '「别急着把晶石花光，若是刷到了趁手的高阶圣遗物，点右上角的小锁就能替你留到下一层~」'
+      ];
+      let talkIdx = 0;
+      witchImgEl.onclick = () => {
+        beep(640, 0.05, 'triangle', 0.035);
+        const sEl = document.getElementById('shopSub');
+        if (sEl) {
+          sEl.textContent = bonusTalks[talkIdx % bonusTalks.length];
+          talkIdx++;
+        }
+      };
+    }
+  }
+  const nextFloorNum = wave + 1;
+  const nextIsBoss = (nextFloorNum >= 4 && nextFloorNum % 4 === 0);
+  const floorBadgeTxt = endlessMode ? `无尽第 ${wave} 层` : `第 ${wave} / ${MAX_WAVE} 层`;
   document.getElementById('shopTitle').textContent = uiMode !== 'desktop'
-    ? `🛒 第 ${wave} 波整备${anvilUpgradedMsg ? ' · ⚒️已升阶' : ''}`
-    : `🛒 第 ${wave} 波完成 — 军火商店（${diff.badge}）`;
+    ? `${floorBadgeTxt}整备${anvilUpgradedMsg ? ' · 已升阶' : ''}`
+    : `${floorBadgeTxt}整备  —  青羽的风语行商（${diff.badge}）`;
   const subEl = document.getElementById('shopSub');
   if (subEl) {
-    subEl.textContent = `${diff.badge} · ${curScene.icon} ${curScene.name} · 同名同阶武器可合成${anvilUpgradedMsg}`;
+    const whisper = (typeof SPIRE_STORY_PACK !== 'undefined' && SPIRE_STORY_PACK.witchWhispers)
+      ? SPIRE_STORY_PACK.witchWhispers[Math.min(SPIRE_STORY_PACK.witchWhispers.length - 1, Math.max(0, wave - 1))]
+      : '';
+    subEl.textContent = whisper
+      ? `${whisper}${anvilUpgradedMsg}`
+      : `${diff.badge}  ·  ${curScene.name}  ·  同名同阶兵装可共鸣升阶${anvilUpgradedMsg}`;
   }
-  document.getElementById('shopMat').textContent = `💎 ${player.mats}`;
+  document.getElementById('shopMat').textContent = `◇ ${player.mats}`;
   const actualReroll = freeRerollsLeft > 0 ? 0 : rerollCost;
-  const rerollTxt = actualReroll === 0 ? `🎲 免费刷新 (${freeRerollsLeft})` : `🎲 刷新 (${actualReroll})`;
+  const rerollTxt = actualReroll === 0 ? `免费刷新 (${freeRerollsLeft})` : `刷新 (${actualReroll})`;
   const rb = document.getElementById('rerollBtn');
   rb.textContent = rerollTxt;
   rb.disabled = player.mats < actualReroll;
@@ -535,9 +573,14 @@ function renderShop() {
     mrb.textContent = rerollTxt;
     mrb.disabled = player.mats < actualReroll;
   }
+  const nextLabel = nextIsBoss
+    ? `◆ 迎战第 ${nextFloorNum} 层守誓首领 →`
+    : `◆ 登往第 ${nextFloorNum} 层 →`;
+  const dnb = document.getElementById('deskNextBtn');
+  if (dnb) dnb.textContent = nextLabel;
   const mnb = document.getElementById('mobNextBtn');
   if (mnb) {
-    mnb.textContent = `⚔️ 出发第 ${wave + 1} 波`;
+    mnb.textContent = nextLabel;
   }
 
   const totalRange = getTotalRangeBonus();
@@ -554,7 +597,7 @@ function renderShop() {
     if (o.kind === 'weapon') {
       const tpl = WEAPONS[o.id];
       if (!tpl) return;
-      const sLabel = SET_DEFS[tpl.set] ? SET_DEFS[tpl.set].label : '';
+      const sLabel = SET_DEFS[tpl.set] ? SET_DEFS[tpl.set].label.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '') : '';
       const scale = tpl.set === 'elemental' ? getElemMul() : (tpl.techScale ? getTechMul() : 1);
       const aspdBonus = tpl.aspdScale ? Math.max(0, getEffectiveAtkSpd() - 1) * 9 : 0;
       const rngBonus = tpl.rangeScale ? Math.max(0, totalRange) * tpl.rangeScale : 0;
@@ -573,27 +616,27 @@ function renderShop() {
             <div class="card-meta">
               <div class="card-title">${tpl.name}</div>
               <div class="card-badges">
-                <span class="tag t${o.tier}">${TIER_NAMES[o.tier]}武器</span>
+                <span class="tag t${o.tier}">${TIER_NAMES[o.tier]}兵装</span>
                 <span class="tag">${sLabel}</span>
-                ${hasMergePair ? '<span class="tag tag-merge">⬆️ 可合成</span>' : ''}
+                ${hasMergePair ? '<span class="tag tag-merge">可升阶</span>' : ''}
               </div>
             </div>
           </div>
           <div class="card-body">
             <div class="card-desc">${tpl.desc}</div>
             <div class="stat-chips">
-              <span class="stat-chip">⚔️ ${dmg}${pelletsTxt}</span>
-              <span class="stat-chip">⏱️ ${tpl.cd}s</span>
-              <span class="stat-chip">📏 ${effRange}</span>
+              <span class="stat-chip">伤害 ${dmg}${pelletsTxt}</span>
+              <span class="stat-chip">间隔 ${tpl.cd}s</span>
+              <span class="stat-chip">射程 ${effRange}</span>
             </div>
           </div>
         </div>
         <div class="card-side">
-          <button class="lock-pin lock${o.locked ? ' is-locked' : ''}" title="${o.locked ? '点击解锁商品' : '锁定商品保留至下一波'}"><span>${o.locked ? '🔒' : '🔓'}</span><span>${o.locked ? '已锁' : '锁定'}</span></button>
+          <button class="lock-pin lock${o.locked ? ' is-locked' : ''}" title="${o.locked ? '点击解锁商品' : '锁定保留至下一层'}"><span>${o.locked ? '已锁定' : '保留'}</span></button>
           <div class="card-actions">
             <button class="btn buy${hasMergePair ? ' merge-ready' : ''}" ${ok ? '' : 'disabled'}>
-              <span>${hasMergePair ? (uiMode !== 'desktop' ? '⬆️合成' : '⬆️ 购买合成') : '购买'}</span>
-              <span class="buy-price">💎 ${o.cost}</span>
+              <span>${hasMergePair ? (uiMode !== 'desktop' ? '共鸣升阶' : '购入升阶') : '购入'}</span>
+              <span class="buy-price">◇ ${o.cost}</span>
             </button>
           </div>
         </div>`;
@@ -618,8 +661,8 @@ function renderShop() {
             <div class="card-meta">
               <div class="card-title">${it.name}</div>
               <div class="card-badges">
-                <span class="tag t${o.tier}">${TIER_NAMES[o.tier]}道具</span>
-                ${ownedCnt > 0 ? `<span class="tag tag-owned">已拥有 ×${ownedCnt}</span>` : ''}
+                <span class="tag t${o.tier}">${TIER_NAMES[o.tier]}遗物</span>
+                ${ownedCnt > 0 ? `<span class="tag tag-owned">已持有 ×${ownedCnt}</span>` : ''}
               </div>
             </div>
           </div>
@@ -628,11 +671,11 @@ function renderShop() {
           </div>
         </div>
         <div class="card-side">
-          <button class="lock-pin lock${o.locked ? ' is-locked' : ''}" title="${o.locked ? '点击解锁商品' : '锁定商品保留至下一波'}"><span>${o.locked ? '🔒' : '🔓'}</span><span>${o.locked ? '已锁' : '锁定'}</span></button>
+          <button class="lock-pin lock${o.locked ? ' is-locked' : ''}" title="${o.locked ? '点击解锁商品' : '锁定保留至下一层'}"><span>${o.locked ? '已锁定' : '保留'}</span></button>
           <div class="card-actions">
             <button class="btn buy" ${ok ? '' : 'disabled'}>
-              <span>购买</span>
-              <span class="buy-price">💎 ${o.cost}</span>
+              <span>购入</span>
+              <span class="buy-price">◇ ${o.cost}</span>
             </button>
           </div>
         </div>`;
@@ -664,8 +707,8 @@ function renderShop() {
   if (player.maxSlots === 0) {
     document.getElementById('slotHint').textContent = '🐂 蛮牛铁卫特性：不可携带武器，堆叠生命、护甲、护盾与元素装备即可强化碰撞烈焰震荡波！';
   } else {
-    const sellTipText = isTouch ? '连点两下回收单把' : '点击单把回收';
-    document.getElementById('slotHint').innerHTML = `⚔️ 随身军械库 (<b>${player.weapons.length}</b>/${player.maxSlots}) · 同名同阶点击合成，${sellTipText}`;
+    const sellTipText = isTouch ? '双击单把可熔炼回收' : '点击单把可熔炼回收';
+    document.getElementById('slotHint').innerHTML = `随身守誓兵装席 (<b>${player.weapons.length}</b>/${player.maxSlots})  ·  同名同阶点击共鸣升阶，${sellTipText}`;
     player.weapons.forEach((w, idx) => {
       const tpl = WEAPONS[w.id];
       if (!tpl) return;
@@ -675,12 +718,12 @@ function renderShop() {
       const confirming = !hasPair && confirmSellIdx === idx && player.weapons.length > 1;
       const d = document.createElement('div');
       d.className = `slot t${w.tier}${confirming ? ' confirming' : ''}`;
-      const mobSub = hasPair ? '⬆️ 点此合成' : (player.weapons.length > 1 ? `💰 回收 +${refund}` : '主武器');
-      d.innerHTML = `${hasPair ? '<span class="merge-badge">⬆️合成</span>' : ''}
+      const mobSub = hasPair ? '点此升阶' : (player.weapons.length > 1 ? `回收 +◇${refund}` : '主兵装');
+      d.innerHTML = `${hasPair ? '<span class="merge-badge">升阶</span>' : ''}
         <div class="slot-icon">${tpl.icon}</div>
-        <div class="slot-name" style="color:${TIER_COLORS[w.tier]}">${tpl.name} Lv${w.tier}</div>
+        <div class="slot-name" style="color:${TIER_COLORS[w.tier]}">${tpl.name} · 阶${w.tier}</div>
         <div class="slot-sub m-only">${mobSub}</div>
-        <div class="sell-tip">${hasPair ? '⬆️ 点击合成' : (confirming ? '确认回收 +' + refund : '💰 回收 +' + refund)}</div>`;
+        <div class="sell-tip">${hasPair ? '点击升阶' : (confirming ? '确认回收 +◇' + refund : '回收 +◇' + refund)}</div>`;
       d.onclick = () => {
         if (hasPair) {
           confirmSellIdx = -1;
@@ -745,30 +788,33 @@ function endGame(win) {
   em.classList.remove('hidden');
   em.scrollTop = 0;
   document.getElementById('endlessBtn').classList.toggle('hidden', !win);
-  const waveLabel = endlessMode ? `无尽第 ${wave} 波` : `第 ${wave} 波`;
+  const waveLabel = endlessMode ? `无尽第 ${wave} 层` : `第 ${wave} / ${MAX_WAVE} 层`;
   const retryBtn = document.getElementById('retryWaveBtn');
   if (retryBtn) {
     const canRetry = !win && typeof waveCheckpoint !== 'undefined' && !!(waveCheckpoint && waveCheckpoint.player);
     retryBtn.classList.toggle('hidden', !canRetry);
-    retryBtn.textContent = `⏪ 重新开始本回合 (${waveLabel})`;
+    retryBtn.textContent = `◆ 重新开始本层 (${waveLabel})`;
   }
   const abandonBtn = document.getElementById('abandonRestartBtn');
   if (abandonBtn) {
     abandonBtn.classList.toggle('hidden', !!win);
-    abandonBtn.textContent = '🔄 放弃并从头开始';
+    abandonBtn.textContent = '放弃并从头开始';
   }
   const mainBtn = document.getElementById('endMainMenuBtn');
   if (mainBtn) {
     mainBtn.className = win ? 'btn btn-go' : 'btn btn-sec';
-    mainBtn.textContent = win ? '🔄 再战一局' : '🏠 返回主菜单';
+    mainBtn.textContent = win ? '◆ 再启轮回' : '返回主殿';
   }
   const clsObj = CLASSES.find(c => c.id === player.cls);
   const retries = (player && player.retryCount) || 0;
-  logInfo('END', `${win ? '通关胜利' : '战败结束'} · 角色=${clsObj ? clsObj.name : player.cls} · 波次=${wave} · Lv=${player.lv} · 击杀=${player.kills} · 重开=${retries}`);
-  document.getElementById('endTitle').textContent = win ? '🏆 恭喜通关 12 波！异星土豆战神！' : '💀 土豆变成热腾腾的薯泥了…';
+  logInfo('END', `${win ? '破晓通关' : '提灯熄灭'} · 角色=${clsObj ? clsObj.name : player.cls} · 波次=${wave} · Lv=${player.lv} · 击杀=${player.kills} · 重开=${retries}`);
+  document.getElementById('endTitle').textContent = win ? '第 1000 道黎明破晓 · 天灾神骸已碎' : '青焰提灯于长夜中黯然熄灭';
+  const storyNote = win
+    ? '<br><span style="color:#89c4d4">烬羽的残火、艾丝特莉亚的冰冕、伽蓝的星晷与青羽的微风化作晨光——这一次，人间终于迎来了没有天灾的黎明。</span>'
+    : '<br><span style="color:#d46a7e">守誓者们的叹息仍在高塔回荡……重新握紧提灯，再次改写第九百九十九次轮回。</span>';
   document.getElementById('endDesc').innerHTML =
-    `难度：<b>${diff.badge}</b> · 角色：<b>${clsObj ? clsObj.name : ''}</b> · 到达：<b>${waveLabel}</b> · 等级：<b>Lv.${player.lv}</b> · 击杀：<b>${player.kills}</b>` +
-    (retries > 0 ? ` · 重试：<b>${retries} 次</b>` : '');
+    `厄度：<b>${diff.badge}</b>  ·  登塔者：<b>${clsObj ? clsObj.name : ''}</b>  ·  抵达：<b>${waveLabel}</b>  ·  共鸣：<b>Lv.${player.lv}</b>  ·  净化：<b>${player.kills}</b>` +
+    (retries > 0 ? `  ·  回溯：<b>${retries} 次</b>` : '') + storyNote;
 }
 
 function continueEndless() {

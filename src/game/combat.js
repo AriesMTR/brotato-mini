@@ -22,8 +22,10 @@ function addText(x, y, txt, color = '#fff', size = 16, customDur = 0, forceImpor
   texts.push({
     x: x + (Math.random() - 0.5) * (important ? 10 : 16), y,
     vx: (Math.random() - 0.5) * (important ? 12 : 44),
-    vy: important ? (-30 - Math.random() * 8) : (-114 - Math.random() * 36),
-    txt: s, color, size, t: dur, maxT: dur, important, _baseW: -1
+    vy: important ? (-30 - Math.random() * 8) : (-118 - Math.random() * 38),
+    txt: s, color, size, t: dur, maxT: dur, important,
+    isCritPop: isNumericHit && s.endsWith('!'),
+    _baseW: -1
   });
 }
 
@@ -204,7 +206,8 @@ function getEffectiveAtkSpd() {
   if (!player) return 1;
   const missingBonus = player.cls === 'vampire' ? (1 - Math.max(0, player.hp) / Math.max(1, player.maxHp)) * 0.9 : 0;
   const sporeBonus = player.inSpore ? 0.14 : 0;
-  return Math.max(0.3, player.atkSpd + getSetBonuses().aspd + missingBonus + sporeBonus);
+  const dashBonus = (player.dashHasteT || 0) > 0 ? 0.20 : 0;
+  return Math.max(0.3, player.atkSpd + getSetBonuses().aspd + missingBonus + sporeBonus + dashBonus);
 }
 function getEffectiveCrit() { return (player ? player.crit : 0) + getSetBonuses().crit; }
 function getEffectiveCritMult(baseMult = 1.95) { return baseMult + (player ? (player.critDmg || 0) : 0); }
@@ -213,7 +216,174 @@ function getTechMul() { return 1 + (player ? (player.techBonus || 0) : 0) + getS
 function getBlastScale() { return (player ? player.explosionScale : 1) + getSetBonuses().blast; }
 function getEffectiveSpdMul() {
   if (!player) return 1;
-  return player.noSlow ? Math.max(1.0, player.spdMul) : Math.max(0.72, player.spdMul);
+  const dashSpd = (player.dashHasteT || 0) > 0 ? 0.26 : 0;
+  const raw = player.spdMul + dashSpd;
+  return player.noSlow ? Math.max(1.0, raw) : Math.max(0.72, raw);
+}
+
+// v2.5.0 【青焰瞬步 · Soul Dash】全角色通用极速闪避 + 六大角色专属派生战技
+function triggerSoulDash() {
+  if (!player || state !== 'wave' || player.hp <= 0 || bossCutscene) return false;
+  if (typeof SpireDirector !== 'undefined' && SpireDirector && SpireDirector.isBlockingGameplay()) return false;
+  if ((player.dashCd || 0) > 0.01 || (player.dashT || 0) > 0) return false;
+
+  let dx = 0, dy = 0;
+  if (typeof keys !== 'undefined') {
+    if (keys['a'] || keys['arrowleft']) dx -= 1;
+    if (keys['d'] || keys['arrowright']) dx += 1;
+    if (keys['w'] || keys['arrowup']) dy -= 1;
+    if (keys['s'] || keys['arrowdown']) dy += 1;
+  }
+  if (typeof joy !== 'undefined' && joy.active && joy.mag > 0.08) {
+    dx += joy.dx;
+    dy += joy.dy;
+  }
+  if (dx === 0 && dy === 0 && (Math.hypot(player.vx || 0, player.vy || 0) > 25)) {
+    dx = player.vx;
+    dy = player.vy;
+  }
+  if (dx === 0 && dy === 0) {
+    const la = Number.isFinite(player.lookA) ? player.lookA : ((player.faceDir || 1) > 0 ? 0 : Math.PI);
+    dx = Math.cos(la);
+    dy = Math.sin(la);
+  }
+  const len = Math.hypot(dx, dy) || 1;
+  dx /= len;
+  dy /= len;
+
+  const ox = player.x, oy = player.y;
+  const cdMax = player.cls === 'ghost' ? 2.5 : 3.2;
+  player.dashMaxCd = cdMax;
+  player.dashCd = cdMax;
+  player.dashT = 0.17;
+  const dashSpd = 960;
+  player.dashVx = dx * dashSpd;
+  player.dashVy = dy * dashSpd;
+  player.lookA = Math.atan2(dy, dx);
+  if (Math.abs(dx) > 0.08) player.faceDir = dx > 0 ? 1 : -1;
+  player.invuln = Math.max(player.invuln || 0, 0.30);
+  player.magnetPulseT = Math.max(player.magnetPulseT || 0, 1.15);
+
+  beep(680, 0.065, 'triangle', 0.048);
+  addBurst(ox, oy, '#72efdd', 9, 185);
+  if (rings.length < 40) rings.push({ x: ox, y: oy, r: 48, color: '#72efdd', t: 0.20, maxT: 0.20 });
+
+  const cls = player.cls || 'allrounder';
+  const baseDmg = (22 + wave * 4.6) * getEffectiveDmgMul();
+
+  if (cls === 'brawler') {
+    // 烬羽 · 断刃一闪：向前劈出大弧度绯红居合刀波，高暴击斩穿路径敌群并劈碎近身弹幕
+    const slashA = Math.atan2(dy, dx);
+    const sx = ox + dx * 62, sy = oy + dy * 62;
+    if (slashes.length < 36) {
+      slashes.push({ x: sx, y: sy, angle: slashA, r: 138, color: '#fb7185', mode: 'crescent', t: 0.22, maxT: 0.22 });
+    }
+    const sDmg = baseDmg * 1.42 * (1 + (player.meleeBonus || 0));
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (!e || e.hp <= 0 || e.primed) continue;
+      const ex = e.x - sx, ey = e.y - sy;
+      if (ex * ex + ey * ey <= (146 + e.r) * (146 + e.r)) {
+        const isCrit = Math.random() < Math.min(0.95, getEffectiveCrit() + 0.35);
+        hurtEnemy(e, sDmg * (isCrit ? getEffectiveCritMult() : 1), isCrit, slashA, true, { isMelee: true, knockMult: 1.5 });
+      }
+    }
+    addText(ox, oy - 30, '⚔️ 断刃一闪!', '#fb7185', 14, 0.65, false);
+  } else if (cls === 'ranger') {
+    // 艾丝特莉亚 · 碎冕霜步：原地冻结霜环 + 向后齐射3枚穿透寒霜冰锥
+    if (rings.length < 40) rings.push({ x: ox, y: oy, r: 102, color: '#7dd3fc', t: 0.24, maxT: 0.24, fill: true });
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (!e || e.hp <= 0 || e.primed) continue;
+      if (Math.hypot(e.x - ox, e.y - oy) <= 104 + e.r) {
+        applyFreeze(e, 1.35);
+        hurtEnemy(e, baseDmg * 0.92 * getElemMul(), false, Math.atan2(e.y - oy, e.x - ox), true, { forceChill: true });
+      }
+    }
+    const backA = Math.atan2(-dy, -dx);
+    for (let k = -1; k <= 1 && bullets.length < 220; k++) {
+      const ba = backA + k * 0.24;
+      const isCrit = Math.random() < Math.min(0.95, getEffectiveCrit() + 0.20);
+      bullets.push({
+        x: ox, y: oy, px: ox, py: oy,
+        vx: Math.cos(ba) * 620, vy: Math.sin(ba) * 620,
+        dmg: baseDmg * 0.88 * getElemMul() * (isCrit ? getEffectiveCritMult() : 1),
+        isCrit, angle: ba, pierce: 2, bounces: 0,
+        isIce: true, freezeHit: 0.45,
+        life: 0.62, maxLife: 0.62, color: '#72efdd', r: 5.5,
+        hit: null, lastHit: null
+      });
+    }
+    addText(ox, oy - 30, '❄️ 碎冕霜步', '#7dd3fc', 14, 0.65, false);
+  } else if (cls === 'engineer') {
+    // 伽蓝 · 逆时超频：全场炮台超频 +75% 射速，并在残影处布下高能时滞感应雷
+    player.turretOverclockT = 2.8;
+    if (mines.length < 18) {
+      mines.push({
+        x: ox, y: oy, r: 15, triggerR: 60,
+        blastR: 112 * getBlastScale(),
+        dmg: baseDmg * 1.38 * getTechMul(),
+        armT: 0.12, pulse: 0, life: 18
+      });
+    }
+    if (player.maxShield > 0) {
+      player.shield = Math.min(player.maxShield, (player.shield || 0) + 3);
+    }
+    addText(ox, oy - 30, '⚙️ 逆时超频!', '#fde68a', 14, 0.65, false);
+  } else if (cls === 'ghost') {
+    // 青羽 · 苍岚风羽：短CD瞬步 + 疾风攻移速增益 + 5枚翠岚弹射风羽镖
+    player.dashHasteT = 2.0;
+    for (let k = 0; k < 5 && bullets.length < 220; k++) {
+      const target = pickRandomAliveEnemy(null);
+      const ba = target ? Math.atan2(target.y - oy, target.x - ox) + (k - 2) * 0.09 : (k / 5) * Math.PI * 2;
+      const isCrit = Math.random() < Math.min(0.95, getEffectiveCrit() + 0.15);
+      bullets.push({
+        x: ox, y: oy, px: ox, py: oy,
+        vx: Math.cos(ba) * 590, vy: Math.sin(ba) * 590,
+        dmg: baseDmg * 0.78 * getElemMul() * (isCrit ? getEffectiveCritMult() : 1),
+        isCrit, angle: ba, pierce: 1, bounces: 1,
+        isDart: true, poisonHit: 0.85,
+        life: 0.72, maxLife: 0.72, color: '#6ee7b7', r: 5.2,
+        hit: null, lastHit: null
+      });
+    }
+    addText(ox, oy - 30, '🍃 苍岚风羽', '#6ee7b7', 14, 0.65, false);
+  } else if (cls === 'multitasker') {
+    // 日蚀圣女 · 黑日天罚：瞬步引落最多3道黑日金雷轰击附近敌群
+    const wBonus = 1 + (player.weapons ? player.weapons.length : 2) * 0.06;
+    let struck = 0;
+    for (let i = 0; i < enemies.length && struck < 3; i++) {
+      const e = enemies[i];
+      if (!e || e.hp <= 0 || e.primed) continue;
+      if (Math.hypot(e.x - ox, e.y - oy) <= 310) {
+        struck++;
+        if (lightnings.length < 35) {
+          lightnings.push({
+            pts: [{ x: e.x + (struck - 2) * 14, y: Math.max(12, e.y - 210) }, { x: e.x, y: e.y }],
+            color: '#fde68a', t: 0.22, maxT: 0.22
+          });
+        }
+        hurtEnemy(e, baseDmg * 0.95 * wBonus, true, null, true, { forceBurn: true });
+      }
+    }
+    if (rings.length < 40) rings.push({ x: ox, y: oy, r: 92, color: '#fde68a', t: 0.22, maxT: 0.22 });
+    addText(ox, oy - 30, '🌑 黑日天罚!', '#fde68a', 14, 0.65, false);
+  } else {
+    // 零号 · 青焰净魂：原地绽放青焰魂灯净化新星，灼烧近身敌群并微幅稳固心火
+    if (rings.length < 40) rings.push({ x: ox, y: oy, r: 108, color: '#5eead4', t: 0.24, maxT: 0.24, fill: true });
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (!e || e.hp <= 0 || e.primed) continue;
+      if (Math.hypot(e.x - ox, e.y - oy) <= 110 + e.r) {
+        hurtEnemy(e, baseDmg * 1.05 * getElemMul(), false, Math.atan2(e.y - oy, e.x - ox), true, { forceBurn: true, knockMult: 1.3 });
+      }
+    }
+    if (player.hp > 0 && player.hp < player.maxHp && !player.noRegen && Math.random() < 0.55) {
+      player.hp = Math.min(player.maxHp, player.hp + 1);
+    }
+    addText(ox, oy - 30, '🕯️ 青焰净魂', '#5eead4', 14, 0.65, false);
+  }
+  return true;
 }
 // 对齐中后期 <=80 同屏怪上限后的单怪晶石购买力曲线
 function getWaveMatRate(w) {
@@ -276,6 +446,9 @@ function triggerBossMythicPhase2(e) {
     }
   }
   beep(155, 0.32, 'sawtooth', 0.09);
+  if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.triggerHitstop === 'function') {
+    SpireDirector.triggerHitstop(0.055);
+  }
   if (rings.length < 40) {
     rings.push({ x: e.x, y: e.y, r: 240, color: '#ffd166', t: 0.45, maxT: 0.45, fill: true });
     rings.push({ x: e.x, y: e.y, r: 165, color: '#ff2a55', t: 0.36, maxT: 0.36 });
@@ -288,16 +461,18 @@ function triggerBossMythicPhase2(e) {
   }
   const bw = document.getElementById('bossBarWrap');
   if (bw) { bw.classList.remove('hidden'); bw.classList.add('mythic'); }
-  if (typeof startBossCutscene === 'function') {
+  if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.onBossPhase2 === 'function') {
+    SpireDirector.onBossPhase2(wave, e);
+  } else if (typeof startBossCutscene === 'function') {
     startBossCutscene(
       'mythic_phase2',
       e.variant,
       (e.bossTitle || '神话首领').replace(/^⚡\s*/, ''),
-      '⚡ 隐藏二阶段觉醒 · 专属隐藏换装立绘解封！',
-      '⏱️ 决战时间补充 +60秒 · 击败必爆【传说神装秘宝舱】与永久赐福！',
+      '🔥 宿命死战 · 二阶段暗黑作画演出解封！',
+      '⏱️ 决战时间补充 +60秒 · 击败必爆【传说圣遗物匣】与永久弑神赐福！',
       '#ff2a55',
       '#ffd166',
-      1.65
+      5.8
     );
   }
   if (player) addText(player.x, player.y - 52, '⚡ 隐藏二阶段觉醒！时间 +60s！', '#ffd166', 21, 2.8);
@@ -373,23 +548,51 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
     addText(e.x, e.y - e.r - 2, dmg, opts.dotColor || '#ff9f1c', 12, 0.52, false);
   } else {
     const hitCol = shatterCrit ? '#72efdd' : (isCrit ? '#ffd166' : '#ffffff');
-    addSparks(e.x, e.y, knockA !== null ? knockA + Math.PI : Math.random() * 6.28, isCrit ? '#ffd166' : '#fff3b0', isCrit ? 4 : 2);
-    addText(e.x, e.y - e.r - 4, isCrit ? dmg + '!' : dmg, hitCol, isCrit ? 21 : 15, 0.62, false);
+    addSparks(e.x, e.y, knockA !== null ? knockA + Math.PI : Math.random() * 6.28, isCrit ? '#ffd166' : '#fff3b0', isCrit ? 5 : 2);
+    addText(e.x, e.y - e.r - 4, isCrit ? dmg + '!' : dmg, hitCol, isCrit ? 22 : 15, 0.62, false);
     beep(isCrit ? 360 : 240, 0.028, 'sawtooth', 0.025);
+    if (isCrit && (shatterCrit || isBossTarget || dmg >= 42) && player && (!player._hsCd || player._hsCd <= 0)) {
+      player._hsCd = 0.26;
+      if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.triggerHitstop === 'function') {
+        SpireDirector.triggerHitstop(0.018);
+      }
+    }
 
-    // 攻击附带【🔥灼烧 / ❄️冰冻与冰缓 / ☠️剧毒 / 💥高爆弹头】判定
-    if (opts.forceBurn || (player.burnChance > 0 && Math.random() < player.burnChance)) {
+    // 攻击附带【🔥灼烧 / ❄️冰冻与冰缓 / 🍃风蚀剧毒 / 💥四象元素反应】判定
+    const hadBurn = (e.burnT || 0) > 0.1;
+    const hadCryo = (e.chillT || 0) > 0.1 || (e.freezeT || 0) > 0.1;
+    const hadWind = (e.poisonT || 0) > 0.1 && (e.poisonStacks || 0) > 0;
+    const procBurn = opts.forceBurn || (player.burnChance > 0 && Math.random() < player.burnChance);
+    const procFreeze = opts.forceFreeze || (player.freezeChance > 0 && Math.random() < player.freezeChance);
+    const procChill = !procFreeze && (opts.forceChill || (player.chillChance > 0 && Math.random() < player.chillChance));
+    const procPoison = opts.forcePoison || (player.poisonChance > 0 && Math.random() < player.poisonChance);
+    if (procBurn) {
       e.burnT = 3.0;
       e.burnDmg = Math.max(e.burnDmg || 0, Math.max(2, (4.0 + wave * 1.25) * getElemMul() * getEffectiveDmgMul()));
       if (!e.burnTick || e.burnTick <= 0) e.burnTick = 0.42;
     }
-    if (opts.forceFreeze || (player.freezeChance > 0 && Math.random() < player.freezeChance)) {
+    if (procFreeze) {
       applyFreeze(e, 1.2);
-    } else if (opts.forceChill || (player.chillChance > 0 && Math.random() < player.chillChance)) {
+    } else if (procChill) {
       e.chillT = Math.max(e.chillT || 0, 2.1);
     }
-    if (opts.forcePoison || (player.poisonChance > 0 && Math.random() < player.poisonChance)) {
+    if (procPoison) {
       applyPoison(e, 1);
+    }
+    if (!opts.noProc && (!e._reactCd || e._reactCd <= 0)) {
+      if ((hadBurn && (procFreeze || procChill)) || (hadCryo && procBurn)) {
+        e._reactCd = 0.65;
+        if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: e.r + 36, color: '#fb923c', t: 0.24, maxT: 0.24, fill: true });
+        addText(e.x, e.y - e.r - 14, '🔥❄️ 融毁!', '#fde68a', 14, 0.55, false);
+      } else if (shatterCrit) {
+        e._reactCd = 0.65;
+        if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: e.r + 32, color: '#72efdd', t: 0.22, maxT: 0.22 });
+        addText(e.x, e.y - e.r - 14, '🧊⚡ 超导碎冰!', '#72efdd', 14, 0.55, false);
+      } else if (hadWind && (procBurn || procFreeze || procChill)) {
+        e._reactCd = 0.70;
+        if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: e.r + 42, color: '#5ef29b', t: 0.24, maxT: 0.24 });
+        addText(e.x, e.y - e.r - 14, '🍃 扩散共鸣!', '#80ed99', 14, 0.55, false);
+      }
     }
     if (!opts.noProc && player.blastChance > 0 && Math.random() < player.blastChance) {
       triggerExplosion(e.x, e.y, 68 * getBlastScale(), dmg * 0.55 * getElemMul(), false, 0, '#ff9f1c', true);
@@ -458,17 +661,32 @@ function dropCrystals(x, y, totalMat) {
       }
       if (merged) continue;
     }
-    const a = Math.random() * Math.PI * 2, dist = Math.random() * 20;
-    drops.push({ x: x + Math.cos(a) * dist, y: y + Math.sin(a) * dist, kind: 'mat', val, bob: Math.random() * 6.28 });
+    const a = Math.random() * Math.PI * 2, dist = Math.random() * 14;
+    const popSpd = 68 + Math.random() * 82;
+    drops.push({
+      x: x + Math.cos(a) * dist, y: y + Math.sin(a) * dist,
+      vx: Math.cos(a) * popSpd, vy: Math.sin(a) * popSpd, popT: 0.17,
+      kind: 'mat', val, bob: Math.random() * 6.28
+    });
   }
 }
 
 function killEnemyRewards(e) {
   e.hp = 0;
   player.kills++;
+  if (player && (player.dashCd || 0) > 0) {
+    if (e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss') {
+      player.dashCd = Math.max(0, player.dashCd - 1.5);
+    } else if (e.elite) {
+      player.dashCd = Math.max(0, player.dashCd - 0.65);
+    }
+  }
   pushStain({ x: e.x, y: e.y, r: e.r * (0.85 + Math.random() * 0.35), color: e.color, kind: 'blood' });
   if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: e.r * 1.85, color: e.elite ? '#ffd166' : e.color, t: 0.20, maxT: 0.20 });
   const isBigBoss = e.type === 'boss' || e.type === 'special_boss';
+  if ((isBigBoss || e.type === 'mini_boss') && typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.triggerHitstop === 'function') {
+    SpireDirector.triggerHitstop(isBigBoss ? 0.062 : 0.030);
+  }
   addBurst(e.x, e.y, e.elite ? '#ffd166' : e.color, isBigBoss ? 32 : 10, isBigBoss ? 260 : 165);
 
   // 狂化精英亡语：向四周迸射 6 枚慢速毒刺弹（135px/s 留足走位空隙，防无脑贴脸）
@@ -570,7 +788,32 @@ function killEnemyRewards(e) {
   if (e.type === 'boss' || e.type === 'special_boss') {
     const otherBoss = enemies.some(o => o !== e && (o.type === 'boss' || o.type === 'special_boss') && o.hp > 0);
     if (!otherBoss && !spawns.some(s => s.type === 'boss' || s.type === 'special_boss')) {
-      if (overtime) {
+      eBullets.length = 0;
+      hazards.length = 0;
+      if (player) player.invuln = Math.max(player.invuln || 0, 3.0);
+      const isStoryActBoss = (!endlessMode && e.type === 'boss' && wave <= MAX_WAVE && wave % 4 === 0);
+      if (isStoryActBoss) {
+        // 守誓者解脱：净化场上残余杂兵与刷怪点，并将首领秘宝与晶石牵引至提灯人身边
+        spawns.length = 0;
+        for (let oi = 0; oi < enemies.length; oi++) {
+          const oe = enemies[oi];
+          if (oe && oe !== e && oe.hp > 0) {
+            addBurst(oe.x, oe.y, '#72efdd', 5, 95);
+            oe.hp = 0;
+          }
+        }
+        if (player) {
+          for (let di = 0; di < drops.length; di++) {
+            drops[di].x = player.x + (di % 3 - 1) * 6;
+            drops[di].y = player.y;
+          }
+        }
+        overtime = false;
+        waveTime = Math.min(waveTime, 0.28);
+        if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.onBossDefeated === 'function') {
+          SpireDirector.onBossDefeated(wave, e.variant);
+        }
+      } else if (overtime) {
         overtime = false;
         waveTime = Math.min(waveTime, 0.8);
       } else if (e.type === 'boss') {
@@ -613,6 +856,7 @@ function hurtPlayer(rawDmg) {
     if (Math.random() < Math.min(player.dodgeCap || 0.80, player.dodge || 0)) {
       addText(player.x, player.y - 28, '闪避!', '#4cc9f0', 17, 0.65, false);
       player.invuln = 0.16 * invScale;
+      if ((player.dashCd || 0) > 0) player.dashCd = Math.max(0, player.dashCd - 0.6);
       if (player.thorns > 0) triggerThornsNova();
       if (player.cls === 'ghost') {
         triggerExplosion(player.x, player.y, 135 * getBlastScale(), (18 + player.lv * 4) * getEffectiveDmgMul() * getElemMul(), false, 0, '#72efdd', false);
@@ -639,6 +883,10 @@ function hurtPlayer(rawDmg) {
       }
     }
     let dmg = Math.max(1, Math.round(rawDmg * (1 - getArmorMitigation()) * (1 - meleeParry) * (1 - closeGuard)));
+    // 第 4/8/12/16 层首领战防满血瞬秒保护（含剧情模式与无尽前16层）：单次受击扣血不超过最大生命值的 42%
+    if (wave <= MAX_WAVE && wave % 4 === 0) {
+      dmg = Math.min(dmg, Math.max(2, Math.round(player.maxHp * 0.42)));
+    }
     player.shieldRegenT = player.fastShield ? 4.5 : 7.0;
 
     // 能量护盾优先吸收伤害
