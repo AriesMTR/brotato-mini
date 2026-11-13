@@ -189,16 +189,3 @@ window.addEventListener('wheel', e => {
   camZoom = Math.max(0.38, Math.min(1.55, camZoom - e.deltaY * 0.0005));
   if (bootReady) clampCam();
 }, { passive: true });
-
-/* SPIRE_V2_3_1_PATCHED */
-(function() {
-  function applyRetinaSmoothing() {
-    var c = (typeof ctx !== 'undefined' && ctx) ? ctx : window.ctx;
-    if (c) {
-      c.imageSmoothingEnabled = true;
-      if ('imageSmoothingQuality' in c) c.imageSmoothingQuality = 'high';
-    }
-  }
-  window.addEventListener('resize', applyRetinaSmoothing);
-  setTimeout(applyRetinaSmoothing, 0);
-})();

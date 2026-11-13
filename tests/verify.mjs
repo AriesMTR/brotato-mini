@@ -295,7 +295,7 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
 // ============================================================================
 {
   const { sandbox: s } = createEnv(false, 1440, 900, 2);
-  assert.strictEqual(vm.runInContext("APP_VERSION", s), "v1.3.7", "APP_VERSION must be v1.3.7");
+  assert.strictEqual(vm.runInContext("APP_VERSION", s), "v1.3.8", "APP_VERSION must be v1.3.8");
   assert.strictEqual(vm.runInContext("MAX_WAVE", s), 16, "MAX_WAVE must be strictly 16 floors");
   assert.strictEqual(vm.runInContext("menuStage", s), "home", "Game must boot onto clean Main Title Screen (menuStage === 'home')");
 
@@ -582,7 +582,32 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
       sigBossesVerified++;
     }
 
-    return { ok: true, sheetsValid, flipLeft, midTurnFlip, atkPoseTriggered, floorScale: curFloorScale, dashArtsTested, sigBossesVerified };
+    // Verify 16x2 Boss Phase 1 & Phase 2 Cutout Portraits, 33% rates, 5.0s + 0.85s dissolve banner & 100% guaranteed Phase 2 portrait
+    const portraitKeys = Object.keys(BOSS_PORTRAIT_DATA || {});
+    const all32PortraitsReady = portraitKeys.length === 16 && portraitKeys.every(k => {
+      const p1 = getBossAnimePortrait(k, false);
+      const p2 = getBossAnimePortrait(k, true);
+      return p1 && p2 && p1 !== p2 && p1.width === 440 && p1.height === 516 && p2.width === 440 && p2.height === 516;
+    });
+    const ratesValid = (RARE_PORTRAIT_RATE === 0.33 && PHASE2_AWAKEN_RATE === 0.33 && BOSS_CUTSCENE_SHOW_SEC === 5.0);
+
+    // Render Phase 1 & Phase 2 cut-in banners across entrance, 5s hold, and 0.85s dissolve fade-out
+    startBossCutscene('final_boss', 'butcher', '绯红断刃剑姬 · 烬羽', '🕯️ 第 4 层守誓之主', '⚔️ 贴近风眼安全');
+    const p1Dur = bossCutscene ? bossCutscene.maxT : 0;
+    for (const stepDt of [0.10, 2.40, 2.80]) { _advanceClock(stepDt * 1000); update(stepDt); draw(); }
+    bossCutscene = null;
+
+    // Trigger Phase 2 in Endless Mode -> must 100% guarantee immediate mythic_phase2 portrait banner!
+    endlessMode = true;
+    player.waveMythicAwakened = false;
+    const p2Boss = createEnemy(player.x + 150, player.y, 'boss', 'frost_queen');
+    p2Boss.canPhase2 = true;
+    hurtEnemy(p2Boss, p2Boss.maxHp + 99999, true);
+    const p2Guaranteed = !!(bossCutscene && bossCutscene.mode === 'mythic_phase2' && bossCutscene.variant === 'frost_queen' && bossCutscene.maxT >= 5.8);
+    for (const stepDt of [0.12, 2.50, 2.75]) { _advanceClock(stepDt * 1000); update(stepDt); draw(); }
+    bossCutscene = null;
+
+    return { ok: true, sheetsValid, flipLeft, midTurnFlip, atkPoseTriggered, floorScale: curFloorScale, dashArtsTested, sigBossesVerified, all32PortraitsReady, ratesValid, p1Dur, p2Guaranteed };
   })()`, s);
 
   assert.strictEqual(actionAudit.ok, true, actionAudit.reason || "Action & Boss Signature audit failed");
@@ -592,6 +617,10 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
   assert.strictEqual(actionAudit.floorScale, 1.0, "Desktop floor texture must bake at crisp 1.0x native resolution");
   assert.strictEqual(actionAudit.dashArtsTested, 6, "All 6 heroes must execute their signature Soul Dash arts & slice projectiles");
   assert.strictEqual(actionAudit.sigBossesVerified, 4, "All 4 Fixed Act Bosses must telegraph and unleash their signature named skills");
+  assert.strictEqual(actionAudit.all32PortraitsReady, true, "All 16 Bosses must provide distinct 440x516 Phase 1 & Phase 2 cutout portraits (32 total)");
+  assert.strictEqual(actionAudit.ratesValid, true, "Phase 1 portrait rate & Phase 2 awaken rate must both be 33% (0.33), with 5.0s display");
+  assert(actionAudit.p1Dur >= 5.8, "Boss portrait cut-in banner must display for 5.0s plus smooth fade-out (~5.85s total)");
+  assert.strictEqual(actionAudit.p2Guaranteed, true, "Triggering Phase 2 awakening must 100% guarantee displaying the Phase 2 portrait banner");
 
   // Confirm 4-frame sprite sheet slicing (sw=256, sh=256 across sx = 0, 256, 512, 768) actually executed on game canvas
   const seenFrameSx = new Set(
@@ -783,9 +812,10 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
     ]) {
       assert(typeof map[key] === "string" && map[key].startsWith("data:image/"), `Single-file bundle missing inline data URI for ${key}`);
     }
+    assert(typeof map["assets/audio/scene_foundry_rain.wav"] === "string" && map["assets/audio/scene_foundry_rain.wav"].startsWith("data:audio/"), "Single-file bundle must inline scene audio WAV assets");
   } finally {
     if (tempBuilt && fs.existsSync(singlePath)) fs.unlinkSync(singlePath);
   }
 }
 
-console.log(`ALL 5 V1.3.7 VERIFICATION SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+console.log(`ALL 5 V1.3.8 VERIFICATION SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);

@@ -80,18 +80,24 @@ const AudioBank = {
   bgm: null,
   bgmMuted: false,
   currentBgmUrl: '',
+  _resolveUrl(url) {
+    if (!url) return '';
+    const inlineMap = typeof window !== 'undefined' && window.__SPIRE_INLINE_ASSETS__;
+    return (inlineMap && inlineMap[url]) ? inlineMap[url] : url;
+  },
   registerSfx(key, url, volume = 0.55) {
-    this.sfx[key] = { url, volume, pool: [], idx: 0 };
+    this.sfx[key] = { url, volume, pool: [], idx: 0, failed: false };
   },
   playSfx(key, fallbackFreq = 440, fallbackDur = 0.06, fallbackType = 'square', fallbackVol = 0.045) {
     if (this.bgmMuted && key && key.startsWith('cutscene_')) return;
     const entry = this.sfx[key];
-    if (entry && typeof Audio !== 'undefined') {
+    if (entry && !entry.failed && typeof Audio !== 'undefined') {
       try {
         if (entry.pool.length < 3) {
-          const a = new Audio(entry.url);
+          const a = new Audio(this._resolveUrl(entry.url));
           a.preload = 'auto';
           a.volume = entry.volume;
+          a.onerror = () => { entry.failed = true; };
           entry.pool.push(a);
         }
         const inst = entry.pool[entry.idx++ % entry.pool.length];
@@ -116,7 +122,7 @@ const AudioBank = {
         return true;
       }
       if (this.bgm) { try { this.bgm.pause(); } catch (_) {} }
-      const a = new Audio(url);
+      const a = new Audio(this._resolveUrl(url));
       a._relUrl = url;
       a.loop = true;
       a.volume = volume;
@@ -191,6 +197,9 @@ const SpireAudio = {
       g.gain.setValueAtTime(0.018, actx.currentTime);
       g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + cfg.step * 0.88);
       o.connect(g); g.connect(actx.destination);
+      o.onended = () => {
+        try { o.disconnect(); g.disconnect(); } catch (_) {}
+      };
       o.start(); o.stop(actx.currentTime + cfg.step * 0.90);
     } catch (_) {}
   },

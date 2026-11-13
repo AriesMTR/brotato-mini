@@ -488,9 +488,193 @@ function getSpireArenaBgImage(sceneId) {
   return SpireAssets.getArenaBg(sceneId);
 }
 
-function getBossAnimePortrait(variant, isMythic = false) {
-  return SpireAssets.getPortrait(variant, isMythic);
+// ============================================================================
+// 👑 全 16 大首领（6 守誓主宰 + 7 先锋统领 + 3 记忆祭坛首领）专属一阶段/二阶段破框半身立绘库
+// 一阶段：33% 概率触发登场横幅展示夏装半身立绘（440×516 高清无锯齿透明抠图）
+// 二阶段：33% 概率觉醒神话二阶段，且觉醒时 100% 必出二阶段专属隐藏换装立绘横幅！
+// ============================================================================
+const BOSS_PORTRAIT_DATA = {
+  butcher: {
+    w: 440, h: 516,
+    personaName: '烬羽 · 绯红断刃剑姬',
+    summerTitle: '绯红魔角夏装',
+    mythicTitle: '真红魅魔纱裙泳装'
+  },
+  frost_queen: {
+    w: 440, h: 516,
+    personaName: '艾丝特莉亚 · 永冻星使',
+    summerTitle: '冰晶碎冕夏装',
+    mythicTitle: '凛冬冰晶轻纱泳装'
+  },
+  mech_colossus: {
+    w: 440, h: 516,
+    personaName: '泰娅 · 倒悬重装机神',
+    summerTitle: '炽橙机能夏装',
+    mythicTitle: '超载炽金度假泳装'
+  },
+  void_weaver: {
+    w: 440, h: 516,
+    personaName: '伽蓝 · 紫电弦月少主',
+    summerTitle: '紫晶蝶翼夏装',
+    mythicTitle: '星渊蝶纱魅影泳装'
+  },
+  plague_empress: {
+    w: 440, h: 516,
+    personaName: '青羽 · 残羽风语魔女',
+    summerTitle: '翠蝶流金夏装',
+    mythicTitle: '万蛊翠纱魅影泳装'
+  },
+  solar_seraph: {
+    w: 440, h: 516,
+    personaName: '日蚀圣女 · 镜中真我',
+    summerTitle: '圣羽绯阳夏装',
+    mythicTitle: '破晓流金绯纱泳装'
+  },
+  crimson_lord: {
+    w: 440, h: 516,
+    personaName: '瑟琳娜 · 第998世绯影',
+    summerTitle: '永夜蝠翼夏装',
+    mythicTitle: '绯夜蔷薇蕾丝泳装'
+  },
+  golden_golem: {
+    w: 440, h: 516,
+    personaName: '奥蕾莉亚 · 黄金圣柜机神',
+    summerTitle: '曜金翠玉夏装',
+    mythicTitle: '曜金女神流金泳装'
+  },
+  abyss_devourer: {
+    w: 440, h: 516,
+    personaName: '冥月 · 蚀日饥饿黑影',
+    summerTitle: '星月暗夜夏装',
+    mythicTitle: '噬星夜纱度假泳装'
+  },
+  vanguard: {
+    w: 440, h: 516,
+    personaName: '凛音 · 守桥重铠统领',
+    summerTitle: '狂厄双角夏装',
+    mythicTitle: '狂厄绯红竞速泳装'
+  },
+  pyro_lord: {
+    w: 440, h: 516,
+    personaName: '煌焱 · 赤伞焚灯督军',
+    summerTitle: '熔火龙角夏装',
+    mythicTitle: '业火流金热带泳装'
+  },
+  shadow_stalker: {
+    w: 440, h: 516,
+    personaName: '影凪 · 紫电斩首统领',
+    summerTitle: '暗雷翠眸夏装',
+    mythicTitle: '夜樱暗雷轻纱泳装'
+  },
+  venom_matriarch: {
+    w: 440, h: 516,
+    personaName: '琉璃 · 苍翠荆棘守碑姬',
+    summerTitle: '翠蛇金簪夏装',
+    mythicTitle: '碧鳞金环薄纱泳装'
+  },
+  glacial_valkyrie: {
+    w: 440, h: 516,
+    personaName: '塞蕾丝 · 眠冬圣枪近卫',
+    summerTitle: '苍羽冰骑夏装',
+    mythicTitle: '极北银辉霜纱泳装'
+  },
+  iron_warden: {
+    w: 440, h: 516,
+    personaName: '瓦伦蒂娜 · 黑曜镇狱统领',
+    summerTitle: '黑金盾徽夏装',
+    mythicTitle: '曜铁金链暗纱泳装'
+  },
+  storm_siren: {
+    w: 440, h: 516,
+    personaName: '岚音 · 逆钟星律歌姬',
+    summerTitle: '苍雷双马尾夏装',
+    mythicTitle: '雷鸣晴空流纱泳装'
+  }
+};
+
+const _bossCutoutCache = Object.create(null);
+
+function _compositeBossCutoutSlot(cacheKey, w, h, rgbRel, maskRel) {
+  let rec = _bossCutoutCache[cacheKey];
+  if (rec) return rec.ready ? rec.canvas : null;
+  if (typeof document === 'undefined' || !rgbRel || !maskRel) return null;
+
+  rec = { ready: false, canvas: null, rgbImg: null, maskImg: null };
+  _bossCutoutCache[cacheKey] = rec;
+
+  const tryFinish = function () {
+    if (rec.ready || !rec.rgbImg || !rec.maskImg) return;
+    if (!(rec.rgbImg.naturalWidth > 0) || !(rec.maskImg.naturalWidth > 0)) return;
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const g = c.getContext('2d');
+    if (!g) return;
+    g.imageSmoothingEnabled = true;
+    if ('imageSmoothingQuality' in g) g.imageSmoothingQuality = 'high';
+    g.clearRect(0, 0, w, h);
+    g.drawImage(rec.rgbImg, 0, 0, w, h);
+    g.globalCompositeOperation = 'destination-in';
+    g.drawImage(rec.maskImg, 0, 0, w, h);
+    g.globalCompositeOperation = 'source-over';
+    rec.canvas = c;
+    rec.ready = true;
+    rec.rgbImg = null;
+    rec.maskImg = null;
+  };
+
+  SpireAssets.loadImage(rgbRel, function (img) {
+    rec.rgbImg = img;
+    tryFinish();
+  });
+  SpireAssets.loadImage(maskRel, function (img) {
+    rec.maskImg = img;
+    tryFinish();
+  });
+
+  return rec.ready ? rec.canvas : null;
 }
+
+function getBossAnimePortrait(variant, isMythic = false) {
+  const key = variant && BOSS_PORTRAIT_DATA[variant] ? variant : 'butcher';
+  const spec = BOSS_PORTRAIT_DATA[key];
+  if (spec) {
+    if (isMythic) {
+      const p2 = _compositeBossCutoutSlot(
+        key + '__p2',
+        spec.w,
+        spec.h,
+        `assets/spire/bp_${key}_p2_rgb.jpg`,
+        `assets/spire/bp_${key}_p2_mask.png`
+      );
+      if (p2) return p2;
+    }
+    const p1 = _compositeBossCutoutSlot(
+      key + '__p1',
+      spec.w,
+      spec.h,
+      `assets/spire/bp_${key}_p1_rgb.jpg`,
+      `assets/spire/bp_${key}_p1_mask.png`
+    );
+    if (p1) return p1;
+  }
+  return SpireAssets.getPortrait(key);
+}
+
+function preloadAllBossCutoutPortraits() {
+  if (typeof Image === 'undefined' || typeof document === 'undefined') return;
+  const keys = Object.keys(BOSS_PORTRAIT_DATA);
+  const schedule = (typeof requestIdleCallback === 'function')
+    ? cb => requestIdleCallback(cb, { timeout: 1400 })
+    : cb => setTimeout(cb, 320);
+  schedule(function () {
+    for (let i = 0; i < keys.length; i++) {
+      getBossAnimePortrait(keys[i], false);
+      getBossAnimePortrait(keys[i], true);
+    }
+  });
+}
+preloadAllBossCutoutPortraits();
 
 function getSpireCutscenePack(variant) {
   return SpireAssets.getCutscene(variant);
@@ -498,6 +682,7 @@ function getSpireCutscenePack(variant) {
 
 if (typeof globalThis !== 'undefined') {
   globalThis.SPIRE_STORY_PACK = SPIRE_STORY_PACK;
+  globalThis.BOSS_PORTRAIT_DATA = BOSS_PORTRAIT_DATA;
   globalThis.SpireAssets = SpireAssets;
   globalThis.getSpireArenaBgImage = getSpireArenaBgImage;
   globalThis.getBossAnimePortrait = getBossAnimePortrait;

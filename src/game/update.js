@@ -99,6 +99,11 @@ function update(dt) {
   if (state !== 'wave' || !player) return;
   if (shake > 0) shake = Math.max(0, shake - dt * 36);
   if (player._atkPoseT > 0) player._atkPoseT = Math.max(0, player._atkPoseT - dt);
+  if (typeof pendingBossCutscene !== 'undefined' && pendingBossCutscene && !bossCutscene && typeof startBossCutscene === 'function') {
+    const pc = pendingBossCutscene;
+    pendingBossCutscene = null;
+    startBossCutscene(pc.mode, pc.variant, pc.title, pc.subtitle, pc.extraTag, pc.color, pc.accent, pc.dur, { fadeDur: pc.fadeDur });
+  }
   // 首领召唤 / 终局降临 / 隐藏神话二阶段全屏静止登场演出
   if (bossCutscene && bossCutscene.t > 0) {
     bossCutscene.t -= dt;
@@ -612,7 +617,10 @@ function update(dt) {
     for (let ei = 0; ei < enemies.length; ei++) {
       const e = enemies[ei];
       if (!e || e.hp <= 0 || e.primed) continue;
-      const dxE = e.x - baseWx, dyE = e.y - baseWy, lim = bestD + e.r;
+      const dxE = e.x - baseWx, lim = bestD + e.r;
+      if (dxE >= lim || dxE <= -lim) continue;
+      const dyE = e.y - baseWy;
+      if (dyE >= lim || dyE <= -lim) continue;
       const dSq = dxE * dxE + dyE * dyE;
       if (dSq >= lim * lim) continue;
       const d = Math.sqrt(dSq) - e.r;
@@ -948,6 +956,18 @@ function update(dt) {
   }
 
   // 玩家投射物更新（支持火箭尾烟、榴弹弹跳爆破、电浆球脉冲爆、冰锥寒霜、吹箭剧毒、剑气波）
+  let eEnvMinX = Infinity, eEnvMaxX = -Infinity, eEnvMinY = Infinity, eEnvMaxY = -Infinity;
+  for (let ei = 0; ei < enemies.length; ei++) {
+    const e = enemies[ei];
+    if (!e || e.hp <= 0 || e.primed) continue;
+    const er = e.r || 20;
+    if (e.x - er < eEnvMinX) eEnvMinX = e.x - er;
+    if (e.x + er > eEnvMaxX) eEnvMaxX = e.x + er;
+    if (e.y - er < eEnvMinY) eEnvMinY = e.y - er;
+    if (e.y + er > eEnvMaxY) eEnvMaxY = e.y + er;
+  }
+  const hasEnemyEnvelope = eEnvMinX <= eEnvMaxX;
+
   for (let i = bullets.length - 1; i >= 0; i--) {
     const b = bullets[i];
     b.px = b.x; b.py = b.y;
@@ -990,60 +1010,68 @@ function update(dt) {
       bullets.splice(i, 1); continue;
     }
 
-    for (let j = enemies.length - 1; j >= 0; j--) {
-      const e = enemies[j];
-      if (!e || e.hp <= 0 || e.primed) continue;
-      const bdx = e.x - b.x, bdy = e.y - b.y, hitR = e.r + b.r;
-      if (bdx * bdx + bdy * bdy < hitR * hitR && !hasBulletHit(b, e)) {
-        markBulletHit(b, e);
-        if (b.isRocket) {
-          triggerExplosion(b.x, b.y, b.blastR, b.dmg * elemMul, false, 0, '#ff9f1c', true);
-          b.life = -1; break;
-        }
-        hurtEnemy(e, b.dmg, b.isCrit, b.angle, b.isFlame || b.isPlasma || b.isWaveArc, {
-          isMelee: !!b.isWaveArc,
-          noProc: !!(b.turretShot && !player.turretElem),
-          forceBurn: b.isFlame,
-          forceChill: b.isIce,
-          forceFreeze: b.freezeHit > 0 && Math.random() < b.freezeHit,
-          forcePoison: b.poisonHit > 0 && Math.random() < b.poisonHit,
-          knockMult: b.isFlame ? 0.15 : (b.isBolt ? 1.35 : 1)
-        });
-        if (b.shredBlast > 0 && Math.random() < b.shredBlast) {
-          triggerExplosion(b.x, b.y, 64 * getBlastScale(), b.dmg * 0.65, false, 0, '#ff9f1c', true);
-        }
-
-        // 跳弹索敌判定（弹弓圆石 / 手里剑 / 榴弹弹跳连环爆 / 跳弹棱镜）
-        if (b.bounces > 0) {
-          if (b.isGrenade) {
-            triggerExplosion(b.x, b.y, b.blastR || 76, b.dmg * 0.72, false, 0, '#ff9f1c', true);
+    const br = b.r || 4;
+    if (hasEnemyEnvelope && b.x + br >= eEnvMinX && b.x - br <= eEnvMaxX && b.y + br >= eEnvMinY && b.y - br <= eEnvMaxY) {
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        const e = enemies[j];
+        if (!e || e.hp <= 0 || e.primed) continue;
+        const hitR = e.r + br;
+        const bdx = e.x - b.x;
+        if (bdx >= hitR || bdx <= -hitR) continue;
+        const bdy = e.y - b.y;
+        if (bdy >= hitR || bdy <= -hitR) continue;
+        if (bdx * bdx + bdy * bdy < hitR * hitR && !hasBulletHit(b, e)) {
+          markBulletHit(b, e);
+          if (b.isRocket) {
+            triggerExplosion(b.x, b.y, b.blastR, b.dmg * elemMul, false, 0, '#ff9f1c', true);
+            b.life = -1; break;
           }
-          let nextE = null, nextDSq = 275 * 275;
-          for (let ci = 0; ci < enemies.length; ci++) {
-            const cand = enemies[ci];
-            if (cand && cand.hp > 0 && !cand.primed && !hasBulletHit(b, cand)) {
-              const cdx = cand.x - b.x, cdy = cand.y - b.y;
-              const cdSq = cdx * cdx + cdy * cdy;
-              if (cdSq < nextDSq) { nextDSq = cdSq; nextE = cand; }
+          hurtEnemy(e, b.dmg, b.isCrit, b.angle, b.isFlame || b.isPlasma || b.isWaveArc, {
+            isMelee: !!b.isWaveArc,
+            noProc: !!(b.turretShot && !player.turretElem),
+            forceBurn: b.isFlame,
+            forceChill: b.isIce,
+            forceFreeze: b.freezeHit > 0 && Math.random() < b.freezeHit,
+            forcePoison: b.poisonHit > 0 && Math.random() < b.poisonHit,
+            knockMult: b.isFlame ? 0.15 : (b.isBolt ? 1.35 : 1)
+          });
+          if (b.shredBlast > 0 && Math.random() < b.shredBlast) {
+            triggerExplosion(b.x, b.y, 64 * getBlastScale(), b.dmg * 0.65, false, 0, '#ff9f1c', true);
+          }
+
+          // 跳弹索敌判定（弹弓圆石 / 手里剑 / 榴弹弹跳连环爆 / 跳弹棱镜）
+          if (b.bounces > 0) {
+            if (b.isGrenade) {
+              triggerExplosion(b.x, b.y, b.blastR || 76, b.dmg * 0.72, false, 0, '#ff9f1c', true);
+            }
+            let nextE = null, nextDSq = 275 * 275;
+            for (let ci = 0; ci < enemies.length; ci++) {
+              const cand = enemies[ci];
+              if (cand && cand.hp > 0 && !cand.primed && !hasBulletHit(b, cand)) {
+                const cdx = cand.x - b.x, cdy = cand.y - b.y;
+                if (cdx >= 275 || cdx <= -275 || cdy >= 275 || cdy <= -275) continue;
+                const cdSq = cdx * cdx + cdy * cdy;
+                if (cdSq < nextDSq) { nextDSq = cdSq; nextE = cand; }
+              }
+            }
+            if (nextE) {
+              const spd = Math.hypot(b.vx, b.vy);
+              const na = Math.atan2(nextE.y - b.y, nextE.x - b.x);
+              b.vx = Math.cos(na) * spd; b.vy = Math.sin(na) * spd; b.angle = na;
+              b.bounces--;
+              b.dmg *= 0.9;
+              b.life = Math.max(b.life, 0.44);
+              addSparks(b.x, b.y, na, b.isGrenade ? '#ff9f1c' : (b.isPebble ? '#e2e8f0' : '#72efdd'), 3);
+              beep(b.isPebble ? 490 : 610, 0.025, 'triangle', 0.02);
+              break;
             }
           }
-          if (nextE) {
-            const spd = Math.hypot(b.vx, b.vy);
-            const na = Math.atan2(nextE.y - b.y, nextE.x - b.x);
-            b.vx = Math.cos(na) * spd; b.vy = Math.sin(na) * spd; b.angle = na;
-            b.bounces--;
-            b.dmg *= 0.9;
-            b.life = Math.max(b.life, 0.44);
-            addSparks(b.x, b.y, na, b.isGrenade ? '#ff9f1c' : (b.isPebble ? '#e2e8f0' : '#72efdd'), 3);
-            beep(b.isPebble ? 490 : 610, 0.025, 'triangle', 0.02);
-            break;
+          if (b.pierce <= 0) {
+            if (b.isGrenade) triggerExplosion(b.x, b.y, b.blastR || 76, b.dmg * 0.85, false, 0, '#ff9f1c', true);
+            b.life = -1; break;
           }
+          b.pierce--;
         }
-        if (b.pierce <= 0) {
-          if (b.isGrenade) triggerExplosion(b.x, b.y, b.blastR || 76, b.dmg * 0.85, false, 0, '#ff9f1c', true);
-          b.life = -1; break;
-        }
-        b.pierce--;
       }
     }
     if (b.life <= 0 && !b.isRocket && !b.isGrenade) {
@@ -2247,7 +2275,7 @@ function update(dt) {
         if (!activeCastLabel && e.castLabel && ((e.sigWindupT || 0) > 0 || (e.castEndT || 0) > 0)) {
           activeCastLabel = (e.sigWindupT || 0) > 0 ? `⚠️ 蓄力咏唱 · ${e.castLabel}` : `💥 释放杀招 · ${e.castLabel}`;
         }
-        const bt = e.bossTitle || (e.type === 'mini_boss' ? '⚔️ 狂厄裂地统领' : '👑 守誓断刃剑姬');
+        const bt = e.bossTitle || (e.type === 'mini_boss' ? '⚔️ 雨夜守桥重铠武者' : '👑 绯红断刃剑姬 · 烬羽');
         if (bossTitles.length < 2 && !bossTitles.includes(bt)) bossTitles.push(bt);
       }
     }

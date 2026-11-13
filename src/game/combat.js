@@ -90,13 +90,14 @@ function addBurst(x, y, color, n = 6, speed = 135) {
   }
 }
 
-// 利落明亮的方向性受击火花（白炽内芯 + 彩芒拖尾）
+// 利落明亮的方向性受击火花（白炽内芯 + 彩芒拖尾，预存单位向量免除渲染帧 hypot 开销）
 function addSparks(x, y, baseA, color = '#ffe8a3', n = 3) {
   const cnt = isTouch ? Math.max(2, Math.ceil(n * 0.8)) : n;
   for (let i = 0; i < cnt; i++) {
     const a = baseA + (Math.random() - 0.5) * 1.15;
+    const ca = Math.cos(a), sa = Math.sin(a);
     const spd = 165 + Math.random() * 210;
-    pushSpark({ x, y, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, len: 9 + Math.random() * 8, color, t: 0.19, maxT: 0.19 });
+    pushSpark({ x, y, vx: ca * spd, vy: sa * spd, ux: ca, uy: sa, len: 9 + Math.random() * 8, color, t: 0.19, maxT: 0.19 });
   }
 }
 
@@ -467,17 +468,17 @@ function triggerBossMythicPhase2(e) {
   if (bw) { bw.classList.remove('hidden'); bw.classList.add('mythic'); }
   if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.onBossPhase2 === 'function') {
     SpireDirector.onBossPhase2(wave, e);
+  }
+  // 二阶段 33% 概率触发觉醒，且一旦进入二阶段 100% 必出二阶段专属隐藏立绘横幅（完整展示 5 秒后柔化消逝）！
+  const p2Title = (e.bossTitle || '神话首领').replace(/^⚡\s*/, '');
+  const p2Sub = '🔥 宿命死战 · 二阶段专属隐藏立绘解封！';
+  const p2Tag = '⏱️ 决战时间补充 +60秒 · 击败必爆【传说圣遗物匣】与永久弑神赐福！';
+  const p2Dur = (typeof BOSS_CUTSCENE_TOTAL_SEC === 'number') ? BOSS_CUTSCENE_TOTAL_SEC : 5.85;
+  const dirBlocking = (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.isBlockingGameplay === 'function' && SpireDirector.isBlockingGameplay());
+  if (dirBlocking && typeof queueBossCutscene === 'function') {
+    queueBossCutscene('mythic_phase2', e.variant, p2Title, p2Sub, p2Tag, '#ff2a55', '#ffd166', p2Dur);
   } else if (typeof startBossCutscene === 'function') {
-    startBossCutscene(
-      'mythic_phase2',
-      e.variant,
-      (e.bossTitle || '神话首领').replace(/^⚡\s*/, ''),
-      '🔥 宿命死战 · 二阶段暗黑作画演出解封！',
-      '⏱️ 决战时间补充 +60秒 · 击败必爆【传说圣遗物匣】与永久弑神赐福！',
-      '#ff2a55',
-      '#ffd166',
-      5.8
-    );
+    startBossCutscene('mythic_phase2', e.variant, p2Title, p2Sub, p2Tag, '#ff2a55', '#ffd166', p2Dur);
   }
   if (player) addText(player.x, player.y - 52, '⚡ 隐藏二阶段觉醒！时间 +60s！', '#ffd166', 21, 2.8);
   announce('⚡ 逆天异变！首领觉醒【隐藏神话二阶段】，补充 +60 秒，击败必掉传说神装！', '#ffd166', 4.5);
@@ -640,7 +641,7 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
       primeBomber(e);
       return;
     }
-    if ((e.type === 'boss' || e.type === 'special_boss') && e.canPhase2 && !e.mythicPhase2) {
+    if ((e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss') && e.canPhase2 && !e.mythicPhase2) {
       triggerBossMythicPhase2(e);
       return;
     }
@@ -792,6 +793,14 @@ function killEnemyRewards(e) {
     }
   }
 
+  if (e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss') {
+    if (typeof pendingBossCutscene !== 'undefined' && pendingBossCutscene && pendingBossCutscene.variant === e.variant) {
+      pendingBossCutscene = null;
+    }
+    if (typeof bossCutscene !== 'undefined' && bossCutscene && bossCutscene.variant === e.variant) {
+      bossCutscene = null;
+    }
+  }
   if (e.type === 'boss' || e.type === 'special_boss') {
     const otherBoss = enemies.some(o => o !== e && (o.type === 'boss' || o.type === 'special_boss') && o.hp > 0);
     if (!otherBoss && !spawns.some(s => s.type === 'boss' || s.type === 'special_boss')) {

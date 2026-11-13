@@ -5,27 +5,27 @@ const BOSS_DEFS = {
   butcher: {
     id: 'butcher', icon: '🦊', sprite: 'assets/spire/hero_jinyu.png', portrait: 'assets/spire/port_jinyu.jpg',
     name: '绯红断刃剑姬 · 烬羽', epithet: '一层守桥挚友 · 第998道残火', color: '#e63946', spd: 90,
-    desc: '佩戴半截白狐假面、死守雨夜孤桥九百九十八世的昔日剑卫：蓄力绯夜一闪、释放【红莲外环剑域（贴身风眼安全）】、倾泻余烬火池并唤出浪人残偶；大招后短暂喘息暴露破绽，25% 概率燃尽魂火觉醒二阶段！'
+    desc: '佩戴半截白狐假面、死守雨夜孤桥九百九十八世的昔日剑卫：蓄力绯夜一闪、释放【红莲外环剑域（贴身风眼安全）】、倾泻余烬火池并唤出浪人残偶；大招后短暂喘息暴露破绽，33% 概率燃尽魂火觉醒二阶段并必展二阶隐藏立绘！'
   },
   frost_queen: {
     id: 'frost_queen', icon: '❄️', sprite: 'assets/spire/hero_astria.png', portrait: 'assets/spire/port_astria.jpg',
     name: '永冻星使 · 艾丝特莉亚', epithet: '二层冰封王城之主 · 碎冕星瞳', color: '#00bbf9', spd: 84,
-    desc: '遵从你千年前遗愿冰封全城子民的挚友星使：绽放螺旋霜星花瓣弹、吟唱【眠冬外环暴雪（近身风眼安全）】、凝结碎冕寒冰镜并唤出冰冠亡灵；25% 概率碎冕觉醒二阶段！'
+    desc: '遵从你千年前遗愿冰封全城子民的挚友星使：绽放螺旋霜星花瓣弹、吟唱【眠冬外环暴雪（近身风眼安全）】、凝结碎冕寒冰镜并唤出冰冠亡灵；33% 概率碎冕觉醒二阶段并必展二阶隐藏立绘！'
   },
   mech_colossus: {
     id: 'mech_colossus', icon: '⚙️', sprite: 'assets/spire/boss_mech_colossus.png', portrait: 'assets/spire/port_jialan.jpg',
     name: '倒悬机神 · 伽蓝重装态', epithet: '三层逆转发条钟楼镇守者', color: '#f77f00', spd: 78,
-    desc: '伽蓝操控的倒悬钟楼重装镇塔巨像：双肩发条火炮交叉齐射、倾泻滚烫【余烬熔池】改造地形、轰击星晷外环震波并投放齿轮陀螺偶；散热期暴露破绽，25% 概率超载觉醒二阶段！'
+    desc: '伽蓝操控的倒悬钟楼重装镇塔巨像：双肩发条火炮交叉齐射、倾泻滚烫【余烬熔池】改造地形、轰击星晷外环震波并投放齿轮陀螺偶；散热期暴露破绽，33% 概率超载觉醒二阶段并必展二阶隐藏立绘！'
   },
   void_weaver: {
     id: 'void_weaver', icon: '🕰️', sprite: 'assets/spire/hero_jialan.png', portrait: 'assets/spire/port_jialan.jpg',
     name: '紫电弦月人偶 · 伽蓝', epithet: '三层星晷断罪少主 · 逆命傀儡师', color: '#9d4edd', spd: 86,
-    desc: '头插黄金骷髅发条的毒舌人偶少主：施展逆钟折跃与紫电十字星璇、撕裂【星晷断层裂谷】重塑地形、发动虚空外环坍缩并操控紫电剑偶；25% 概率拧碎发条觉醒二阶段！'
+    desc: '头插黄金骷髅发条的毒舌人偶少主：施展逆钟折跃与紫电十字星璇、撕裂【星晷断层裂谷】重塑地形、发动虚空外环坍缩并操控紫电剑偶；33% 概率拧碎发条觉醒二阶段并必展二阶隐藏立绘！'
   },
   plague_empress: {
     id: 'plague_empress', icon: '🍃', sprite: 'assets/spire/hero_qingyu.png', portrait: 'assets/spire/port_qingyu.jpg',
     name: '残羽魔女 · 青羽试炼影', epithet: '风语守望者 · 最后的温柔锁', color: '#52b788', spd: 85,
-    desc: '守望九百九十九次轮回的残羽魔女幻影：旋舞双螺旋苍翠风翎弹幕、降下风蚀花雨并唤出风语灵体试炼你的决心；25% 概率展翼觉醒二阶段！'
+    desc: '守望九百九十九次轮回的残羽魔女幻影：旋舞双螺旋苍翠风翎弹幕、降下风蚀花雨并唤出风语灵体试炼你的决心；33% 概率展翼觉醒二阶段并必展二阶隐藏立绘！'
   },
   solar_seraph: {
     id: 'solar_seraph', icon: '🌑', sprite: 'assets/spire/hero_eclipse.png', portrait: 'assets/spire/port_eclipse.jpg',
@@ -152,52 +152,3 @@ if (typeof globalThis !== 'undefined') {
   globalThis.SPECIAL_RELICS = SPECIAL_RELICS;
   globalThis.MONSTER_CODEX = MONSTER_CODEX;
 }
-
-
-/* SPIRE_V2_3_1_MONSTERS_START */
-(function(global) {
-  var bossSpecsV231 = {
-    butcher:      { name: '绯红断刃剑姬 · 烬羽',   baseHp: 680,  dmgMul: 0.78, telegraphBonusSec: 0.12 },
-    frost_queen:  { name: '永冻星使 · 艾丝特莉亚', baseHp: 1600, dmgMul: 1.00 },
-    void_weaver:  { name: '紫电弦月人偶 · 伽蓝',   baseHp: 3000, dmgMul: 1.22, cooldownAccelerate: 0.12 },
-    solar_seraph: { name: '第999号 · 日蚀圣女',    baseHp: 4900, effectiveTotalHp: 8085, dmgMul: 1.30, phase2DmgMul: 1.45 }
-  };
-  var pools = [global.BOSS_VARIANTS, global.BOSSES, global.MONSTER_TYPES, global.ENEMY_TYPES, global.MONSTERS];
-  pools.forEach(function(pool) {
-    if (!pool) return;
-    if (Array.isArray(pool)) {
-      pool.forEach(function(it) {
-        if (!it) return;
-        var k = it.id || it.variant || it.type || it.key;
-        if (k && bossSpecsV231[k]) {
-          it.name = bossSpecsV231[k].name;
-          it.title = bossSpecsV231[k].name;
-          it.v231Curve = bossSpecsV231[k];
-        }
-        if (k === 'spore_mother') {
-          it.name = '蚀忆魂灯龛';
-          it.desc = '封存前998次轮回残魂的浮空灯龛，播撒残响灵泉并召唤蚀忆子嗣（第3/7/11/15层与无尽深渊登场）。';
-          it.sprite = 'assets/spire/mob_s5_reliquary.png';
-          it.disabled = false;
-          it.hidden = false;
-        }
-      });
-    } else if (typeof pool === 'object') {
-      Object.keys(bossSpecsV231).forEach(function(k) {
-        if (pool[k]) {
-          pool[k].name = bossSpecsV231[k].name;
-          pool[k].title = bossSpecsV231[k].name;
-          pool[k].v231Curve = bossSpecsV231[k];
-        }
-      });
-      if (pool.spore_mother) {
-        pool.spore_mother.name = '蚀忆魂灯龛';
-        pool.spore_mother.desc = '封存前998次轮回残魂的浮空灯龛，播撒残响灵泉并召唤蚀忆子嗣（第3/7/11/15层与无尽深渊登场）。';
-        pool.spore_mother.sprite = 'assets/spire/mob_s5_reliquary.png';
-        pool.spore_mother.disabled = false;
-        pool.spore_mother.hidden = false;
-      }
-    }
-  });
-})(typeof window !== 'undefined' ? window : globalThis);
-/* SPIRE_V2_3_1_MONSTERS_END */
