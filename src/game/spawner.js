@@ -548,6 +548,7 @@ function summonSpecialBoss(rel, forceCutscene = false) {
 
 function beginWave(retryMeta = null) {
   state = 'wave';
+  if (typeof beginSpireFloor === 'function') beginSpireFloor(wave, !!(retryMeta && retryMeta.isRetry));
   inHurtPlayer = false;
   shake = 0;
   resetJoy();
@@ -883,12 +884,13 @@ function createEnemy(x, y, type, variant = '') {
     else baseBossHp = 14800 + Math.max(0, wave - MAX_WAVE) * 3600;
     const bhp = Math.round(baseBossHp * endlessMul * diff.hpMul * twinScale);
     const bossDmgBase = wave <= 4 ? 7.8 : (wave <= 8 ? 9.6 : (wave <= 12 ? 11.2 : 12.6));
-    const phase2Chance = (wave === 16 && bKey === 'solar_seraph')
-      ? 1.0 // 第 16 层日蚀圣女 100% 触发二阶段【真我破茧】演出！
-      : (isStoryBoss ? (selectedDiff >= 3 ? 0.30 : 0) : mythicRate);
+    // 主线以稳定的两阶段讲清每位守誓者的坚持与败北；无尽保留随机神话觉醒。
+    const phase2Chance = isStoryBoss ? 1 : mythicRate;
     ent = {
       ...base, r: 48, hp: bhp, maxHp: bhp, spd: bDef.spd * sm, dmg: Math.round(bossDmgBase * dm),
-      color: bDef.color, type: 'boss', variant: bKey, bossTitle: `${bDef.icon} ${bDef.name}`,
+      color: bDef.color, type: 'boss', variant: bKey,
+      bossTitle: `${bDef.icon} ${bDef.name}${isStoryBoss ? ' · 第一阶段' : ''}`,
+      storyPhaseBoss: isStoryBoss, storyStage: isStoryBoss ? 1 : 0,
       dashT: 2.5, sumT: 5.8, meteorT: 4.1, skillT: 2.2, terrainCd: 6.0, ringCd: 4.9,
       burstLeft: 0, burstCd: 0, canPhase2: Math.random() < phase2Chance, mythicPhase2: false,
       mat: wave <= 4 ? 26 : (wave <= 8 ? 34 : (wave <= 12 ? 42 : 52))

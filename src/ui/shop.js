@@ -1,4 +1,185 @@
-// 波次结算流转、战利品宝箱、基因强化与军火商店交互
+// 波次结算流转、战利品宝箱、记忆信物与风亭整备。
+// 一个楼层只接受一种最终结果，异步演出回调也必须属于同一个玩家/楼层实例。
+let spireFloorFlow = null;
+let spireFloorSerial = 0;
+const SPIRE_MEMENTO_KEYS = ['jinyu', 'astria', 'jialan', 'qingyu'];
+
+function getSpireStoryProgress() {
+  if (!player) return null;
+  if (!player.story || typeof player.story !== 'object') player.story = {};
+  const story = player.story;
+  if (!story.mementos || typeof story.mementos !== 'object') story.mementos = {};
+  if (!story.memories || typeof story.memories !== 'object') story.memories = {};
+  if (!story.clearedFloors || typeof story.clearedFloors !== 'object') story.clearedFloors = {};
+  return story;
+}
+
+function grantSpireMemento(key) {
+  if (endlessMode || !SPIRE_MEMENTO_KEYS.includes(key)) return false;
+  const story = getSpireStoryProgress();
+  if (!story) return false;
+  story.mementos[key] = true;
+  return true;
+}
+
+function rememberSpireMemento(key) {
+  const story = getSpireStoryProgress();
+  if (endlessMode || !story || !SPIRE_MEMENTO_KEYS.includes(key) || !story.mementos[key]) return false;
+  story.memories[key] = true;
+  return true;
+}
+
+function hasSpireTrueEnding() {
+  const story = getSpireStoryProgress();
+  return !!story && SPIRE_MEMENTO_KEYS.every(key => story.mementos[key] && story.memories[key]);
+}
+
+function beginSpireFloor(floor, isRetry) {
+  spireFloorFlow = {
+    serial: ++spireFloorSerial, floor, player, result: 'active', rewardsGranted: false,
+    awaitingChoice: !endlessMode && floor === MAX_WAVE
+  };
+  if (!endlessMode) {
+    const story = getSpireStoryProgress();
+    story.ending = null;
+    if (floor === 15 && isRetry) grantSpireMemento('qingyu');
+    if (floor === MAX_WAVE) {
+      const canResumeFight = isRetry && story.finalChoice === 'refuse' && hasSpireTrueEnding();
+      spireFloorFlow.awaitingChoice = !canResumeFight;
+      if (!canResumeFight) story.finalChoice = null;
+    }
+  }
+}
+
+function isCurrentSpireFlow(flow) {
+  return !!flow && flow === spireFloorFlow && flow.player === player && flow.floor === wave;
+}
+
+function isSpireCombatSuspended() {
+  return !!spireFloorFlow && isCurrentSpireFlow(spireFloorFlow) &&
+    (spireFloorFlow.result !== 'active' || spireFloorFlow.awaitingChoice);
+}
+
+function stopSpireCombat(flow, result) {
+  if (!isCurrentSpireFlow(flow) || flow.result !== 'active') return false;
+  flow.result = result;
+  flow.awaitingChoice = false;
+  state = 'story';
+  resetJoy();
+  for (const key in keys) keys[key] = false;
+  eBullets.length = 0;
+  bullets.length = 0;
+  hazards.length = 0;
+  spawns.length = 0;
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('pauseMenu').classList.add('hidden');
+  return true;
+}
+
+function resolveSpireBossDefeat(enemy) {
+  const flow = spireFloorFlow;
+  if (!player || player.hp <= 0 || !stopSpireCombat(flow, 'boss-defeated')) return;
+  // 一阶绝不能从这里通过：护栏也覆盖调试/外部伤害入口。
+  if (enemy.storyPhaseBoss && enemy.storyStage !== 2) {
+    flow.result = 'active';
+    state = 'wave';
+    enemy._storyDefeatQueued = false;
+    triggerBossMythicPhase2(enemy);
+    return;
+  }
+  flow.bossDefeated = true;
+  enemies.forEach(other => { if (other !== enemy) other.hp = 0; });
+  player.invuln = Math.max(player.invuln || 0, 3);
+  const memento = ({ 4: 'jinyu', 8: 'astria', 12: 'jialan' })[wave];
+  if (memento) grantSpireMemento(memento);
+  const finish = () => {
+    if (!isCurrentSpireFlow(flow) || flow.result !== 'boss-defeated' || flow.rewardsGranted || player.hp <= 0) return;
+    if (wave < MAX_WAVE) awardEnemyRewards(enemy);
+    else if (!enemy._rewarded) { enemy._rewarded = true; player.kills++; }
+    settleSpireFloor(flow);
+  };
+  if (typeof SpireDirector !== 'undefined' && typeof SpireDirector.onBossDefeated === 'function') {
+    SpireDirector.onBossDefeated(wave, enemy.variant, finish);
+  } else finish();
+}
+
+function resolveSpireFinalChoice(choice) {
+  const flow = spireFloorFlow;
+  if (endlessMode || wave !== MAX_WAVE || !isCurrentSpireFlow(flow) || flow.result !== 'active' ||
+      !flow.awaitingChoice || !player || player.hp <= 0) return false;
+  if (choice === 'refuse') {
+    if (!hasSpireTrueEnding()) return false;
+    getSpireStoryProgress().finalChoice = 'refuse';
+    // 镜前补完的记忆与选择进入同层检查点；重试不会丢失刚亲自确认的约定。
+    if (waveCheckpoint && waveCheckpoint.wave === wave && waveCheckpoint.player) {
+      waveCheckpoint.player.story = JSON.parse(JSON.stringify(getSpireStoryProgress()));
+      if (typeof SpireSave !== 'undefined' && SpireSave) SpireSave.write(waveCheckpoint);
+    }
+    flow.awaitingChoice = false;
+    state = 'wave';
+    document.getElementById('hud').classList.remove('hidden');
+    return true;
+  }
+  if (choice === 'accept') {
+    getSpireStoryProgress().finalChoice = 'accept';
+    if (!stopSpireCombat(flow, 'ending')) return false;
+    playSpireEnding('A', flow);
+    return true;
+  }
+  return false;
+}
+
+function playSpireEnding(ending, flow) {
+  if (!isCurrentSpireFlow(flow) || flow.endingStarted) return;
+  if (ending === 'B' && (!flow.bossDefeated || !hasSpireTrueEnding() || getSpireStoryProgress().finalChoice !== 'refuse')) return;
+  flow.endingStarted = true;
+  flow.result = 'ending';
+  state = 'story';
+  const story = getSpireStoryProgress();
+  story.ending = ending;
+  const done = () => {
+    if (!isCurrentSpireFlow(flow) || flow.result !== 'ending') return;
+    flow.result = 'ended';
+    try {
+      const records = JSON.parse(localStorage.getItem('spire-endings-v2') || '{}');
+      records[ending] = true;
+      localStorage.setItem('spire-endings-v2', JSON.stringify(records));
+    } catch (_) { /* Private browsing may disallow storage; the ending still completes. */ }
+    if (typeof SpireSave !== 'undefined' && SpireSave) SpireSave.clear();
+    waveCheckpoint = null;
+    showSpireEndMenu(true, ending);
+  };
+  if (typeof SpireDirector !== 'undefined' && typeof SpireDirector.playEnding === 'function') {
+    SpireDirector.playEnding(ending, done);
+  } else done();
+}
+
+function settleSpireFloor(flow) {
+  if (!isCurrentSpireFlow(flow) || flow.rewardsGranted || !player || player.hp <= 0) return;
+  flow.rewardsGranted = true;
+  const story = !endlessMode ? getSpireStoryProgress() : null;
+  if (story) story.clearedFloors[wave] = true;
+  if (!endlessMode && wave === MAX_WAVE) {
+    if (story.finalChoice === 'refuse' && hasSpireTrueEnding()) playSpireEnding('B', flow);
+    return;
+  }
+  // 剧场关闭后再回收战利品，避免箱子/奖励卡压在告别台词上。
+  if (!endlessMode) {
+    for (const drop of drops) {
+      if (drop.kind !== 'crate') continue;
+      if (drop.isMythic || pendingCrates < 3) {
+        pendingCrates++;
+        if (drop.isMythic) player.mythicCratesQueued = (player.mythicCratesQueued || 0) + 1;
+        else if (drop.isBoss) player.bossCratesQueued = (player.bossCratesQueued || 0) + 1;
+      } else player.mats += 16 + wave * 3;
+    }
+  }
+  settleWaveRewards();
+  flow.result = 'settled';
+  drops.length = 0;
+  advancePostWave();
+}
+
 function advancePostWave() {
   const cm = document.getElementById('crateMenu');
   const lm = document.getElementById('levelMenu');
@@ -16,6 +197,22 @@ function advancePostWave() {
 }
 
 function finishWave() {
+  if (!player || player.hp <= 0 || state !== 'wave') return;
+  const flow = spireFloorFlow;
+  if (!isCurrentSpireFlow(flow) || flow.result !== 'active' || flow.rewardsGranted || flow.awaitingChoice) return;
+  // 首领层必须由第二阶段的最终击败结束，不能通过计时归零绕过战斗。
+  if (!endlessMode && wave % 4 === 0) return;
+  if (!stopSpireCombat(flow, 'floor-cleared')) return;
+  const done = () => {
+    if (!isCurrentSpireFlow(flow) || flow.result !== 'floor-cleared') return;
+    settleSpireFloor(flow);
+  };
+  if (!endlessMode && typeof SpireDirector !== 'undefined' && typeof SpireDirector.onFloorCleared === 'function') {
+    SpireDirector.onFloorCleared(wave, done);
+  } else done();
+}
+
+function settleWaveRewards() {
   resetJoy();
   beep(660, 0.18, 'triangle', 0.07);
   let leftoverMats = 0;
@@ -45,8 +242,6 @@ function finishWave() {
   logInfo('WAVE_END', `第 ${wave} 波通关 · 结算晶石=${player.mats} (回收+${leftover}, 津贴+${clearBonus}, 收获+${harvestGain}, 利息+${interestGain}, 宝箱=${pendingCrates}) · 击杀=${player.kills}`);
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('pauseMenu').classList.add('hidden');
-  if (!endlessMode && wave >= MAX_WAVE) { endGame(true); return; }
-  advancePostWave();
 }
 
 // 严格受控的战利品与商店品质概率曲线（幸运收益递减软上限，杜绝后期满屏传说刷屏）
@@ -519,6 +714,8 @@ function renderShop() {
   renderBuildSummary('statsRow', 'setRow');
   const witchImgEl = document.getElementById('shopMerchantPortrait');
   if (witchImgEl) {
+    witchImgEl.alt = !endlessMode && wave < 15 ? '青羽 · 风亭行商' : '青羽 · 记忆的守望者';
+    witchImgEl.title = '与青羽交谈';
     if (typeof SpireAssets !== 'undefined' && typeof SpireAssets.resolve === 'function') {
       const resolvedSrc = SpireAssets.resolve('assets/spire/port_qingyu.jpg');
       if (witchImgEl._resolvedSrc !== resolvedSrc) {
@@ -529,12 +726,11 @@ function renderShop() {
     if (!witchImgEl._chatBound) {
       witchImgEl._chatBound = true;
       witchImgEl.style.cursor = 'pointer';
-      witchImgEl.title = '点击与残羽魔女·青羽交谈';
       const bonusTalks = [
-        '「风羽替你探过路啦——按【Space / Shift / 右键】就能发动你专属的青焰瞬步，穿弹超帅的！」',
-        '「每登到第 4、8、12、16 层，守誓同伴都会咏唱她们的成名绝学，看清地上法阵再瞬步切入破绽吧！」',
-        '「同名同阶的守誓兵装买回来会自动共鸣升阶，凑齐羁绊比盲目堆数量更锋利哦。」',
-        '「别急着把晶石花光，若是刷到了趁手的高阶圣遗物，点右上角的小锁就能替你留到下一层~」'
+        '雨还没停。先暖暖手，再看看缺什么。',
+        '看见地上的预警就先让开。瞬步可以穿过弹雨，但要留一点余地。',
+        '同名、同阶的兵装能合在一起。带得趁手，比带得多更要紧。',
+        '想留的东西，替它扣上小锁。下次来，我还给你留着。'
       ];
       let talkIdx = 0;
       witchImgEl.onclick = () => {
@@ -555,9 +751,25 @@ function renderShop() {
     : `${floorBadgeTxt}整备  —  青羽的风语行商（${diff.badge}）`;
   const subEl = document.getElementById('shopSub');
   if (subEl) {
-    const whisper = (typeof SPIRE_STORY_PACK !== 'undefined' && SPIRE_STORY_PACK.witchWhispers)
-      ? SPIRE_STORY_PACK.witchWhispers[Math.min(SPIRE_STORY_PACK.witchWhispers.length - 1, Math.max(0, wave - 1))]
-      : '';
+    const storyWhispers = [
+      '我叫青羽。做些补给生意，也替人认认遗失的东西。',
+      '桥上的雨太凉。带一块干布，灯别淋灭了。',
+      '旧编号，不是名字。那块铭牌先收好。',
+      '烬羽的剑穗，还是你以前系的样子。别弄丢了。',
+      '冰里的人还在呼吸。灯举低一些。',
+      '有些声音会让灯自己亮起来。你要留意它照向哪里。',
+      '那段曲子还没弹完。见到她，再听一听。',
+      '画像是证据。你仔细看她的手，她也怕弄疼你。',
+      '这里的钟总往回走。你脚下的路却可以往前。',
+      '她不肯让你看手上的裂缝。你看到了，就替她记着。',
+      '有些事记不起了，手还会记得。',
+      '那道“阻止我”的指令，是你留下的。现在你亲自听见了。',
+      '先看清脚下，再去听镜里的声音。',
+      '我在这里。门后的话，你可以慢慢想。',
+      '四件旧物都在了。进门之前，把我们的约定想完整。',
+      '茶快凉了。'
+    ];
+    const whisper = endlessMode ? '' : storyWhispers[Math.max(0, Math.min(15, wave - 1))];
     subEl.textContent = whisper
       ? `${whisper}${anvilUpgradedMsg}`
       : `${diff.badge}  ·  ${curScene.name}  ·  同名同阶兵装可共鸣升阶${anvilUpgradedMsg}`;
@@ -573,7 +785,7 @@ function renderShop() {
     mrb.textContent = rerollTxt;
     mrb.disabled = player.mats < actualReroll;
   }
-  const nextLabel = nextIsBoss
+  const nextLabel = !endlessMode && nextFloorNum === 16 ? '准备好了，推开终门 →' : nextIsBoss
     ? `◆ 迎战第 ${nextFloorNum} 层守誓首领 →`
     : `◆ 登往第 ${nextFloorNum} 层 →`;
   const dnb = document.getElementById('deskNextBtn');
@@ -775,9 +987,35 @@ function rerollShop() {
   rollOffers(); beep(440, 0.05); renderShop();
 }
 
-function nextWave() { wave++; beginWave(); }
+function nextWave() {
+  if (state !== 'shop' || !player) return;
+  if (typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay()) return;
+  wave++;
+  beginWave();
+}
 
 function endGame(win) {
+  if (!player || state === 'end') return;
+  const flow = spireFloorFlow;
+  if (!isCurrentSpireFlow(flow)) return;
+  if (win) {
+    if (!endlessMode && wave === MAX_WAVE && flow.bossDefeated && getSpireStoryProgress().finalChoice === 'refuse' && hasSpireTrueEnding()) {
+      playSpireEnding('B', flow);
+    }
+    return;
+  }
+  if (!stopSpireCombat(flow, 'player-defeated')) return;
+  const done = () => {
+    if (!isCurrentSpireFlow(flow) || flow.result !== 'player-defeated') return;
+    flow.result = 'ended';
+    showSpireEndMenu(false);
+  };
+  if (!endlessMode && typeof SpireDirector !== 'undefined' && typeof SpireDirector.onPlayerDefeated === 'function') {
+    SpireDirector.onPlayerDefeated(wave, done);
+  } else done();
+}
+
+function showSpireEndMenu(win, ending = '') {
   state = 'end';
   resetJoy();
   document.getElementById('hud').classList.add('hidden');
@@ -785,41 +1023,56 @@ function endGame(win) {
   const cm = document.getElementById('crateMenu');
   if (cm) cm.classList.add('hidden');
   const em = document.getElementById('endMenu');
+  if (typeof em.setAttribute === 'function') em.setAttribute('data-result', win ? `ending-${ending}` : 'defeat');
+  const actIndex = Math.max(1, Math.min(4, Math.ceil(wave / 4)));
+  const background = !win && wave === 4
+    ? 'assets/spire/v2/player-defeat-clean.png'
+    : `assets/spire/scene_${actIndex}_vista.jpg`;
+  const imageUrl = typeof resolveSpireAssetUrl === 'function' ? resolveSpireAssetUrl(background) :
+    ((typeof window !== 'undefined' && window.__SPIRE_INLINE_ASSETS__ && window.__SPIRE_INLINE_ASSETS__[background]) || background);
+  if (em.style && typeof em.style.setProperty === 'function') em.style.setProperty('--ending-art', `url("${imageUrl}")`);
   em.classList.remove('hidden');
   em.scrollTop = 0;
-  document.getElementById('endlessBtn').classList.toggle('hidden', !win);
+  document.getElementById('endlessBtn').classList.toggle('hidden', !win || ending !== 'B');
   const waveLabel = endlessMode ? `无尽第 ${wave} 层` : `第 ${wave} / ${MAX_WAVE} 层`;
   const retryBtn = document.getElementById('retryWaveBtn');
   if (retryBtn) {
     const canRetry = !win && typeof waveCheckpoint !== 'undefined' && !!(waveCheckpoint && waveCheckpoint.player);
     retryBtn.classList.toggle('hidden', !canRetry);
-    retryBtn.textContent = `◆ 重新开始本层 (${waveLabel})`;
+    retryBtn.textContent = '重试本层';
   }
   const abandonBtn = document.getElementById('abandonRestartBtn');
   if (abandonBtn) {
-    abandonBtn.classList.toggle('hidden', !!win);
+    abandonBtn.classList.add('hidden');
     abandonBtn.textContent = '放弃并从头开始';
   }
   const mainBtn = document.getElementById('endMainMenuBtn');
   if (mainBtn) {
     mainBtn.className = win ? 'btn btn-go' : 'btn btn-sec';
-    mainBtn.textContent = win ? '◆ 再启轮回' : '返回主殿';
+    mainBtn.textContent = win && ending === 'A' ? '再次提灯启程' : '返回主殿';
   }
   const clsObj = CLASSES.find(c => c.id === player.cls);
   const retries = (player && player.retryCount) || 0;
-  logInfo('END', `${win ? '破晓通关' : '提灯熄灭'} · 角色=${clsObj ? clsObj.name : player.cls} · 波次=${wave} · Lv=${player.lv} · 击杀=${player.kills} · 重开=${retries}`);
-  document.getElementById('endTitle').textContent = win ? '第 1000 道黎明破晓 · 天灾神骸已碎' : '青焰提灯于长夜中黯然熄灭';
+  logInfo('END', `${win ? (ending === 'A' ? '神座加冕' : '守誓者的破晓') : '本层败北'} · 角色=${clsObj ? clsObj.name : player.cls} · 波次=${wave} · Lv=${player.lv} · 击杀=${player.kills} · 重开=${retries}`);
+  document.getElementById('endTitle').textContent = win ? (ending === 'A' ? '神座加冕' : '第一千道黎明') : '魂灯未熄';
   const storyNote = win
-    ? '<br><span style="color:#89c4d4">烬羽的残火、艾丝特莉亚的冰冕、伽蓝的星晷与青羽的微风化作晨光——这一次，人间终于迎来了没有天灾的黎明。</span>'
-    : '<br><span style="color:#d46a7e">守誓者们的叹息仍在高塔回荡……重新握紧提灯，再次改写第九百九十九次轮回。</span>';
+    ? (ending === 'A'
+      ? '<br><span class="ending-story-note">你与镜中圣女合一，黑日吞没了世界。无边的孤寂中，记忆再次崩散。第一千次轮回开始了。</span>'
+      : '<br><span class="ending-story-note">四位同伴的温暖残影与你斩碎了黑镜。长桥雨停，冰城苏醒，钟声终于向前。她们留在旧物、晨光与你的记忆里。</span>')
+    : `<br><span class="ending-story-note">你倒在了${['雨夜长桥', '永冻冰窟', '倒悬钟楼', '日蚀镜界'][actIndex - 1]}。可以从第 ${wave} 层起点重新握紧提灯。</span>`;
   document.getElementById('endDesc').innerHTML =
     `厄度：<b>${diff.badge}</b>  ·  登塔者：<b>${clsObj ? clsObj.name : ''}</b>  ·  抵达：<b>${waveLabel}</b>  ·  共鸣：<b>Lv.${player.lv}</b>  ·  净化：<b>${player.kills}</b>` +
     (retries > 0 ? `  ·  回溯：<b>${retries} 次</b>` : '') + storyNote;
 }
 
 function continueEndless() {
+  if (state !== 'end' || !player || getSpireStoryProgress().ending !== 'B') return;
   endlessMode = true;
   beep(620, 0.09, 'triangle');
   document.getElementById('endMenu').classList.add('hidden');
-  advancePostWave();
+  // 真结局后由第 17 层继续；没有把结局演出当成普通宝箱结算。
+  pendingCrates = 0;
+  pendingLevels = 0;
+  wave = MAX_WAVE + 1;
+  beginWave();
 }

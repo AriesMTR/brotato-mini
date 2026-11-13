@@ -412,18 +412,20 @@ function applyPoison(e, addStacks = 1) {
   if (!e.poisonTick || e.poisonTick <= 0) e.poisonTick = 0.46;
 }
 
-// 首领 25% 概率触发的【隐藏二阶段 · 真红神话觉醒】（回血狂暴 + 补充 60 秒 + 播放隐藏动画 + 必爆传说神装，同波防双王叠加）
+// 主线固定第二阶段；无尽保留 25% 神话觉醒与额外战利品。
 function triggerBossMythicPhase2(e) {
   if (!e || e.mythicPhase2) return false;
-  if (player && player.waveMythicAwakened) {
+  const storyPhase = !!e.storyPhaseBoss && !endlessMode;
+  if (!storyPhase && player && player.waveMythicAwakened) {
     e.canPhase2 = false;
     return false;
   }
   if (player) {
     player.waveMythicAwakened = true;
-    player.mythicAwakenedCount = (player.mythicAwakenedCount || 0) + 1;
+    if (!storyPhase) player.mythicAwakenedCount = (player.mythicAwakenedCount || 0) + 1;
   }
   e.mythicPhase2 = true;
+  if (storyPhase) e.storyStage = 2;
   e.canPhase2 = false;
   e.maxHp = Math.max(300, Math.round(e.maxHp * 0.74));
   e.hp = e.maxHp;
@@ -431,7 +433,9 @@ function triggerBossMythicPhase2(e) {
   e.dmg = Math.round(e.dmg * 1.16);
   e.spd *= 1.10;
   e.exposeT = 0;
-  if (!String(e.bossTitle || '').includes('神话')) {
+  if (storyPhase) {
+    e.bossTitle = String(e.bossTitle || '守誓者').replace(/ · 第一阶段$/, '') + ' · 第二阶段';
+  } else if (!String(e.bossTitle || '').includes('神话')) {
     e.bossTitle = `⚡ ${e.bossTitle || '深渊首领'} · 神话二阶段`;
   }
   overtime = false;
@@ -475,9 +479,13 @@ function triggerBossMythicPhase2(e) {
       5.8
     );
   }
-  if (player) addText(player.x, player.y - 52, '⚡ 隐藏二阶段觉醒！时间 +60s！', '#ffd166', 21, 2.8);
-  announce('⚡ 逆天异变！首领觉醒【隐藏神话二阶段】，补充 +60 秒，击败必掉传说神装！', '#ffd166', 4.5);
-  logInfo('MYTHIC_PHASE2', `首领触发隐藏二阶段觉醒 ${e.bossTitle} · HP=${e.maxHp} · 延长回合至 ${Math.ceil(waveTime)}s`);
+  if (storyPhase) {
+    logInfo('STORY_PHASE2', `${e.bossTitle} · HP=${e.maxHp} · 不发放胜利奖励`);
+  } else {
+    if (player) addText(player.x, player.y - 52, '⚡ 隐藏二阶段觉醒！时间 +60s！', '#ffd166', 21, 2.8);
+    announce('⚡ 逆天异变！首领觉醒【隐藏神话二阶段】，补充 +60 秒，击败必掉传说神装！', '#ffd166', 4.5);
+    logInfo('MYTHIC_PHASE2', `首领触发隐藏二阶段觉醒 ${e.bossTitle} · HP=${e.maxHp} · 延长回合至 ${Math.ceil(waveTime)}s`);
+  }
   return true;
 }
 
@@ -493,6 +501,9 @@ function primeBomber(e) {
 
 function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts = {}) {
   if (!e || e.hp <= 0 || e.primed || !Number.isFinite(rawDmg)) return;
+  if (!player || player.hp <= 0 || state !== 'wave') return;
+  if (typeof isSpireCombatSuspended === 'function' && isSpireCombatSuspended()) return;
+  if (typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay()) return;
   if (!Number.isFinite(e.hp)) { e.hp = 0; return; }
 
   // 铁甲圣甲虫正面举盾减伤 45% + 金属格挡火星（格挡轻提示 0.38s 快隐 + 0.28s 节流防刷屏）
@@ -634,8 +645,7 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
       return;
     }
     if ((e.type === 'boss' || e.type === 'special_boss') && e.canPhase2 && !e.mythicPhase2) {
-      triggerBossMythicPhase2(e);
-      return;
+      if (triggerBossMythicPhase2(e)) return;
     }
     killEnemyRewards(e);
   }
@@ -672,6 +682,23 @@ function dropCrystals(x, y, totalMat) {
 }
 
 function killEnemyRewards(e) {
+  if (!e || e._rewarded || e._storyDefeatQueued || !player || player.hp <= 0 || state !== 'wave') return;
+  if (typeof isSpireCombatSuspended === 'function' && isSpireCombatSuspended()) return;
+  const isStoryActBoss = !endlessMode && e.type === 'boss' && wave <= MAX_WAVE && wave % 4 === 0;
+  if (isStoryActBoss && typeof resolveSpireBossDefeat === 'function') {
+    // 本帧立即锁定结果；之后的弹丸/反伤不得同时把本层结算为玩家失败。
+    e.hp = 0;
+    e._storyDefeatQueued = true;
+    resolveSpireBossDefeat(e);
+    return;
+  }
+  awardEnemyRewards(e);
+}
+
+// 真正的奖励只由击败流程调用一次。主线首领在告别演出结束后才抵达这里。
+function awardEnemyRewards(e) {
+  if (!e || e._rewarded || !player || player.hp <= 0) return;
+  e._rewarded = true;
   e.hp = 0;
   player.kills++;
   if (player && (player.dashCd || 0) > 0) {
@@ -741,7 +768,7 @@ function killEnemyRewards(e) {
   }
 
   // 若击败的是【隐藏二阶段·真红神话形态】首领，额外爆出必出传说装的【神话秘宝舱】与永久弑神赐福！
-  if (e.mythicPhase2) {
+  if (e.mythicPhase2 && !e.storyPhaseBoss) {
     dropCrystals(e.x, e.y, 36);
     player.dmgMul += 0.15;
     player.critDmg = (player.critDmg || 0) + 0.25;
@@ -786,34 +813,14 @@ function killEnemyRewards(e) {
   }
 
   if (e.type === 'boss' || e.type === 'special_boss') {
+    // 主线的清场、对白和结算由 resolveSpireBossDefeat 统一串联。
+    if (!endlessMode && e.type === 'boss' && wave <= MAX_WAVE && wave % 4 === 0) return;
     const otherBoss = enemies.some(o => o !== e && (o.type === 'boss' || o.type === 'special_boss') && o.hp > 0);
     if (!otherBoss && !spawns.some(s => s.type === 'boss' || s.type === 'special_boss')) {
       eBullets.length = 0;
       hazards.length = 0;
       if (player) player.invuln = Math.max(player.invuln || 0, 3.0);
-      const isStoryActBoss = (!endlessMode && e.type === 'boss' && wave <= MAX_WAVE && wave % 4 === 0);
-      if (isStoryActBoss) {
-        // 守誓者解脱：净化场上残余杂兵与刷怪点，并将首领秘宝与晶石牵引至提灯人身边
-        spawns.length = 0;
-        for (let oi = 0; oi < enemies.length; oi++) {
-          const oe = enemies[oi];
-          if (oe && oe !== e && oe.hp > 0) {
-            addBurst(oe.x, oe.y, '#72efdd', 5, 95);
-            oe.hp = 0;
-          }
-        }
-        if (player) {
-          for (let di = 0; di < drops.length; di++) {
-            drops[di].x = player.x + (di % 3 - 1) * 6;
-            drops[di].y = player.y;
-          }
-        }
-        overtime = false;
-        waveTime = Math.min(waveTime, 0.28);
-        if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.onBossDefeated === 'function') {
-          SpireDirector.onBossDefeated(wave, e.variant);
-        }
-      } else if (overtime) {
+      if (overtime) {
         overtime = false;
         waveTime = Math.min(waveTime, 0.8);
       } else if (e.type === 'boss') {
@@ -849,6 +856,8 @@ function triggerBullNova() {
 // 全面加固受击结算（防重入锁 + 状态校验 + 阵亡即时熔断，彻底根治受击瞬间卡死或二次爆炸异常）
 function hurtPlayer(rawDmg) {
   if (!player || state !== 'wave' || player.hp <= 0 || player.invuln > 0 || inHurtPlayer) return;
+  if (typeof isSpireCombatSuspended === 'function' && isSpireCombatSuspended()) return;
+  if (typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay()) return;
   if (!Number.isFinite(rawDmg) || rawDmg <= 0) return;
   inHurtPlayer = true;
   try {

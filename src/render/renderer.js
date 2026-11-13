@@ -1529,47 +1529,89 @@ function draw() {
 
 logInfo('BOOT', `引擎启动完成 · view=${viewW}x${viewH}(dpr=${dpr}) · ui=${uiMode} · world=${WORLD.w}x${WORLD.h}(scale=${curFloorScale})`);
 last = performance.now();
+// Full-screen HTML menus and the narrative stage cover the battlefield entirely.
+// Keep the last battle frame on pause; never repaint thousands of hidden sprites.
+function shouldRenderBattlefield() {
+  return state === 'wave' && !(typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay());
+}
+
+let framePacingRemainder = 0;
+let previousLoopMode = '';
+let battleUpdateCostMs = 0, battleDrawCostMs = 0, battleCostSamples = 0;
 function loop(now) {
   requestAnimationFrame(loop);
   const safeNow = Number.isFinite(now) ? now : performance.now();
+  if (document.hidden) { last = safeNow; framePacingRemainder = 0; resetBattleFrameSample(); return; }
+  const playing = shouldRenderBattlefield();
+  const storytelling = typeof SpireDirector !== 'undefined' && SpireDirector.isActive();
+  // Target 60 FPS in battle; prose needs at most 30 updates/s, static menus 10.
+  // The elapsed time is accumulated until work runs, so throttling never slows time.
+  const frameBudget = playing ? (1000 / 60) : (storytelling ? (1000 / 30) : 100);
+  const loopMode = playing ? 'battle' : (storytelling ? 'story' : 'idle');
+  if (loopMode !== previousLoopMode) {
+    framePacingRemainder = 0;
+    previousLoopMode = loopMode;
+    resetBattleFrameSample();
+    // The first frame includes time spent on a different screen.
+    battleUpdateCostMs = battleDrawCostMs = battleCostSamples = 0;
+    perfLogAcc = 0;
+  }
+  if (safeNow - last + framePacingRemainder < frameBudget - 0.75) return;
   const rawMs = Math.max(0, safeNow - last);
-  const dt = Math.min(0.05, rawMs / 1000);
+  // Carry the fractional interval over: dropping it halves the effective
+  // frame rate on 75/90 Hz displays and produces uneven pacing on 144 Hz.
+  framePacingRemainder = Math.max(0, rawMs + framePacingRemainder - frameBudget) % frameBudget;
+  const dt = Math.min(playing ? 0.05 : 0.15, rawMs / 1000);
   last = safeNow;
 
-  if (state === 'wave' && !(typeof document !== 'undefined' && document.hidden) && rawMs > 180 && rawMs < 5000) {
+  if (playing && rawMs > 180 && rawMs < 5000) {
     logSpikeCount++;
     logWarn('STALL', `帧耗时峰值 ${Math.round(rawMs)}ms · w=${wave} E=${enemies.length} B=${bullets.length} P=${particles.length}`);
   }
 
-  const sampleMs = Math.min(250, rawMs);
-  fpsFrames++;
-  fpsAcc += sampleMs;
-  if (rawMs < 5000 && rawMs > maxFrameMsWindow) maxFrameMsWindow = rawMs;
-  if (fpsAcc >= 500) {
-    fpsVal = Math.max(1, Math.min(240, Math.round((fpsFrames * 1000) / fpsAcc)));
-    fpsFrames = 0;
-    fpsAcc = 0;
-  }
-
-  if (state === 'wave') {
+  if (playing) {
+    const sampleMs = Math.min(250, rawMs);
+    fpsFrames++;
+    fpsAcc += sampleMs;
+    if (rawMs < 5000 && rawMs > maxFrameMsWindow) maxFrameMsWindow = rawMs;
+    if (fpsAcc >= 500) {
+      fpsVal = Math.max(1, Math.min(240, Math.round((fpsFrames * 1000) / fpsAcc)));
+      fpsFrames = 0;
+      fpsAcc = 0;
+    }
     perfLogAcc += dt;
     if (perfLogAcc >= 5.0) {
       perfLogAcc = 0;
-      logInfo('PERF', `FPS=${fpsVal} maxFrame=${Math.round(maxFrameMsWindow)}ms w=${wave}(${Math.ceil(waveTime)}s) E=${enemies.length} B=${bullets.length} D=${drops.length}`);
+      const samples = Math.max(1, battleCostSamples);
+      logInfo('PERF', `FPS=${fpsVal} maxFrame=${Math.round(maxFrameMsWindow)}ms update=${(battleUpdateCostMs / samples).toFixed(1)}ms draw=${(battleDrawCostMs / samples).toFixed(1)}ms dpr=${dpr.toFixed(2)} w=${wave}(${Math.ceil(waveTime)}s) E=${enemies.length} B=${bullets.length} D=${drops.length}`);
       maxFrameMsWindow = 0;
+      battleUpdateCostMs = battleDrawCostMs = battleCostSamples = 0;
     }
+  } else {
+    // Menu/story throttling is intentional and is not a battle FPS sample.
+    fpsFrames = 0;
+    fpsAcc = 0;
+    maxFrameMsWindow = 0;
   }
 
+  if (playing && !bossCutscene) recordBattleFrame(rawMs);
+  const updateStart = playing ? performance.now() : 0;
   try {
     update(dt);
   } catch (err) {
     logError('UPDATE_ERR', err);
   }
-  try {
-    draw();
-  } catch (err) {
-    logError('DRAW_ERR', err);
-    try { ctx.restore(); } catch (_) {}
+  if (playing) battleUpdateCostMs += performance.now() - updateStart;
+  if (shouldRenderBattlefield()) {
+    const drawStart = performance.now();
+    try {
+      draw();
+    } catch (err) {
+      logError('DRAW_ERR', err);
+      try { ctx.restore(); } catch (_) {}
+    }
+    battleDrawCostMs += performance.now() - drawStart;
+    battleCostSamples++;
   }
   if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.render === 'function') {
     try {

@@ -43,20 +43,32 @@ if (fs.existsSync(path.join(ROOT, 'assets/icon.svg'))) {
 }
 const spireDir = path.join(ROOT, 'assets/spire');
 if (fs.existsSync(spireDir)) {
-  for (const name of fs.readdirSync(spireDir).sort()) {
-    const abs = path.join(spireDir, name);
-    if (!fs.statSync(abs).isFile()) continue;
-    const ext = path.extname(name).toLowerCase();
-    if (!MIME_BY_EXT[ext]) continue;
-    inlineAssets[`assets/spire/${name}`] = toDataUri(abs);
-  }
+  const collect = dir => {
+    for (const name of fs.readdirSync(dir).sort()) {
+      const abs = path.join(dir, name);
+      if (fs.statSync(abs).isDirectory()) { collect(abs); continue; }
+      const ext = path.extname(name).toLowerCase();
+      // Reference boards contain baked UI and are documentation, not runtime art.
+      if (!MIME_BY_EXT[ext] || name.endsWith('-reference.png')) continue;
+      inlineAssets[path.relative(ROOT, abs).split(path.sep).join('/')] = toDataUri(abs);
+    }
+  };
+  collect(spireDir);
 }
 
 // Collect all CSS <link rel="stylesheet" href="...">
 const cssLinks = [...indexHtml.matchAll(/<link\s+rel="stylesheet"\s+href="([^"]+)"\s*>/g)];
 if (!cssLinks.length) throw new Error('No stylesheet links found in index.html');
 const combinedCss = cssLinks
-  .map(m => fs.readFileSync(path.join(ROOT, stripQuery(m[1])), 'utf8').trim())
+  .map(m => {
+    const cssPath = path.join(ROOT, stripQuery(m[1]));
+    return fs.readFileSync(cssPath, 'utf8').trim().replace(/url\(\s*(['"]?)([^)'"\s]+)\1\s*\)/g, (match, quote, url) => {
+      if (/^(?:data:|https?:|#)/i.test(url)) return match;
+      const abs = path.resolve(path.dirname(cssPath), stripQuery(url));
+      const key = path.relative(ROOT, abs).split(path.sep).join('/');
+      return inlineAssets[key] ? `url("${inlineAssets[key]}")` : match;
+    });
+  })
   .join('\n\n')
   .split('\n')
   .map(l => (l.length ? `  ${l}` : ''))

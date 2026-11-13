@@ -245,7 +245,7 @@ const SpireAssets = (function () {
     const cacheKey = relPath + '@' + cap;
     let entry = _spriteBank[cacheKey];
     if (entry) return entry.ready ? entry : null;
-    entry = { ready: false, normal: null, flash: null, w: cap, h: cap };
+    entry = { ready: false, normal: null, flash: null, normalView: null, flashView: null, w: cap, h: cap };
     _spriteBank[cacheKey] = entry;
     loadImage(relPath, function (img) {
       const nw = img.naturalWidth || 256, nh = img.naturalHeight || 256;
@@ -272,6 +272,10 @@ const SpireAssets = (function () {
       entry.flash = cFlash;
       entry.w = tw;
       entry.h = th;
+      // Stable views are shared by draw calls. Hundreds of sprites no longer
+      // allocate a short-lived wrapper every frame while reading this cache.
+      entry.normalView = { canvas: cNorm, w: tw, h: th };
+      entry.flashView = { canvas: cFlash, w: tw, h: th };
       entry.ready = true;
     });
     return entry.ready ? entry : null;
@@ -282,7 +286,7 @@ const SpireAssets = (function () {
     if (!relPath || typeof document === 'undefined') return null;
     let entry = _sheetBank[relPath];
     if (entry) return entry.ready ? entry : null;
-    entry = { ready: false, normal: null, flash: null, cellW: 256, cellH: 256, frames: 4 };
+    entry = { ready: false, normal: null, flash: null, normalView: null, flashView: null, cellW: 256, cellH: 256, frames: 4 };
     _sheetBank[relPath] = entry;
     loadImage(relPath, function (img) {
       const nw = img.naturalWidth || 1024;
@@ -311,6 +315,8 @@ const SpireAssets = (function () {
       entry.cellW = cellW;
       entry.cellH = cellH;
       entry.frames = frames;
+      entry.normalView = { canvas: cNorm, cellW, cellH, frames };
+      entry.flashView = { canvas: cFlash, cellW, cellH, frames };
       entry.ready = true;
     });
     return entry.ready ? entry : null;
@@ -321,26 +327,21 @@ const SpireAssets = (function () {
     if (!rel) return null;
     const ent = ensureSheetEntry(rel);
     if (!ent) return null;
-    return {
-      canvas: flash ? ent.flash : ent.normal,
-      cellW: ent.cellW,
-      cellH: ent.cellH,
-      frames: ent.frames
-    };
+    return flash ? ent.flashView : ent.normalView;
   }
 
   function getHeroSprite(cls, flash) {
     const rel = HERO_MAP[cls] || HERO_MAP.allrounder;
     const ent = ensureSpriteEntry(rel, 256);
     if (!ent) return null;
-    return { canvas: flash ? ent.flash : ent.normal, w: ent.w, h: ent.h };
+    return flash ? ent.flashView : ent.normalView;
   }
 
   function getPropSprite(sceneId, flash) {
     const rel = PROP_MAP[sceneId] || PROP_MAP.foundry;
     const ent = ensureSpriteEntry(rel, 224);
     if (!ent) return null;
-    return { canvas: flash ? ent.flash : ent.normal, w: ent.w, h: ent.h };
+    return flash ? ent.flashView : ent.normalView;
   }
 
   function pickMonsterPath(e) {
@@ -377,7 +378,7 @@ const SpireAssets = (function () {
     const isBig = e && (e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss' || e.type === 'juggernaut');
     const ent = ensureSpriteEntry(rel, isBig ? 256 : 208);
     if (!ent) return null;
-    return { canvas: flash ? ent.flash : ent.normal, w: ent.w, h: ent.h };
+    return flash ? ent.flashView : ent.normalView;
   }
 
   const _arenaHooked = Object.create(null);
@@ -426,42 +427,19 @@ const SpireAssets = (function () {
 
   function warmup() {
     if (typeof Image === 'undefined') return;
-    // 第一优先级：开场动画 3 镜 + 第一幕远景/地面 + 全部 6 位主角左侧半身立绘与 4 帧动作表！
-    ['assets/spire/cut_intro_1.jpg', 'assets/spire/cut_intro_2.jpg', 'assets/spire/cut_intro_3.jpg'].forEach(f => loadImage(f));
-    loadImage(SPIRE_STORY_PACK.vistaMaps.foundry);
-    getArenaBg('foundry');
-    const uniqueSheets = new Set(Object.values(HERO_SHEET_MAP));
-    uniqueSheets.forEach(s => ensureSheetEntry(s));
-    const uniquePortraits = new Set(Object.values(PORTRAIT_MAP));
-    uniquePortraits.forEach(p => loadImage(p));
-    Object.values(HERO_MAP).forEach(p => ensureSpriteEntry(p, 256));
-    ensureSpriteEntry(PROP_MAP.foundry, 224);
-    Object.values(SCENE_MOBS.foundry).forEach(p => ensureSpriteEntry(p, 208));
-
-    const idle = (typeof requestIdleCallback === 'function')
-      ? cb => requestIdleCallback(cb, { timeout: 1000 })
-      : cb => setTimeout(cb, 160);
-
-    idle(function () {
-      ['glacier', 'wasteland', 'desert'].forEach(sc => {
-        getArenaBg(sc);
-        loadImage(SPIRE_STORY_PACK.vistaMaps[sc]);
-        ensureSpriteEntry(PROP_MAP[sc], 224);
-        Object.values(SCENE_MOBS[sc]).forEach(p => ensureSpriteEntry(p, 208));
-      });
-      ensureSpriteEntry('assets/spire/mob_s3_bomb.png', 208);
-      ensureSpriteEntry('assets/spire/mob_s4_colossus.png', 256);
-    });
-
-    setTimeout(function () {
-      Object.values(SPIRE_STORY_PACK.cutscenes).forEach(pk => pk.frames.forEach(f => loadImage(f)));
-      [
-        'assets/spire/cut_defeat_act1_1.jpg', 'assets/spire/cut_defeat_act1_2.jpg',
-        'assets/spire/cut_defeat_act2_1.jpg', 'assets/spire/cut_defeat_act2_2.jpg',
-        'assets/spire/cut_defeat_act3_1.jpg', 'assets/spire/cut_defeat_act3_2.jpg',
-        'assets/spire/cut_defeat_act4_1.jpg', 'assets/spire/cut_defeat_act4_2.jpg'
-      ].forEach(f => loadImage(f));
-    }, 650);
+    // Only the first playable area is warmed. Later scenes/sheets use the same
+    // cached lazy getters; obsolete cutscenes are no longer decoded at startup.
+    const jobs = [
+      () => ensureSheetEntry(HERO_SHEET_MAP.zero),
+      () => getArenaBg('foundry'),
+      () => ensureSpriteEntry(PROP_MAP.foundry, 224),
+      ...Object.values(SCENE_MOBS.foundry).map(p => () => ensureSpriteEntry(p, 208))
+    ];
+    const idle = typeof requestIdleCallback === 'function'
+      ? cb => requestIdleCallback(cb, { timeout: 1500 })
+      : cb => setTimeout(cb, 120);
+    const next = () => { const job = jobs.shift(); if (job) { job(); if (jobs.length) idle(next); } };
+    idle(next);
   }
 
   warmup();

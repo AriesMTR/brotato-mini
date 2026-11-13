@@ -77,19 +77,7 @@ function update(dt) {
   if (typeof SpireDirector !== 'undefined' && SpireDirector) {
     SpireDirector.update(dt);
     if (SpireDirector.isBlockingGameplay()) {
-      if (state === 'wave' && player) {
-        // 登场剧情播放期间预先将首领实体从传送预警法阵具象化至桥心，对话落幕瞬间即可无缝交锋
-        for (let i = spawns.length - 1; i >= 0; i--) {
-          const sp = spawns[i];
-          if (sp.type === 'boss' || sp.type === 'special_boss' || sp.type === 'mini_boss') {
-            sp.t -= dt;
-            if (sp.t <= 0) {
-              createEnemy(sp.x, sp.y, sp.type, sp.variant);
-              spawns.splice(i, 1);
-            }
-          }
-        }
-      }
+      // 剧情、选项与回看期间连刷怪预警也冻结，镜前作决定时不提前启动战斗。
       return;
     }
     const ts = typeof SpireDirector.getTimeScale === 'function' ? SpireDirector.getTimeScale() : 1;
@@ -97,6 +85,7 @@ function update(dt) {
     dt *= ts;
   }
   if (state !== 'wave' || !player) return;
+  if (typeof isSpireCombatSuspended === 'function' && isSpireCombatSuspended()) return;
   if (shake > 0) shake = Math.max(0, shake - dt * 36);
   if (player._atkPoseT > 0) player._atkPoseT = Math.max(0, player._atkPoseT - dt);
   // 首领召唤 / 终局降临 / 隐藏神话二阶段全屏静止登场演出

@@ -1,0 +1,89 @@
+{
+  "version": "2.1.0",
+  "generatedWith": "built-in image_gen",
+  "promptManifest": "image-prompts.json",
+  "usage": "One complete scene per image. No baked UI or panel crops. Original character identities preserved.",
+  "assets": [
+    {
+      "file": "awakening-coffin.png",
+      "url": "assets/spire/v3/awakening-coffin.png",
+      "role": "standalone-cinematic",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2807288,
+      "sha256": "c8659e3beffcf001794a22da4a348e6acfb8631d3907614faee63b186f3188ea"
+    },
+    {
+      "file": "awakening-lantern.png",
+      "url": "assets/spire/v3/awakening-lantern.png",
+      "role": "standalone-cinematic",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2977668,
+      "sha256": "0eb0a9a6b192b576ac0c912b15b0e9842b947cadca4b089f3593a484a61fc112"
+    },
+    {
+      "file": "qingyu-rain.png",
+      "url": "assets/spire/v3/qingyu-rain.png",
+      "role": "standalone-cinematic",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2561554,
+      "sha256": "46ba6f9e125272b1b0d7a93a698d7b86df5b081a8c22382d327a344daea13b84"
+    },
+    {
+      "file": "jinyu-clash.png",
+      "url": "assets/spire/v3/jinyu-clash.png",
+      "role": "standalone-cinematic",
+      "width": 1672,
+      "height": 941,
+      "bytes": 3153591,
+      "sha256": "79338ccd9d0d0abba8f0279b49fdc1d945c82283b7ad8a64003ef3fcb7825690"
+    },
+    {
+      "file": "jinyu-farewell.png",
+      "url": "assets/spire/v3/jinyu-farewell.png",
+      "role": "standalone-cinematic",
+      "width": 1672,
+      "height": 941,
+      "bytes": 3138236,
+      "sha256": "3efd4b628e3903aa7ac7d5e7e75820c0968a18631e2ecf21450fb4d5d3c7108e"
+    },
+    {
+      "file": "astria-wings.png",
+      "url": "assets/spire/v3/astria-wings.png",
+      "role": "standalone-cinematic",
+      "width": 1672,
+      "height": 941,
+      "bytes": 3283871,
+      "sha256": "093cf3cf6291cf6aff652f8fb8e9de572b7699eacc244c385b3211f9b5ce5107"
+    },
+    {
+      "file": "jialan-clock.png",
+      "url": "assets/spire/v3/jialan-clock.png",
+      "role": "standalone-cinematic",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2997668,
+      "sha256": "93643d908e1238f4264e637d9dee7c5fcf563feb54f138bf00fbea048a76f582"
+    },
+    {
+      "file": "eclipse-mirror.png",
+      "url": "assets/spire/v3/eclipse-mirror.png",
+      "role": "standalone-cinematic",
+      "width": 1672,
+      "height": 941,
+      "bytes": 3063733,
+      "sha256": "378cd92de09332a34742be20c040626c5bc4e99f4eb8b6b241fdcd4ba94ba94d"
+    },
+    {
+      "file": "dawn.png",
+      "url": "assets/spire/v3/dawn.png",
+      "role": "standalone-cinematic",
+      "width": 1672,
+      "height": 941,
+      "bytes": 3050575,
+      "sha256": "ddbae094d757dc556c73282d5b9f09dc13d52e0230bb872024657a95f2fca331"
+    }
+  ]
+}
