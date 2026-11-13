@@ -1,7 +1,9 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import vm from "node:vm";
 import assert from "node:assert";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -16,7 +18,7 @@ const cssFiles = rawCssRefs.map(r => r.split("?")[0]);
 const jsFiles = rawJsRefs.map(r => r.split("?")[0]);
 
 assert.strictEqual(cssFiles.length, 2, "Expected 2 modular stylesheets (base.css + mobile.css)");
-assert.strictEqual(jsFiles.length, 17, "Expected 17 modular script files in index.html");
+assert.strictEqual(jsFiles.length, 18, "Expected 18 modular script files in index.html (including src/game/director.js)");
 
 for (const rel of [...cssFiles, ...jsFiles, "manifest.json", "assets/icon.svg"]) {
   assert(fs.existsSync(path.join(ROOT, rel)), "Missing modular project file: " + rel);
@@ -25,77 +27,103 @@ for (const rel of [...cssFiles, ...jsFiles, "manifest.json", "assets/icon.svg"])
 const cssCombined = cssFiles.map(f => fs.readFileSync(path.join(ROOT, f), "utf8")).join("\n");
 const code = jsFiles.map(f => {
   const src = fs.readFileSync(path.join(ROOT, f), "utf8");
-  new vm.Script(src, { filename: f }); // syntax-check each individual module file
+  new vm.Script(src, { filename: f });
   return src;
 }).join("\n\n");
 const html = indexHtml + "\n<style>\n" + cssCombined + "\n</style>";
 
-new vm.Script(code, { filename: "brotato_modular_bundle.js" });
+new vm.Script(code, { filename: "spire_modular_bundle.js" });
 
-function makeCtx(stats) {
+function readJpegPngDims(absPath) {
+  const buf = fs.readFileSync(absPath);
+  // PNG signature
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+    return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20), fmt: "png" };
+  }
+  // JPEG SOF0/SOF2 scan
+  if (buf[0] === 0xff && buf[1] === 0xd8) {
+    let off = 2;
+    while (off + 9 < buf.length) {
+      if (buf[off] !== 0xff) { off++; continue; }
+      const marker = buf[off + 1];
+      if (marker === 0xff) { off++; continue; }
+      if (marker === 0xd8 || marker === 0xd9) { off += 2; continue; }
+      const segLen = buf.readUInt16BE(off + 2);
+      if (marker === 0xc0 || marker === 0xc1 || marker === 0xc2) {
+        return { h: buf.readUInt16BE(off + 5), w: buf.readUInt16BE(off + 7), fmt: "jpg" };
+      }
+      off += 2 + segLen;
+    }
+  }
+  throw new Error("Unsupported image header: " + absPath);
+}
+
+function makeCtx(stats, drawCalls = null) {
   return new Proxy({
     arc(x, y, r) {
-      if (typeof r !== 'number' || Number.isNaN(r) || r < 0) {
-        throw new Error(`IndexSizeError: Failed to execute 'arc' on 'CanvasRenderingContext2D': The radius provided (${r}) is negative or NaN.`);
+      if (typeof r !== "number" || Number.isNaN(r) || r < 0) {
+        throw new Error(`IndexSizeError: arc radius (${r}) is negative or NaN.`);
       }
     },
     ellipse(x, y, rx, ry) {
-      if (typeof rx !== 'number' || typeof ry !== 'number' || Number.isNaN(rx) || Number.isNaN(ry) || rx < 0 || ry < 0) {
-        throw new Error(`IndexSizeError: Failed to execute 'ellipse' on 'CanvasRenderingContext2D': Radii (${rx}, ${ry}) invalid.`);
+      if (typeof rx !== "number" || typeof ry !== "number" || Number.isNaN(rx) || Number.isNaN(ry) || rx < 0 || ry < 0) {
+        throw new Error(`IndexSizeError: ellipse radii (${rx}, ${ry}) invalid.`);
       }
     },
     drawImage(img, ...args) {
-      if (!img) throw new Error('TypeError: drawImage called with null image');
+      if (!img) throw new Error("TypeError: drawImage called with null image");
       for (const v of args) {
-        if (typeof v !== 'number' || !Number.isFinite(v)) {
+        if (typeof v !== "number" || !Number.isFinite(v)) {
           throw new Error(`TypeError: drawImage numeric arg invalid: ${v}`);
         }
       }
-      if (args.length === 8 && typeof img.width === 'number' && typeof img.height === 'number') {
+      if (args.length === 8 && typeof img.width === "number" && typeof img.height === "number" && img.width > 0 && img.height > 0) {
         const [sx, sy, sw, sh, , , dw, dh] = args;
-        if (sx < 0 || sy < 0 || sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0 || sx + sw > img.width || sy + sh > img.height) {
+        if (sx < -0.01 || sy < -0.01 || sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0 || sx + sw > img.width + 0.01 || sy + sh > img.height + 0.01) {
           throw new Error(`IndexSizeError: drawImage source out of bounds (${sx},${sy},${sw},${sh}) vs (${img.width}x${img.height})`);
         }
       }
+      if (drawCalls) drawCalls.push({ img, args });
     },
     createRadialGradient: () => {
       if (stats) stats.radialGradients++;
       return { addColorStop() {} };
     },
     createLinearGradient: () => ({ addColorStop() {} }),
-    measureText: () => ({ width: 20 })
+    measureText: txt => ({ width: Math.max(12, String(txt || "").length * 14) })
   }, {
     get(target, prop) { return prop in target ? target[prop] : () => {}; },
     set(target, prop, val) {
-      if (stats && prop === 'shadowBlur' && val > 0) stats.shadowBlurs++;
+      if (stats && prop === "shadowBlur" && val > 0) stats.shadowBlurs++;
       target[prop] = val;
       return true;
     }
   });
 }
 
-function makeEl(tag = 'div', stats = null) {
+function makeEl(tag = "div", stats = null, drawCalls = null) {
   const listeners = {};
   const children = [];
   const el = {
     tagName: tag.toUpperCase(),
-    width: tag.toLowerCase() === 'canvas' ? 300 : undefined,
-    height: tag.toLowerCase() === 'canvas' ? 150 : undefined,
+    width: tag.toLowerCase() === "canvas" ? 300 : undefined,
+    height: tag.toLowerCase() === "canvas" ? 150 : undefined,
     style: {},
     children,
     scrollTop: 0,
     scrollHeight: 200,
     disabled: false,
-    textContent: '',
-    value: '',
-    href: '',
-    download: '',
-    _html: '',
+    textContent: "",
+    value: "",
+    href: "",
+    src: "",
+    download: "",
+    _html: "",
     get innerHTML() { return this._html; },
-    set innerHTML(v) { this._html = v; if (v === '') children.length = 0; },
-    get className() { return Array.from(this.classList._s).join(' '); },
+    set innerHTML(v) { this._html = v; if (v === "") children.length = 0; },
+    get className() { return Array.from(this.classList._s).join(" "); },
     set className(v) {
-      this.classList._s = new Set(String(v || '').split(/\s+/).filter(Boolean));
+      this.classList._s = new Set(String(v || "").split(/\s+/).filter(Boolean));
     },
     classList: {
       _s: new Set(),
@@ -105,48 +133,86 @@ function makeEl(tag = 'div', stats = null) {
       toggle(c, f) { if (f === undefined) { this._s.has(c) ? this._s.delete(c) : this._s.add(c); } else { f ? this._s.add(c) : this._s.delete(c); } }
     },
     appendChild(ch) { children.push(ch); return ch; },
+    getAttribute(k) { return this._attrs ? this._attrs[k] || null : null; },
+    setAttribute(k, v) { if (!this._attrs) this._attrs = {}; this._attrs[k] = String(v); },
     select() {},
     click() { if (this.onclick) this.onclick(); },
     remove() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: this.width || 1440, height: this.height || 900 };
+    },
     querySelector(sel) {
       if (!this._qs) this._qs = {};
-      if (!this._qs[sel]) this._qs[sel] = makeEl('button');
+      if (!this._qs[sel]) this._qs[sel] = makeEl("button");
       return this._qs[sel];
     },
     addEventListener(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); },
     dispatch(ev, obj) { (listeners[ev] || []).forEach(fn => fn(obj)); },
-    getContext: () => makeCtx(stats)
+    getContext: () => makeCtx(stats, drawCalls)
   };
   return el;
 }
 
-function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
+// Measure real asset dimensions once so MockImage mirrors real disk images!
+const assetDimsMap = {};
+const spireAssetsDir = path.join(ROOT, "assets/spire");
+for (const fname of fs.readdirSync(spireAssetsDir)) {
+  const abs = path.join(spireAssetsDir, fname);
+  if (fs.statSync(abs).isFile() && /\.(png|jpg|jpeg)$/i.test(fname)) {
+    assetDimsMap[`assets/spire/${fname}`] = readJpegPngDims(abs);
+  }
+}
+
+function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
   const els = {};
-  const stats = { radialGradients: 0, shadowBlurs: 0, downloads: [], clipboardText: '', oscStarted: 0 };
+  const stats = { radialGradients: 0, shadowBlurs: 0, downloads: [], clipboardText: "", oscStarted: 0 };
+  const directorDraws = [];
+  const gameDraws = [];
   const winListeners = {};
   let nowClock = 1000;
 
+  class MockImage {
+    constructor() {
+      this.complete = false;
+      this.naturalWidth = 0;
+      this.naturalHeight = 0;
+      this.width = 0;
+      this.height = 0;
+      this.onload = null;
+      this.onerror = null;
+      this._src = "";
+    }
+    set src(val) {
+      this._src = String(val || "");
+      const clean = this._src.split("?")[0];
+      const d = assetDimsMap[clean] || (clean.includes("_sheet") ? { w: 1024, h: 256 } : (clean.includes("port_") ? { w: 550, h: 768 } : (clean.includes("cut_") || clean.includes("vista") ? { w: 1376, h: 768 } : { w: 256, h: 256 })));
+      this.naturalWidth = d.w;
+      this.naturalHeight = d.h;
+      this.width = d.w;
+      this.height = d.h;
+      this.complete = true;
+      if (typeof this.onload === "function") this.onload();
+    }
+    get src() { return this._src; }
+  }
+
   class MockAudioContext {
     constructor() {
-      this.state = audioMode === 'suspended' ? 'suspended' : 'running';
+      this.state = audioMode === "suspended" ? "suspended" : "running";
       this.currentTime = 0;
       this.destination = {};
     }
     resume() {
-      if (audioMode === 'reject') return Promise.reject(new Error('NotAllowedError: user gesture required'));
-      this.state = 'running';
+      if (audioMode === "reject") return Promise.reject(new Error("NotAllowedError"));
+      this.state = "running";
       return Promise.resolve();
     }
     createOscillator() {
-      if (this.state !== 'running') {
-        throw new Error('AudioContext not running when createOscillator called!');
-      }
+      if (this.state !== "running") throw new Error("AudioContext not running!");
       return {
-        type: 'sine',
+        type: "sine",
         frequency: {
-          setValueAtTime(v) {
-            if (!Number.isFinite(v) || v <= 0) throw new Error('Invalid oscillator freq: ' + v);
-          },
+          setValueAtTime(v) { if (!Number.isFinite(v) || v <= 0) throw new Error("Invalid freq: " + v); },
           exponentialRampToValueAtTime() {}
         },
         connect() {},
@@ -157,8 +223,8 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     createGain() {
       return {
         gain: {
-          setValueAtTime(v) { if (!Number.isFinite(v) || v <= 0) throw new Error('Invalid gain: ' + v); },
-          exponentialRampToValueAtTime(v) { if (!Number.isFinite(v) || v <= 0) throw new Error('Invalid ramp gain: ' + v); },
+          setValueAtTime(v) { if (!Number.isFinite(v) || v <= 0) throw new Error("Invalid gain: " + v); },
+          exponentialRampToValueAtTime(v) { if (!Number.isFinite(v) || v <= 0) throw new Error("Invalid ramp gain: " + v); },
           linearRampToValueAtTime() {}
         },
         connect() {}
@@ -167,25 +233,20 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
   }
 
   const sandbox = {
-    Math, Date, Object, Array, Set, Number, String, Boolean, JSON, Error, Promise, console,
+    Math, Date, Object, Array, Set, Map, Number, String, Boolean, JSON, Error, Promise, RegExp, console,
+    parseInt, parseFloat, isNaN, isFinite,
+    Image: MockImage,
     setTimeout: fn => { fn(); return 1; },
+    clearTimeout: () => {},
     Blob: class Blob { constructor(parts, opts) { this.parts = parts; this.opts = opts; } },
-    URL: {
-      createObjectURL: () => 'blob:mock-log-url',
-      revokeObjectURL: () => {}
-    },
+    URL: { createObjectURL: () => "blob:mock-log-url", revokeObjectURL: () => {} },
     performance: { now: () => nowClock },
     _advanceClock: ms => { nowClock += ms; return nowClock; },
     requestAnimationFrame: () => 1,
     navigator: {
-      userAgent: mobile ? 'MockMobileSafari/17.0' : 'MockDesktopChrome/125.0',
+      userAgent: mobile ? "MockMobileSafari/17.0" : "MockDesktopChrome/125.0",
       maxTouchPoints: mobile ? 5 : 0,
-      clipboard: {
-        writeText: txt => {
-          stats.clipboardText = txt;
-          return Promise.resolve();
-        }
-      }
+      clipboard: { writeText: txt => { stats.clipboardText = txt; return Promise.resolve(); } }
     },
     window: {
       innerWidth: w || (mobile ? 390 : 1440),
@@ -197,1636 +258,534 @@ function createEnv(mobile, w, h, dprVal = 3, audioMode = 'running') {
     },
     document: {
       hidden: false,
-      body: makeEl('body'),
+      body: makeEl("body"),
       _docListeners: {},
       execCommand: () => true,
       addEventListener(ev, fn) { (this._docListeners[ev] = this._docListeners[ev] || []).push(fn); },
       dispatch(ev, obj) { (this._docListeners[ev] || []).forEach(fn => fn(obj)); },
       getElementById(id) {
-        if (!els[id]) els[id] = makeEl(id === 'cv' ? 'canvas' : 'div', id === 'cv' ? stats : null);
+        if (!els[id]) {
+          const isCv = id === "cv" || id === "spireDirectorCv";
+          els[id] = makeEl(isCv ? "canvas" : "div", id === "cv" ? stats : null, id === "spireDirectorCv" ? directorDraws : (id === "cv" ? gameDraws : null));
+        }
         return els[id];
       },
       querySelector(sel) {
-        if (!els[sel]) els[sel] = makeEl('div');
+        if (!els[sel]) els[sel] = makeEl("div");
         return els[sel];
       },
       createElement(tag) {
         const el = makeEl(tag);
-        if (tag === 'a') {
+        if (tag === "a") {
           el.click = function () { stats.downloads.push({ href: this.href, download: this.download }); };
         }
         return el;
       }
     }
   };
+  sandbox.globalThis = sandbox;
   if (mobile) sandbox.window.ontouchstart = null;
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox);
-  return { sandbox, els, stats };
+  return { sandbox, els, stats, directorDraws, gameDraws };
 }
 
-// 1. Content Expansion (32 Weapons, 68 Items, 16 Upgrades), Desktop Arena, 5 Scenes & Zero Per-Frame Gradients
-{
-  const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
-  assert.strictEqual(vm.runInContext('Object.keys(WEAPONS).length', s), 32, 'Should have 32 distinct weapons');
-  assert.strictEqual(vm.runInContext('ITEMS.length', s), 68, 'Should have 68 passive items');
-  assert.strictEqual(vm.runInContext('UPGRADES.length', s), 16, 'Should have 16 level-up stat choices');
-  assert.strictEqual(vm.runInContext('WORLD.w', s), 2200, 'Desktop WORLD.w should be 2200');
-  assert.strictEqual(vm.runInContext('WORLD.h', s), 1500, 'Desktop WORLD.h should be 1500');
-  assert.strictEqual(vm.runInContext('uiMode', s), 'desktop', 'PC browser must stay in desktop UI mode');
-  assert.strictEqual(s.document.body.classList.contains('m-ui'), false, 'PC browser body must NOT have m-ui class');
-
-  const sceneIds = ['wasteland', 'desert', 'glacier', 'foundry', 'fungal'];
-  for (const scId of sceneIds) {
-    vm.runInContext(`selectedScene = "${scId}"; startGame("allrounder"); update(0.05); draw();`, s);
-    assert.strictEqual(vm.runInContext('curScene.id', s), scId, `Scene ${scId} must activate`);
-  }
-
-  vm.runInContext('selectedDiff = 5; startGame("allrounder"); wave = 12; beginWave(); bossCutscene = null;', s);
-  stats.radialGradients = 0;
-  stats.shadowBlurs = 0;
-  const allEnemyTypes = ["chaser","swarmer","shooter","mortar","charger","bomber","splitter","mini_slime","shielder","summoner","healer","brute","mini_boss","boss"];
-  for (const t of allEnemyTypes) vm.runInContext(`createEnemy(player.x + 80, player.y - 60, "${t}")`, s);
-  vm.runInContext('ITEMS.forEach(it => { player.items[it.id] = 1; it.apply(player); });', s);
-  const allWeaponIds = vm.runInContext('Object.keys(WEAPONS)', s);
-  for (const wId of allWeaponIds) {
-    vm.runInContext(`player.weapons = [makeWeapon("${wId}", 4)]; player.weapons[0].cd = 0; update(0.05); draw();`, s);
-  }
-  for (const cls of ["allrounder","ranger","brawler","engineer","vampire","multitasker","bull","ghost"]) {
-    vm.runInContext(`player.cls = "${cls}"; draw();`, s);
-  }
-  assert.strictEqual(stats.radialGradients, 0, 'draw() must NOT create per-frame radial gradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'draw() must NOT use expensive shadowBlur');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'All 22 weapons, 36 items, 8 classes & 14 enemies must render with zero errors');
-}
-
-// 2. Prominent Mobile Countdown, Cheaper Shop Rerolls, Attack Range System, Alien Trees & Loot Crates
-{
-  const { sandbox: s, els } = createEnv(true, 390, 844, 3);
-  s.window.dispatch('pointerdown', {}); // Unlock audio cleanly
-  vm.runInContext('startGame("ranger");', s);
-
-  // 2a. Mobile Countdown Capsule Prominence (Normal -> Warn <=10s -> Urgent <=5s + Overhead Badge)
-  vm.runInContext('waveTime = 18; update(0.10); draw();', s);
-  assert.strictEqual(els.timerCapsule.classList.contains('warn'), false, 'At 18s timerCapsule should not be warn');
-  assert.strictEqual(els.timerCapsule.classList.contains('urgent'), false, 'At 18s timerCapsule should not be urgent');
-  assert(els.timerFill.style.width.endsWith('%'), 'timerFill progress bar width must update live');
-
-  vm.runInContext('waveTime = 8.5; update(0.10); draw();', s);
-  assert.strictEqual(els.timerCapsule.classList.contains('warn'), true, 'At <=10s timerCapsule must have .warn class');
-
-  vm.runInContext('waveTime = 4.2; update(0.10); draw();', s);
-  assert.strictEqual(els.timerCapsule.classList.contains('urgent'), true, 'At <=5s timerCapsule must have .urgent class');
-  assert.strictEqual(els.waveTimer.textContent, '5', 'Wave timer should display remaining ceil seconds');
-
-  // 2b. Attack Range System (`📏 范围`)
-  const rangerRange = vm.runInContext('getTotalRangeBonus()', s);
-  assert.strictEqual(rangerRange, 65, 'Ranger class starts with +65 range');
-  assert(vm.runInContext('player._displayRange', s) > 350, 'Ranger _displayRange should include +65 range bonus');
-  vm.runInContext(`
-    const gl = ITEMS.find(i => i.id === 'glasses');
-    player.items.glasses = 1; gl.apply(player);
-    const sc = ITEMS.find(i => i.id === 'sniper_cloak');
-    player.items.sniper_cloak = 1; sc.apply(player);
-    update(0.10);
-    renderBuildSummary('statsRow', 'setsRow');
-  `, s);
-  assert.strictEqual(vm.runInContext('getTotalRangeBonus()', s), 65 + 45 + 90, 'Range bonus must sum class + items');
-  assert(vm.runInContext('getEffectiveDmgMul()', s) > 1.10, 'sniper_cloak rangeToDmg must convert range bonus into damage %');
-  assert(els.statsRow.innerHTML.includes('📏 范围'), 'statsRow must display 📏 范围');
-  assert(els.mobQuickStats.innerHTML.includes('📏'), 'mobQuickStats must display 📏 range');
-
-  // 2c. Alien Trees (`trees`) + Loot Crates (`crate`) + Harvesting (`harvestFlat`) + Crate Modal (`#crateMenu`)
-  assert(vm.runInContext('trees.length', s) >= 1, 'beginWave() must spawn Alien Trees on battlefield');
-  vm.runInContext(`
-    player.harvestFlat = 20;
-    player.luck = 80;
-    const tr = trees[0];
-    tr.x = player.x; tr.y = player.y;
-    hurtTree(tr, 999);
-    drops.push({ x: player.x, y: player.y, kind: 'crate', val: 1, bob: 0 });
-    update(0.05);
-  `, s);
-  assert(vm.runInContext('pendingCrates', s) >= 1, 'Picking up crate drop must increment pendingCrates');
-  const matsBeforeEnd = vm.runInContext('player.mats', s);
-  vm.runInContext('finishWave();', s);
-  assert(vm.runInContext('player.mats', s) >= matsBeforeEnd + 20, 'finishWave() must pay out harvestFlat diamonds');
-  assert(Math.abs(vm.runInContext('player.harvestFlat', s) - 20 * 1.08) < 0.05, 'Harvesting must compound by +8% at end of wave');
-  assert.strictEqual(vm.runInContext('state', s), 'crate', 'With pendingCrates > 0, finishWave() must open #crateMenu');
-  assert.strictEqual(els.crateMenu.classList.contains('hidden'), false, 'crateMenu should be visible');
-
-  // Test Recycle / Take button in Crate Menu
-  vm.runInContext('pendingCrates = 1; showCrateMenu();', s);
-  const crateCard = els.crateBox.children[0];
-  crateCard.querySelector('.recycle-btn').onclick();
-  assert.strictEqual(vm.runInContext('state === "shop" || state === "levelup"', s), true, 'Resolving crate transitions cleanly via advancePostWave()');
-
-  // 2d. Cheaper Shop Rerolls & Free Reroll Recycler & Blacksmith Anvil
-  vm.runInContext(`
-    wave = 1;
-    player.mats = 100;
-    player.freeRerolls = 0;
-    openShop(true);
-  `, s);
-  assert.strictEqual(vm.runInContext('rerollCost', s), 1, 'Wave 1 base shop reroll cost must be 1 diamond');
-  vm.runInContext('rerollShop();', s);
-  assert.strictEqual(vm.runInContext('rerollCost', s), 2, 'Wave 1 second reroll should only step up by +1 to 2 diamonds');
-
-  vm.runInContext(`
-    player.freeRerolls = 1;
-    player.hasAnvil = true;
-    player.weapons = [makeWeapon('pistol', 1)];
-    openShop(true);
-  `, s);
-  assert.strictEqual(vm.runInContext('rerollCost', s), 0, 'With recycler item, first reroll in shop must cost 0');
-  assert(els.rerollBtn.textContent.includes('免费刷新'), 'Free reroll button should show 免费刷新');
-  assert.strictEqual(vm.runInContext('player.weapons[0].tier', s), 2, 'Blacksmith Anvil must auto-upgrade a weapon on shop open');
-  assert(els.shopCards.children.some(c => c.innerHTML.includes('📏')), 'Weapon shop cards should display effective 📏 range');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors across countdown, range, trees, crates & shop rerolls');
-}
-
-// 3. Forensic Torture Test for "有时候一受伤就直接卡死了" (`hurtPlayer` + Suspended Audio + Multi-Hit Death + Corner Shake)
-{
-  // 3a. Suspended / Rejecting AudioContext on Mobile Safari (user hasn't unlocked audio or iOS suspended it)
-  const { sandbox: sSusp } = createEnv(true, 390, 844, 3, 'suspended');
-  vm.runInContext(`
-    startGame("bull");
-    player.thorns = 18;
-    player.shieldMax = 1; player.shield = 1;
-    createEnemy(player.x + 10, player.y, "chaser");
-    createEnemy(player.x - 10, player.y, "bomber");
-  `, sSusp);
-  // Corner positions + extreme screen shake test on floorCanvas drawImage
-  const corners = [
-    [30, 30], [1150, 30], [30, 1930], [1150, 1930], [590, 980]
-  ];
-  for (const [cx, cy] of corners) {
-    vm.runInContext(`
-      player.x = ${cx}; player.y = ${cy};
-      player.invuln = 0; player.hp = 80;
-      hurtPlayer(12);
-      shake = 18;
-      update(0.05);
-      draw();
-    `, sSusp);
-  }
-  assert.strictEqual(vm.runInContext('logErrCount', sSusp), 0, 'Taking damage with suspended AudioContext & corner camera shake must NEVER error or freeze');
-
-  // 3b. Test all 8 classes taking damage, dodging (`ghost`), thorns (`thorns`), cyberball, tentacle & multi-source lethal frame
-  const { sandbox: sRun } = createEnv(true, 390, 844, 3, 'running');
-  sRun.window.dispatch('touchstart', {});
-  for (const cls of ["allrounder","ranger","brawler","engineer","vampire","multitasker","bull","ghost"]) {
-    vm.runInContext(`
-      startGame("${cls}");
-      player.thorns = 15;
-      player.cyberball = 10;
-      player.critHeal = 0.2;
-      createEnemy(player.x + 12, player.y, "charger");
-      createEnemy(player.x - 12, player.y, "bomber");
-      spawnHazard(player.x, player.y, 65, 10, 0.02);
-      eBullets.push({ x: player.x, y: player.y, vx: 0, vy: 0, r: 8, dmg: 10, life: 2, color: "#ff5577" });
-      for (let k = 0; k < 8; k++) { player.invuln = 0; player.hp = 100; update(0.05); draw(); }
-    `, sRun);
-  }
-
-  // 3c. Lethal Multi-Hit in a Single Frame (must halt wave cleanly on death without re-entrant crash)
-  vm.runInContext(`
-    startGame("bull");
-    player.hp = 5;
-    player.armor = 0;
-    player.dodge = 0;
-    player.invuln = 0;
-    createEnemy(player.x, player.y, "brute");
-    createEnemy(player.x + 2, player.y, "charger");
-    eBullets.push({ x: player.x, y: player.y, vx: 0, vy: 0, r: 10, dmg: 50, life: 2, color: "#ff5577" });
-    spawnHazard(player.x, player.y, 70, 50, 0.01);
-    update(0.05);
-    draw();
-  `, sRun);
-  assert.strictEqual(vm.runInContext('state', sRun), 'end', 'Lethal hit must cleanly transition state to end');
-  assert.strictEqual(vm.runInContext('logErrCount', sRun), 0, 'Zero errors across all hurtPlayer torture scenarios');
-}
-
-// 4. Illustrated Codex (`#codexModal`) — All 5 Categories & Sub-Filters
-{
-  const { sandbox: s, els } = createEnv(true, 390, 844, 3);
-  assert.strictEqual(vm.runInContext('MONSTER_CODEX.length', s), 37, 'Codex should catalog all 37 monsters, scene-exclusives, 7 commanders, 6 final bosses & 3 special bosses');
-  vm.runInContext('openCodex("weapons");', s);
-  assert.strictEqual(els.codexModal.classList.contains('hidden'), false, 'openCodex must show #codexModal');
-  assert.strictEqual(els.codexGrid.children.length, 32, 'Weapons tab must render all 32 weapons');
-  vm.runInContext('setCodexFilter("elemental");', s);
-  assert(els.codexGrid.children.length >= 5 && els.codexGrid.children.length < 32, 'Weapon set filter must filter weapon cards');
-
-  vm.runInContext('setCodexTab("items");', s);
-  assert.strictEqual(els.codexGrid.children.length, 68, 'Items tab must render all 68 items');
-  vm.runInContext('setCodexFilter("4");', s);
-  assert(els.codexGrid.children.length >= 12 && els.codexGrid.children.length < 68, 'Tier 4 filter must filter item cards (12 unique legendaries)');
-
-  vm.runInContext('setCodexTab("heroes");', s);
-  assert.strictEqual(els.codexGrid.children.length, 8, 'Heroes tab must render all 8 potato classes');
-
-  vm.runInContext('setCodexTab("monsters");', s);
-  assert.strictEqual(els.codexGrid.children.length, 37, 'Monsters tab must render all 37 monster & boss entries');
-  for (const cat of ['normal', 'scene', 'boss', 'special']) {
-    vm.runInContext(`setCodexFilter("${cat}");`, s);
-    assert(els.codexGrid.children.length > 0, `Monster filter ${cat} must have entries`);
-  }
-
-  vm.runInContext('setCodexTab("world");', s);
-  assert.strictEqual(els.codexGrid.children.length, 13, 'World & Relics tab must render 5 scenes + 5 terrains + 3 special relics');
-  vm.runInContext('setCodexFilter("scene");', s);
-  assert.strictEqual(els.codexGrid.children.length, 5, 'World scene filter must render 5 scenes');
-  vm.runInContext('setCodexFilter("terrain");', s);
-  assert.strictEqual(els.codexGrid.children.length, 5, 'World terrain filter must render 5 interactive terrains/portals');
-  vm.runInContext('setCodexFilter("relic");', s);
-  assert.strictEqual(els.codexGrid.children.length, 3, 'World relic filter must render 3 special relics');
-
-  s.window.dispatch('keydown', { key: 'Escape' });
-  assert.strictEqual(els.codexModal.classList.contains('hidden'), true, 'Escape key must close #codexModal first');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Codex rendering must produce zero errors');
-}
-
-// 5. Randomized Boss Varieties (4 Final Bosses + 3 Elite Commanders) & Rare Map Relics Summoning 3 Special Bosses
-{
-  const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
-  vm.runInContext('selectedDiff = 5; startGame("allrounder");', s);
-
-  // 5a. Verify all 6 Final Bosses & Twin Boss distinct variants
-  const bossIds = vm.runInContext('Object.keys(BOSS_DEFS)', s);
-  assert.strictEqual(bossIds.length, 6, 'Should define 6 distinct Final Bosses');
-  vm.runInContext('wave = 12; beginWave(); for (let k = 0; k < 25; k++) update(0.05); draw();', s);
-  const spawnedBossVariants = vm.runInContext('enemies.filter(e => e.type === "boss").map(e => e.variant)', s);
-  assert.strictEqual(spawnedBossVariants.length, 2, 'Twin Boss difficulty on Wave 12 must spawn 2 Final Bosses');
-  assert.notStrictEqual(spawnedBossVariants[0], spawnedBossVariants[1], 'Twin Bosses should spawn 2 distinct Boss variants');
-
-  for (const bVar of bossIds) {
-    vm.runInContext(`{
-      bossCutscene = null; enemies = []; eBullets = []; hazards = [];
-      const b = createEnemy(player.x + 210, player.y - 120, 'boss', '${bVar}');
-      b.hp = b.maxHp * 0.45; // Test enraged phase too!
-      for (let step = 0; step < 60; step++) { player.hp = player.maxHp; update(0.05); }
-      draw();
-    }`, s);
-    assert(els['.boss-name'].textContent.length > 2, `HUD boss name should update for ${bVar}`);
-  }
-
-  // 5b. Verify all 7 Elite Commanders
-  const miniIds = vm.runInContext('Object.keys(MINI_BOSS_DEFS)', s);
-  assert.strictEqual(miniIds.length, 7, 'Should define 7 distinct Elite Commanders');
-  for (const mVar of miniIds) {
-    vm.runInContext(`{
-      enemies = []; eBullets = []; hazards = [];
-      createEnemy(player.x + 190, player.y - 90, 'mini_boss', '${mVar}');
-      for (let step = 0; step < 50; step++) { player.hp = player.maxHp; update(0.05); }
-      draw();
-    }`, s);
-  }
-
-  // 5c. Verify all 3 Map Special Relics -> Proximity Charge -> Summon Special Boss -> Defeat Rewards
-  const relicIds = ['blood_altar', 'golden_idol', 'void_cube'];
-  for (const rId of relicIds) {
-    vm.runInContext(`{
-      wave = 5; beginWave();
-      bossCutscene = null; relics = []; enemies = []; spawns = []; drops = [];
-      const rel = spawnSpecialRelic('${rId}');
-      // Off-screen pointer render check first
-      rel.x = WORLD.w - 140; rel.y = WORLD.h - 140;
-      player.x = 200; player.y = 200; cam.x = 200; cam.y = 200;
-      draw();
-      // Stand inside relic circle for 1.2s to summon Special Boss
-      player.x = rel.x; player.y = rel.y;
-      const beforeWaveTime = waveTime;
-      for (let k = 0; k < 26; k++) { update(0.05); draw(); }
-      globalThis.assertRelicConsumed = relics.length === 0;
-      globalThis.assertTimeAdded = waveTime > beforeWaveTime + 15;
-      // Step away while spawnWarning (0.90s) materializes Special Boss so auto-weapons don't kill it early
-      bossCutscene = null;
-      player.x = 200; player.y = 200;
-      for (let k = 0; k < 25; k++) { player.hp = player.maxHp * 0.5; update(0.05); draw(); }
-    }`, s);
-    assert.strictEqual(vm.runInContext('assertRelicConsumed', s), true, `Relic ${rId} should be consumed after standing inside`);
-    assert.strictEqual(vm.runInContext('assertTimeAdded', s), true, `Summoning ${rId} must extend waveTime`);
-    const sbCount = vm.runInContext('enemies.filter(e => e.type === "special_boss").length', s);
-    assert.strictEqual(sbCount, 1, `Relic ${rId} must spawn 1 special_boss`);
-    assert.strictEqual(els.bossBarWrap.classList.contains('hidden'), false, 'Summoning special_boss must unhide #bossBarWrap');
-
-    const dmgBefore = vm.runInContext('player.dmgMul', s);
-    vm.runInContext(`{
-      const sb = enemies.find(e => e.type === 'special_boss');
-      sb.canPhase2 = false;
-      bossCutscene = null;
-      player.x = sb.x + 220; player.y = sb.y;
-      for (let step = 0; step < 45; step++) { player.invuln = 0.5; update(0.05); draw(); }
-      player.hp = Math.max(1, Math.floor(player.maxHp * 0.4));
-      hurtEnemy(sb, sb.maxHp * 0.5, false);
-      hurtEnemy(sb, sb.maxHp + 9999, true);
-      update(0.10); draw();
-    }`, s);
-    if (rId === 'blood_altar') {
-      assert.strictEqual(vm.runInContext('player.hp === player.maxHp', s), true, 'Crimson Lord must restore player to full HP');
-      assert(vm.runInContext('drops.filter(d => d.kind === "crate").length', s) >= 1, 'Crimson Lord must drop 1 crate');
-    } else if (rId === 'golden_idol') {
-      assert(vm.runInContext('drops.filter(d => d.kind === "mat").reduce((a, d) => a + (d.val || 1), 0)', s) >= 65, 'Golden Golem must drop staged + death crystals');
-    } else if (rId === 'void_cube') {
-      assert(vm.runInContext('player.dmgMul', s) > dmgBefore + 0.11, 'Abyss Devourer must grant +12% permanent damage');
-    }
-  }
-  assert.strictEqual(stats.radialGradients, 0, 'New bosses & relics must use zero per-frame radialGradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'New bosses & relics must use zero shadowBlur');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'All Bosses, Commanders & Special Relics must run with zero errors');
-}
-
-// 6. Progressive & Probabilistic Scene-Exclusive Monsters (5) & Scene-Exclusive Events (5)
-{
-  const { sandbox: s } = createEnv(true, 390, 844, 3);
-  vm.runInContext('startGame("allrounder");', s);
-
-  // Wave 1 & Wave 2 must NEVER force scene-exclusive monsters or events
-  for (let trial = 0; trial < 15; trial++) {
-    vm.runInContext('wave = 1; beginWave();', s);
-    assert.strictEqual(vm.runInContext('sceneMobEnabled', s), false, 'Wave 1 must never enable scene-exclusive monsters');
-    assert.strictEqual(vm.runInContext('activeSceneEvent', s), null, 'Wave 1 must never enable scene-exclusive events');
-    vm.runInContext('wave = 2; beginWave();', s);
-    assert.strictEqual(vm.runInContext('sceneMobEnabled', s), false, 'Wave 2 must never enable scene-exclusive monsters');
-    assert.strictEqual(vm.runInContext('activeSceneEvent', s), null, 'Wave 2 must never enable scene-exclusive events');
-  }
-
-  // Wave 5 probabilistic check (neither 0% nor 100% mandatory)
-  let mobTrue = 0, mobFalse = 0;
-  for (let trial = 0; trial < 60; trial++) {
-    vm.runInContext('wave = 5; beginWave();', s);
-    if (vm.runInContext('sceneMobEnabled', s)) mobTrue++; else mobFalse++;
-  }
-  assert(mobTrue > 0 && mobFalse > 0, `Wave 5 scene-exclusive monsters should be probabilistic (got ${mobTrue} true, ${mobFalse} false)`);
-
-  // Test all 5 scene-exclusive monsters & all 5 scene events in combat + rendering
-  const scenePairs = [
-    ['wasteland', 'rad_scorpion', 'rad_meteor'],
-    ['desert', 'sand_worm', 'sandstorm'],
-    ['glacier', 'frost_wisp', 'blizzard'],
-    ['foundry', 'magma_imp', 'geysers'],
-    ['fungal', 'spore_mother', 'spore_tide']
-  ];
-  for (const [scId, mobType, evId] of scenePairs) {
-    vm.runInContext(`{
-      selectedScene = '${scId}';
-      wave = 6; beginWave();
-      sceneMobEnabled = true;
-      activeSceneEvent = '${evId}';
-      sceneEventT = 0.05;
-      const m = createEnemy(player.x + 170, player.y - 60, '${mobType}');
-      for (let k = 0; k < 45; k++) { player.hp = player.maxHp; update(0.05); draw(); }
-      hurtEnemy(m, 99999, true);
-      update(0.05); draw();
-    }`, s);
-  }
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'All 5 scene-exclusive monsters & 5 scene events must run with zero errors');
-}
-
-// 7. CSS Layout Audit: Mobile Portrait Single-Column + Larger Fonts + Desktop Centered Overlays
-{
-  const cssMatch = html.match(/<style>([\s\S]*?)<\/style>/);
-  assert(cssMatch, 'Style tag must exist');
-  const css = cssMatch[1];
-
-  // Verify overlay centering fix (no broken .overlay > :last-child rule, uses .overlay::before & .overlay::after)
-  assert(!css.includes('.overlay > :last-child'), 'Must not use .overlay > :last-child which breaks when .m-only is hidden on desktop');
-  assert(css.includes('.overlay::before') && css.includes('.overlay::after'), 'Must center overlays via flex pseudo-spacers');
-
-  // Verify desktop 4-column grids remain intact
-  assert(/\.classes\s*\{[^}]*repeat\(4,/.test(css), 'Desktop .classes must remain 4-column');
-  assert(/\.cards\s*\{[^}]*repeat\(4,/.test(css), 'Desktop .cards must remain 4-column');
-
-  // Verify mobile portrait uses single-screen 2x4 grid for 8 classes, 1x4 single-column rows for shop/levelup, and 1fr for codex-grid
-  assert(/body\.m-portrait\s+\.classes\s*\{[^}]*repeat\(2,\s*minmax\(0,\s*1fr\)\)/.test(css), 'Mobile portrait .classes must be 2x4 single-screen grid');
-  assert(/body\.m-portrait\s+#shopCards\s*\{[^}]*grid-template-columns:\s*1fr/.test(css), 'Mobile portrait #shopCards must be single-column (1fr) x 4 rows');
-  assert(/body\.m-portrait\s+\.codex-grid[^{]*\{[^}]*grid-template-columns:\s*1fr/.test(css), 'Mobile portrait .codex-grid must be single-column (1fr)');
-}
-
-// 8. Balance Overhaul, 80% Global Dodge Cap, Crate Cap, 4 New Monsters, Widened Stat Spread & Clean Attack FX
-{
-  const { sandbox: s, stats } = createEnv(false, 1440, 900, 2);
-
-  // 8a. Difficulty Curve Monotonicity (hpMul, dmgMul, spawnMul all strictly scale up from D0 -> D5)
-  const diffs = vm.runInContext('DIFFS', s);
-  for (let i = 1; i < diffs.length; i++) {
-    assert(diffs[i].hpMul > diffs[i - 1].hpMul, `D${i} hpMul must exceed D${i - 1}`);
-    assert(diffs[i].dmgMul > diffs[i - 1].dmgMul, `D${i} dmgMul must exceed D${i - 1}`);
-    assert(diffs[i].spawnMul > diffs[i - 1].spawnMul, `D${i} spawnMul must exceed D${i - 1}`);
-  }
-
-  // 8b. Player Starting Stats (Higher HP, Lower Move Speed, Slower Initial Attack Speed, Global 80% Dodge Cap)
-  for (const cls of ["allrounder","ranger","brawler","engineer","vampire","multitasker","bull","ghost"]) {
-    vm.runInContext(`startGame("${cls}");`, s);
-    assert.strictEqual(vm.runInContext('player.dodgeCap', s), 0.80, `${cls} must have 80% global dodge cap`);
-    assert.strictEqual(vm.runInContext('player.spd', s), 182, `${cls} base spd must be lowered to 182`);
-  }
-  vm.runInContext('startGame("engineer");', s);
-  assert.strictEqual(vm.runInContext('player.maxHp', s), 30, 'Base player HP must be 30');
-  assert.strictEqual(vm.runInContext('player.atkSpd', s), 0.88, 'Base player atkSpd must be 0.88');
-
-  // Stack 30 dodge items + upgrades -> must never exceed 0.80
-  vm.runInContext(`
-    const boots = ITEMS.find(i => i.id === 'boots');
-    const adren = ITEMS.find(i => i.id === 'adren');
-    const dodgeUpg = UPGRADES.find(u => u.name === '暗影闪避');
-    for (let k = 0; k < 25; k++) { boots.apply(player); adren.apply(player); dodgeUpg.apply(player); }
-  `, s);
-  assert(Math.abs(vm.runInContext('player.dodge', s) - 0.80) < 1e-6, 'Player dodge must cap strictly at 80% (0.80)');
-
-  // 8c. Per-Wave Crate Drop Cap & Lower High-Tier Shop Roll Rates
-  vm.runInContext(`
-    selectedDiff = 1; startGame("allrounder");
-    player.luck = 10;
-    wave = 2; beginWave();
-    for (let k = 0; k < 25; k++) {
-      spawnTree();
-      if (trees.length) hurtTree(trees[trees.length - 1], 9999);
-      const el = createEnemy(player.x + 150, player.y, 'chaser');
-      el.elite = true;
-      hurtEnemy(el, 99999, true);
-    }
-  `, s);
-  assert(vm.runInContext('waveCratesDropped', s) <= 1, 'Normal luck wave crate drops from trees + elites must obey per-wave cap of 1');
-
-  // Wave 1 & Wave 2 shop should never roll T4 items, and Wave 1 should roll 100% T1
-  let w1High = 0;
-  vm.runInContext('wave = 1; player.luck = 0;', s);
-  for (let k = 0; k < 40; k++) {
-    vm.runInContext('shopOffers = []; rollOffers();', s);
-    w1High += vm.runInContext('shopOffers.filter(o => o.tier >= 2).length', s);
-  }
-  assert.strictEqual(w1High, 0, 'Wave 1 shop with 0 luck must not flood T2/T3/T4 gear');
-
-  // 8d. Monster Stat Differentiation + 4 New Monsters + High-Density 115-Enemy Stress Test + All FX Shapes
-  vm.runInContext(`
-    selectedDiff = 4; wave = 8; beginWave();
-    enemies = [];
-    createEnemy(200, 200, 'swarmer');
-    const sw = enemies[0];
-    const st = createEnemy(260, 200, 'stalker');
-    const sn = createEnemy(320, 200, 'sniper_bug');
-    const sp = createEnemy(380, 200, 'spinner');
-    const jg = createEnemy(460, 200, 'juggernaut');
-    globalThis.diffSpreadOk = (sw.r <= 11 && jg.r >= 36) && (jg.maxHp > sw.maxHp * 15) && (sw.spd > jg.spd * 2.5) && (jg.dmg > sw.dmg * 3);
-  `, s);
-  assert.strictEqual(vm.runInContext('diffSpreadOk', s), true, 'Monster size, HP, speed, and damage must have wide archetype differentiation');
-
-  // Stress-test 115 active enemies including all 4 new monsters, sniper sightlines, charge lock lines, all slash modes & all eBullet shapes
-  stats.radialGradients = 0;
-  stats.shadowBlurs = 0;
-  const newPool = ['chaser','swarmer','stalker','shooter','charger','bomber','sniper_bug','splitter','spinner','shielder','mortar','brute','summoner','healer','juggernaut'];
-  vm.runInContext(`
-    enemies = []; eBullets = []; slashes = [];
-    const pool = ${JSON.stringify(newPool)};
-    for (let i = 0; i < 105; i++) {
-      const ang = (i / 105) * Math.PI * 2;
-      const dist = 160 + (i % 6) * 45;
-      createEnemy(player.x + Math.cos(ang) * dist, player.y + Math.sin(ang) * dist, pool[i % pool.length]);
-    }
-    player.weapons = [makeWeapon('stick', 2), makeWeapon('claws', 2), makeWeapon('knife', 2), makeWeapon('spear', 2), makeWeapon('katana', 2), makeWeapon('icicle', 2)];
-    for (let step = 0; step < 35; step++) {
-      player.hp = player.maxHp; player.invuln = 0.2;
-      update(0.05);
-      draw();
-    }
-  `, s);
-  assert.strictEqual(stats.radialGradients, 0, 'High-density 105+ enemy wave with new FX must create zero radialGradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'High-density 105+ enemy wave with new FX must use zero shadowBlur');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 8 balance, new monsters & clean FX stress test');
-}
-
-// 9. UI Mode Selector (`uiPref`) + Single-Screen Zero-Scroll Mobile Layout (`100dvh`, `overflow: hidden`) + Thumb Buttons
-{
-  // 9a. CSS audit for single-screen zero-scroll mobile layout & decoupled pixel-aligned thumb button column
-  assert(html.includes('height: 100%; max-height: 100vh; max-height: 100dvh; overflow: hidden;'), 'Mobile overlay must lock to 100vh/100dvh single screen with overflow: hidden');
-  assert(html.includes('.card-main, .card-side { display: contents; }'), 'Desktop PC must preserve exact layout via display: contents on .card-main / .card-side');
-  assert(html.includes('body.m-ui #shopCards .card-side') && html.includes('width: 112px; flex-shrink: 0;'), 'Mobile shop cards must use decoupled 112px right-side .card-side flex column');
-  assert(html.includes('grid-auto-flow: column; grid-auto-columns: calc((100% - 25px) / 6);'), 'Mobile weapon arsenal must stay on 1 single 6-slot horizontal row');
-  assert(html.includes('body.m-portrait .pause-btn') && html.includes('min-height: 46px; min-width: 98px;'), 'Mobile portrait pause button must be dedicated 98x46px button');
-  assert(html.includes('body.m-ui .lock-pin') && html.includes('height: 31px; min-height: 31px;') && html.includes('border-width: 1.5px 1.5px 3px 1.5px;'), 'Mobile shop lock button and buy button must share identical 1.5px/3px bevel and centered axis');
-  assert(html.includes('body.m-ui #shopMenu.drawer-open #shopCards'), 'Mobile stats drawer must toggle in-place inside single screen without page overflow');
-
-  // 9b. Desktop browser (1440x900) switching manually to Mobile Mode & back
-  const { sandbox: sDesk, els: dEls } = createEnv(false, 1440, 900, 2);
-  const dBody = sDesk.document.body.classList;
-  assert.strictEqual(vm.runInContext('uiPref', sDesk), 'auto', 'Default uiPref must be auto');
-  assert.strictEqual(vm.runInContext('uiMode', sDesk), 'desktop', 'Desktop browser in auto mode must resolve to desktop');
-  assert.strictEqual(dEls.uiModeTabs.children.length, 3, 'Start menu must render 3 UI mode selector buttons');
-
-  // Click "📱 手机触控版" button on Start Menu
-  dEls.uiModeTabs.children[1].onclick();
-  assert.strictEqual(vm.runInContext('uiPref', sDesk), 'mobile', 'Clicking 2nd mode tab must set uiPref = mobile');
-  assert.strictEqual(vm.runInContext('uiMode', sDesk), 'mobile-landscape', '1440x900 forced mobile mode must activate mobile-landscape');
-  assert.strictEqual(dBody.contains('m-ui'), true, 'Forcing mobile mode on PC must enable body.m-ui');
-
-  // Click back to "🔄 自动"
-  dEls.uiModeTabs.children[0].onclick();
-  assert.strictEqual(vm.runInContext('uiMode', sDesk), 'desktop', 'Returning to auto on PC must restore desktop UI');
-  assert.strictEqual(dBody.contains('m-ui'), false, 'Returning to auto on PC must remove body.m-ui');
-
-  // 9c. Mobile browser (390x844 & compact 375x667) switching UI modes, in-place drawer, and Lock button label toggle
-  const { sandbox: sMob, els: mEls } = createEnv(true, 375, 667, 2);
-  const mBody = sMob.document.body.classList;
-  assert.strictEqual(vm.runInContext('uiMode', sMob), 'mobile-portrait', 'Mobile 375x667 in auto must resolve to mobile-portrait');
-  assert.strictEqual(mBody.contains('m-ui') && mBody.contains('m-portrait'), true, 'Mobile auto must set m-ui and m-portrait');
-  assert(vm.runInContext('camZoom', sMob) <= 0.64 && (375 / vm.runInContext('camZoom', sMob)) >= 680, 'Mobile portrait initial camZoom must be pulled higher (>=680px world width FOV)');
-
-  const { sandbox: sMobLand } = createEnv(true, 844, 390, 2);
-  assert(vm.runInContext('camZoom', sMobLand) <= 0.62 && (390 / vm.runInContext('camZoom', sMobLand)) >= 680, 'Mobile landscape initial camZoom must be pulled higher (>=680px world height FOV)');
-
-  // Test Pause Menu UI switch (`cycleUIPref`)
-  vm.runInContext('startGame("allrounder"); pauseGame();', sMob);
-  assert(mEls.pauseUiBtn.textContent.includes('自动'), 'Pause UI button must show current auto status');
-  vm.runInContext('cycleUIPref();', sMob); // auto -> mobile
-  assert.strictEqual(vm.runInContext('uiPref', sMob), 'mobile', 'First cycleUIPref must switch to mobile');
-  vm.runInContext('cycleUIPref();', sMob); // mobile -> desktop
-  assert.strictEqual(vm.runInContext('uiPref', sMob), 'desktop', 'Second cycleUIPref must switch to desktop');
-  assert.strictEqual(vm.runInContext('uiMode', sMob), 'desktop', 'Forced desktop mode on phone must switch uiMode to desktop');
-  assert.strictEqual(mBody.contains('m-ui'), false, 'Forced desktop mode must remove m-ui');
-  vm.runInContext('cycleUIPref();', sMob); // desktop -> auto
-  assert.strictEqual(vm.runInContext('uiMode', sMob), 'mobile-portrait', 'Third cycleUIPref must restore auto mobile-portrait');
-
-  // Test Shop Lock button + In-place drawer auto-closing on rerollShop()
-  vm.runInContext('resumeGame(); player.mats = 50; finishWave(); openShop(true);', sMob);
-  const firstCard = mEls.shopCards.children[0];
-  assert(firstCard.innerHTML.includes('🔓') && firstCard.innerHTML.includes('锁定'), 'Unlocked shop card must display clear 🔓 锁定 text');
-  firstCard.querySelector('.lock').onclick();
-  const lockedCard = mEls.shopCards.children[0];
-  assert(lockedCard.innerHTML.includes('🔒') && lockedCard.innerHTML.includes('已锁'), 'Locked shop card must display clear 🔒 已锁 text');
-  assert(lockedCard.className.includes('is-locked'), 'Locked shop card must have .is-locked class');
-
-  vm.runInContext('toggleMobDrawer();', sMob);
-  assert.strictEqual(mEls.shopMenu.classList.contains('drawer-open'), true, 'toggleMobDrawer must open in-place stats view');
-  vm.runInContext('rerollShop();', sMob);
-  assert.strictEqual(mEls.shopMenu.classList.contains('drawer-open'), false, 'rerollShop must auto-close drawer back to shop cards');
-  assert.strictEqual(vm.runInContext('logErrCount', sMob), 0, 'Zero runtime errors in Suite 9 single-screen mobile UI tests');
-}
-
-
-// 10. Modular Project Architecture, PWA Manifest & Extensible AudioBank Verification
-{
-  const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "manifest.json"), "utf8"));
-  assert.strictEqual(manifest.display, "standalone", "PWA manifest must configure standalone fullscreen display");
-  assert(Array.isArray(manifest.icons) && manifest.icons.length >= 1, "PWA manifest must declare app icon");
-  const svg = fs.readFileSync(path.join(ROOT, "assets/icon.svg"), "utf8");
-  assert(svg.includes("<svg") && svg.includes("</svg>"), "assets/icon.svg must be valid SVG");
-
-  const { sandbox: sAudio, stats: aStats } = createEnv(false, 1280, 800, 2);
-  assert.strictEqual(vm.runInContext("typeof AudioBank.registerSfx", sAudio), "function", "AudioBank.registerSfx must be available for external SFX");
-  assert.strictEqual(vm.runInContext("typeof AudioBank.playBgm", sAudio), "function", "AudioBank.playBgm must be available for external BGM");
-  // Unregistered key falls back cleanly to procedural WebAudio synth
-  vm.runInContext("unlockAudio(); AudioBank.playSfx(\"laser_shot\", 660, 0.05, \"triangle\", 0.04);", sAudio);
-  assert(aStats.oscStarted >= 1, "AudioBank.playSfx must fall back cleanly to procedural beep when external audio file is not registered");
-}
-
-// 11. v1.1.1 Loot Variety, Strict T4 Drop Caps, Move-Speed Floor & Versioned Date Diagnostic Logs
-{
-  const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
-  vm.runInContext('startGame("engineer");', s);
-
-  // 11a. Log Header + Entries + Export Filename must include Date & Code Version
-  const curVer = vm.runInContext('APP_VERSION', s);
-  assert.strictEqual(curVer, 'v1.3.5', 'APP_VERSION must be v1.3.5');
-  const logTxt = vm.runInContext('getLogText()', s);
-  assert(logTxt.includes(`Version: ${curVer} (BuildDate: 2026-11-12)`), 'Diagnostic log header must include Version & BuildDate');
-  assert(new RegExp(`\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2} \\+\\d+\\.\\d+s\\] \\[${curVer.replace(/\./g, '\\.')}\\]`).test(logTxt), 'Every log entry must carry YYYY-MM-DD HH:MM:SS date-time & code version');
-  vm.runInContext('downloadLogs();', s);
-  assert(stats.downloads.length >= 1 && stats.downloads[0].download.includes(curVer) && /\d{4}-\d{2}-\d{2}/.test(stats.downloads[0].download), 'Exported log filename must embed code version and date');
-
-  // 11b. Strict High-Tier Probability Caps even at Wave 18 + 500 Luck (never flooding 100% T4!)
-  const rates = vm.runInContext(`(() => {
-    let crateT4 = 0, bossT4 = 0, shopT4 = 0;
-    const N = 3000;
-    for (let i = 0; i < N; i++) {
-      if (rollCrateTier(18, 500, false) === 4) crateT4++;
-      if (rollCrateTier(18, 500, true) === 4) bossT4++;
-      if (rollShopTier(18, 500) === 4) shopT4++;
-    }
-    return { crateRate: crateT4 / N, bossRate: bossT4 / N, shopRate: shopT4 / N };
-  })()`, s);
-  assert(rates.crateRate <= 0.125, `Normal crate T4 rate must be strictly capped ~10% (got ${(rates.crateRate * 100).toFixed(1)}%)`);
-  assert(rates.bossRate <= 0.175, `Boss crate T4 rate must be strictly capped ~14% (got ${(rates.bossRate * 100).toFixed(1)}%)`);
-  assert(rates.shopRate <= 0.105, `Shop T4 rate must be strictly capped ~8% (got ${(rates.shopRate * 100).toFixed(1)}%)`);
-
-  // 11c. Unique (`maxCount: 1`) & Limited (`maxCount: 2`) Items Never Repeat After Reaching Cap
-  const neverRepeated = vm.runInContext(`(() => {
-    wave = 12; player.luck = 100;
-    player.items.anvil = 1;
-    player.items.cornucopia = 1;
-    player.items.reactor = 2;
-    for (let i = 0; i < 200; i++) {
-      const it = pickWeightedItem(4, new Set(), true);
-      if (!it || it.id === 'anvil' || it.id === 'cornucopia' || it.id === 'reactor') return false;
-      shopOffers = [];
-      rollOffers();
-      for (const o of shopOffers) {
-        if (o.kind === 'item' && (o.item.id === 'anvil' || o.item.id === 'cornucopia' || o.item.id === 'reactor')) return false;
-      }
-    }
-    return true;
-  })()`, s);
-  assert.strictEqual(neverRepeated, true, 'Capped T4 items already owned must NEVER appear again in crates or shop');
-
-  // 11d. 2-Option Crate Pod & Per-Wave Crate Queue Hard Cap (<= 3, excess auto-converts to crystals + HP)
-  vm.runInContext(`
-    pendingCrates = 0;
-    const matsBefore = player.mats;
-    for (let k = 0; k < 6; k++) {
-      drops.push({ x: player.x, y: player.y, kind: 'crate', isBoss: k === 0, bob: 0 });
-    }
-    update(0.05);
-    globalThis.excessConverted = (pendingCrates === 3) && (player.mats > matsBefore);
-    showCrateMenu();
-  `, s);
-  assert.strictEqual(vm.runInContext('excessConverted', s), true, 'Picking up >3 crates in a single wave must cap pendingCrates at 3 and convert excess to crystals');
-  assert.strictEqual(els.crateBox.children.length, 2, 'Crate modal must offer 2 distinct tactical supply choices');
-
-  // 11e. Movement Speed Penalty Floor (>= 72% even under heavy items + chill) & Hermes Wings Slow Immunity
-  const spdCheck = vm.runInContext(`(() => {
-    startGame('engineer');
-    const bell = ITEMS.find(i => i.id === 'bell');
-    const snail = ITEMS.find(i => i.id === 'snail');
-    const anvil = ITEMS.find(i => i.id === 'anvil');
-    for (let k = 0; k < 15; k++) { bell.apply(player); snail.apply(player); anvil.apply(player); }
-    const baseEff = getEffectiveSpdMul();
-    player.chillSlowT = 1.2;
-    keys['d'] = true;
-    const x0 = player.x;
-    update(0.20);
-    keys['d'] = false;
-    const movedFloor = player.x - x0;
-    const minExpected = player.spd * 0.72 * 0.20 - 0.5;
-
-    // Now equip Hermes Wings -> immune to slow & >= 122% speed!
-    const wings = ITEMS.find(i => i.id === 'hermes_wings');
-    wings.apply(player);
-    return { baseEff, movedFloor, minExpected, wingsEff: getEffectiveSpdMul(), noSlow: player.noSlow };
-  })()`, s);
-  assert(spdCheck.baseEff >= 0.72, `Player effective speed multiplier must never drop below 72% (got ${spdCheck.baseEff})`);
-  assert(spdCheck.movedFloor >= spdCheck.minExpected, `Actual movement even while chilled must stay >= 72% base speed`);
-  assert(spdCheck.noSlow && spdCheck.wingsEff >= 1.2, 'Hermes Wings must grant slow immunity and >= 120% move speed');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 11 loot, speed & logging verification');
-}
-
-// 12. v1.1.2 Early-Wave Monster Count Smoothing & Ranged Enemy Spawn Ratio / Concurrent Cap
+// ============================================================================
+// Suite 1: 16-Floor Fixed Non-Random Boss Architecture & Scene Progression
+// ============================================================================
 {
   const { sandbox: s } = createEnv(false, 1440, 900, 2);
-  vm.runInContext('selectedDiff = 1; startGame("allrounder");', s);
+  assert.strictEqual(vm.runInContext("APP_VERSION", s), "v1.3.6", "APP_VERSION must be v1.3.6");
+  assert.strictEqual(vm.runInContext("MAX_WAVE", s), 16, "MAX_WAVE must be strictly 16 floors");
+  assert.strictEqual(vm.runInContext("menuStage", s), "home", "Game must boot onto clean Main Title Screen (menuStage === 'home')");
 
-  const spawnStats = vm.runInContext(`(() => {
-    const checkWave = w => {
-      wave = w; beginWave();
-      enemies = []; spawns = [];
-      let rangedPicks = 0;
-      const N = 600;
-      for (let i = 0; i < N; i++) {
-        const t = pickWaveEnemyType(w);
-        if (RANGED_ENEMY_TYPES.has(t)) rangedPicks++;
-      }
-      // Now verify concurrent ranged cap holds when spawning into spawns[]
-      spawns = []; enemies = [];
-      for (let i = 0; i < 40; i++) {
-        const t = pickWaveEnemyType(w);
-        spawnWarning(200, 200, t);
-      }
-      return { ratio: rangedPicks / N, cappedRanged: countActiveRangedEnemies(), maxAllowed: Math.min(10, 2 + Math.floor(w * 0.7)) };
-    };
-    return { w2: checkWave(2), w3: checkWave(3), w6: checkWave(6) };
-  })()`, s);
-
-  assert(spawnStats.w2.ratio <= 0.14, `Wave 2 ranged spawn ratio must be low <=14% (got ${(spawnStats.w2.ratio * 100).toFixed(1)}%)`);
-  assert(spawnStats.w3.ratio <= 0.16, `Wave 3 ranged spawn ratio must be low <=16% (got ${(spawnStats.w3.ratio * 100).toFixed(1)}%)`);
-  assert(spawnStats.w6.ratio <= 0.22, `Wave 6 ranged spawn ratio must stay controlled <=22% (got ${(spawnStats.w6.ratio * 100).toFixed(1)}%)`);
-  assert(spawnStats.w2.cappedRanged <= spawnStats.w2.maxAllowed, 'Wave 2 concurrent ranged spawns must never exceed cap');
-  assert(spawnStats.w3.cappedRanged <= spawnStats.w3.maxAllowed, 'Wave 3 concurrent ranged spawns must never exceed cap');
-  assert(spawnStats.w6.cappedRanged <= spawnStats.w6.maxAllowed, 'Wave 6 concurrent ranged spawns must never exceed cap');
-
-  // 12b. v1.1.3 Zero Map Shake on Attacking/Exploding/Killing Monsters; Gentle Shake ONLY on Player Hit
-  const shakeCheck = vm.runInContext(`(() => {
-    startGame('allrounder');
-    wave = 12; beginWave();
-    bossCutscene = null;
-    shake = 0;
-    player.weapons = [makeWeapon('hammer', 4), makeWeapon('rocket', 4)];
-    player.weapons[0].cd = 0; player.weapons[1].cd = 0;
-    const boss = createEnemy(player.x + 85, player.y, 'boss', 'butcher');
-    boss.canPhase2 = false;
-    update(0.05);
-    triggerExplosion(boss.x, boss.y, 120, 500, false, 0, '#ff9f1c', true);
-    hurtEnemy(boss, boss.maxHp + 99999, true);
-    const attackShake = shake;
-
-    // Now deal real HP damage to player -> gentle shake (<= 5)
-    state = 'wave'; player.dodge = 0; player.shield = 0; player.invuln = 0; player.hp = 30;
-    hurtPlayer(5);
-    const hitShake = shake;
-    return { attackShake, hitShake };
-  })()`, s);
-  assert.strictEqual(shakeCheck.attackShake, 0, 'Attacking, exploding, or killing monsters/bosses must NOT shake the map');
-  assert(shakeCheck.hitShake > 0 && shakeCheck.hitShake <= 5, `Player taking HP damage should trigger gentle micro-shake (got ${shakeCheck.hitShake})`);
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 12 spawn pacing, ranged cap & shake verification');
-}
-
-// 13. v1.1.4 Interactive Biome Terrains (Lava, Swamp, Chasm, Ice Sheet, Twin Portals) & Persistent Callouts/Banners
-{
-  const { sandbox: s, stats } = createEnv(false, 1440, 900, 2);
-  vm.runInContext('selectedDiff = 2; startGame("allrounder");', s);
-
-  const terrainCheck = vm.runInContext(`(() => {
-    const kindsSeen = new Set();
-    for (let idx = 0; idx < SCENES.length; idx++) {
-      selectedScene = SCENES[idx].id;
-      wave = 4;
-      beginWave();
-      for (const tr of terrains) kindsSeen.add(tr.kind);
-      cam.x = terrains[0] ? terrains[0].x : WORLD.w * 0.5;
-      cam.y = terrains[0] ? terrains[0].y : WORLD.h * 0.5;
-      update(0.05);
-      draw();
-    }
-
-    // Force deterministic wasteland setup on Wave 3 (guaranteed Twin Portals)
-    selectedScene = 'wasteland'; wave = 3;
-    beginWave();
-    const hasPortals = portals.length === 2;
-    const p0 = portals[0], p1 = portals[1];
-    player.x = p0.x; player.y = p0.y;
-    update(0.05);
-    const warpedToB = Math.hypot(player.x - p1.x, player.y - p1.y) < 10 && portalPairCd > 4.0 && player.invuln >= 0.45;
-
-    // Lava ignites enemies; Ice boosts player speed; Chasm pushes entities out
-    terrains = [
-      { kind: 'lava', x: 500, y: 500, r: 70, pulse: 0, seed: 1 },
-      { kind: 'ice_sheet', x: 800, y: 500, r: 80, pulse: 0, seed: 2 },
-      { kind: 'chasm', x: 1100, y: 500, x1: 1020, y1: 500, x2: 1180, y2: 500, ang: 0, halfLen: 80, r: 30, seed: 3 }
-    ];
-    const dummy = createEnemy(500, 500, 'grunt');
-    player.x = 800; player.y = 500;
-    update(0.05);
-    const lavaIgnited = dummy.burnT > 0 && dummy.burnDmg > 0;
-    const iceBoost = player.terrainSpdMul > 1.25;
-
-    player.x = 1100; player.y = 500;
-    pushOutOfChasms(player);
-    const chasmClear = closestOnChasm(terrains[2], player.x, player.y);
-    const pushedFromChasm = Math.hypot(player.x - 1100, player.y - 500) > 25 && chasmClear && chasmClear.gap >= player.r - 0.5;
-
-    // Persistent callout & banner eviction protection under heavy bullet damage spam
-    texts = []; banners = [];
-    addText(player.x, player.y - 40, '✨ 关键奇遇提示!', '#ffd166', 18);
-    const initDur = texts[0].t;
-    for (let k = 0; k < 130; k++) addText(player.x, player.y, '24', '#fff', 14);
-    const survivedSpam = texts.some(t => t.txt.includes('关键奇遇提示'));
-    announce('🌀 顶部持久战术播报测试', '#e0aaff', 3.5);
-    const bannerDur = banners[0] ? banners[0].t : 0;
-    draw();
-
-    return {
-      kinds: Array.from(kindsSeen).sort(),
-      hasPortals, warpedToB, lavaIgnited, iceBoost, pushedFromChasm,
-      initDur, survivedSpam, bannerDur
-    };
-  })()`, s);
-
-  assert.deepStrictEqual(terrainCheck.kinds, ['chasm', 'ice_sheet', 'lava', 'swamp'], 'All 4 interactive terrain kinds must spawn across the 5 biomes');
-  assert.strictEqual(terrainCheck.hasPortals, true, 'Twin Void Portals must spawn on Wave 3 Wasteland');
-  assert.strictEqual(terrainCheck.warpedToB, true, 'Stepping into Portal A must warp player to Portal B with invuln & cooldown');
-  assert.strictEqual(terrainCheck.lavaIgnited, true, 'Lava pool must ignite enemies stepping inside');
-  assert.strictEqual(terrainCheck.iceBoost, true, 'Ice sheet must grant +28% skating speed boost');
-  assert.strictEqual(terrainCheck.pushedFromChasm, true, 'Chasm ravine must physically block ground entities from crossing');
-  assert(terrainCheck.initDur >= 1.8, `Important overhead callout must last >= 1.8s (got ${terrainCheck.initDur}s)`);
-  assert.strictEqual(terrainCheck.survivedSpam, true, 'Important overhead callout must NOT be evicted by 130 numeric damage hits');
-  assert(terrainCheck.bannerDur >= 3.4, 'HUD event banner must stay visible >= 3.4s');
-  assert.strictEqual(stats.radialGradients, 0, 'Terrain & banner rendering must create ZERO per-frame radial gradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'Terrain & banner rendering must set ZERO shadowBlur');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero errors in Suite 13 interactive terrains & banners verification');
-}
-
-// 14. v1.2.0 Boss Portraits & Time-Stop Cutscenes, Hidden Mythic Phase 2 (+60s & Legendary Drop), Melee Fairness, CritDmg & Tri-Elements, Start Menu Version + Changelog Modal
-{
-  const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
-
-  // 14a. Start Menu Live Version Pill + Interactive Changelog Modal
-  s.document.getElementById('codexModal').classList.add('hidden');
-  s.document.getElementById('logModal').classList.add('hidden');
-  assert(els.startVersionPill.textContent.includes('v1.3.5'), '#startVersionPill must display live version v1.3.5 on start screen');
-  vm.runInContext('openChangelogModal();', s);
-  assert.strictEqual(els.changelogModal.classList.contains('hidden'), false, 'openChangelogModal() must unhide #changelogModal');
-  assert(els.changelogList.children.length >= 7, 'Changelog modal must render >= 7 historical version cards');
-  s.window.dispatch('keydown', { key: 'Escape' });
-  assert.strictEqual(els.changelogModal.classList.contains('hidden'), true, 'Escape key must close #changelogModal');
-
-  // 14b. Crit Damage Items (`critDmg`) + Burn / Freeze / Poison Elemental System & Plague Spread
-  const elemCritCheck = vm.runInContext(`(() => {
-    startGame('brawler');
-    wave = 6; beginWave(); bossCutscene = null;
-    const baseCritMul = getEffectiveCritMult(1.95);
-    ITEMS.find(i => i.id === 'hawk_eye').apply(player);
-    ITEMS.find(i => i.id === 'crit_gauntlet').apply(player);
-    ITEMS.find(i => i.id === 'doom_edge').apply(player);
-    const boostedCritMul = getEffectiveCritMult(1.95);
-
-    // Freeze immobilizes normal enemy & Shatter Crit grants +25% bonus damage
-    enemies = [];
-    const m1 = createEnemy(600, 600, 'chaser');
-    m1.hp = 5000; m1.maxHp = 5000;
-    const hp0 = m1.hp;
-    hurtEnemy(m1, 100, true, 0, true, { noProc: true });
-    const normalCritHit = hp0 - m1.hp;
-
-    applyFreeze(m1, 1.5);
-    const xFrozen0 = m1.x;
-    update(0.10);
-    const stayedStill = Math.abs(m1.x - xFrozen0) < 0.01;
-    const hpBeforeShatter = m1.hp;
-    hurtEnemy(m1, 100, true, 0, true, { noProc: true });
-    const shatterCritHit = hpBeforeShatter - m1.hp;
-
-    // Poison stacks corrode (+3% vuln/stack) + DoT tick + Plague Flask spread on death
-    ITEMS.find(i => i.id === 'plague_flask').apply(player);
-    const pTarget = createEnemy(900, 600, 'shooter');
-    const neighbor = createEnemy(940, 600, 'stalker');
-    pTarget.hp = 1000; pTarget.maxHp = 1000;
-    applyPoison(pTarget, 5);
-    const hpBeforePoisonHit = pTarget.hp;
-    hurtEnemy(pTarget, 100, false, 0, true, { noProc: true });
-    const corrodedHit = hpBeforePoisonHit - pTarget.hp;
-    // Kill poisoned target -> spreads poison to nearby neighbor!
-    hurtEnemy(pTarget, 5000, false, 0, true, { noProc: true });
-    const spreadStacks = neighbor.poisonStacks || 0;
-
-    // Render frozen, poisoned, and burning sprites
-    neighbor.burnT = 2.0; neighbor.freezeT = 1.0;
-    cam.x = 920; cam.y = 600;
-    draw();
-
-    return { baseCritMul, boostedCritMul, stayedStill, normalCritHit, shatterCritHit, corrodedHit, spreadStacks };
-  })()`, s);
-
-  assert(elemCritCheck.boostedCritMul >= elemCritCheck.baseCritMul + 0.99, 'Crit Damage items must boost effective crit multiplier by >= +100%');
-  assert.strictEqual(elemCritCheck.stayedStill, true, 'Frozen regular monster must be completely immobilized');
-  assert(elemCritCheck.shatterCritHit > elemCritCheck.normalCritHit * 1.20, 'Critting a frozen target must trigger +25% Shatter bonus');
-  assert(elemCritCheck.corrodedHit >= 114, `5 stacks of poison must amplify damage by +15% (got ${elemCritCheck.corrodedHit})`);
-  assert(elemCritCheck.spreadStacks >= 2, 'Plague Flask must spread poison stacks to nearby enemies upon death');
-
-  // 14c. Melee vs. Ranged Boss Fairness (Donut Safe Inner Eye, Melee +22% Boss-Breaker, Exposed Window, Close-Quarters Guard)
-  const meleeFairCheck = vm.runInContext(`(() => {
-    startGame('brawler');
-    wave = 10; beginWave(); bossCutscene = null;
-    enemies = []; hazards = [];
-    const boss = createEnemy(700, 700, 'boss', 'mech_colossus');
-    boss.canPhase2 = false;
-    boss.hp = 50000; boss.maxHp = 50000;
-
-    // Ranged hit vs Melee hit on Boss
-    const h0 = boss.hp;
-    hurtEnemy(boss, 100, false, 0, true, { noProc: true });
-    const rangedDmg = h0 - boss.hp;
-    const h1 = boss.hp;
-    hurtEnemy(boss, 100, false, 0, true, { isMelee: true, noProc: true });
-    const meleeDmg = h1 - boss.hp;
-    boss.exposeT = 1.5;
-    const h2 = boss.hp;
-    hurtEnemy(boss, 100, false, 0, true, { isMelee: true, noProc: true });
-    const exposedMeleeDmg = h2 - boss.hp;
-
-    // Donut Outer-Ring Hazard: standing in melee range (74px < innerSafeR 112px, outside Boss 53px body contact) takes 0 dmg; standing far (165px) takes dmg!
-    player.dodge = 0; player.armor = 0; player.shield = 0; player.invuln = 0;
-    player.maxHp = 200; player.hp = 200;
-    player.x = boss.x + 74; player.y = boss.y;
-    spawnHazard(boss.x, boss.y, 238, 30, 0.04, { innerSafeR: 112, color: '#fb5607' });
-    cam.x = boss.x; cam.y = boss.y;
-    draw(); // Test Donut hazard rendering too!
-    update(0.05);
-    const hpAfterCloseEye = player.hp;
-
-    player.invuln = 0;
-    player.x = boss.x + 165; player.y = boss.y;
-    spawnHazard(boss.x, boss.y, 238, 30, 0.04, { innerSafeR: 112, color: '#fb5607' });
-    update(0.05);
-    const hpAfterOuterBlast = player.hp;
-
-    return { rangedDmg, meleeDmg, exposedMeleeDmg, hpAfterCloseEye, hpAfterOuterBlast };
-  })()`, s);
-
-  assert(meleeFairCheck.meleeDmg > meleeFairCheck.rangedDmg * 1.20, 'Melee hits must deal +22% Boss-Breaker damage vs Bosses');
-  assert(meleeFairCheck.exposedMeleeDmg > meleeFairCheck.meleeDmg * 1.22, 'Exposed Boss window must grant an additional +25% melee vulnerability');
-  assert.strictEqual(meleeFairCheck.hpAfterCloseEye, 200, 'Standing inside Boss Donut inner wind-eye (40px < 96px) must deal ZERO damage to melee player');
-  assert(meleeFairCheck.hpAfterOuterBlast < 200, 'Standing in Boss Donut outer blast ring (150px) must hurt distant camper');
-
-  // 14d. Rare Full-Screen Time-Stop Cutscene + All 7 Boss Portraits + Hidden Mythic Phase 2 (+60s & Guaranteed T4 Mythic Drop)
-  const mythicCheck = vm.runInContext(`(() => {
-    // Verify 33% per-Boss-variant rate & max 1 per Boss ID cap (not global 1-per-run cap):
-    // Summoning the SAME Special Boss ('crimson_lord') 3 times in a single run must trigger <= 1 time,
-    // while Wave 12 Final Boss (different Boss ID) CAN also trigger in the same run!
-    let maxSameBossInSingleRun = 0;
-    let runsWithBothEarlyAndFinal = 0;
-    for (let r = 0; r < 160; r++) {
+  // Verify across multiple runs AND D5 difficulty that Waves 1..16 follow exact Act scenes and fixed non-random Bosses
+  const climbAudit = vm.runInContext(`(() => {
+    const expectedScene = w => (w <= 4 ? 'foundry' : (w <= 8 ? 'glacier' : (w <= 12 ? 'wasteland' : 'desert')));
+    const expectedBoss = { 4: 'butcher', 8: 'frost_queen', 12: 'void_weaver', 16: 'solar_seraph' };
+    const expectedMini = { 6: 'glacial_valkyrie', 10: 'shadow_stalker', 14: 'iron_warden' };
+    for (const dIdx of [0, 2, 5]) {
+      selectedDiff = dIdx;
+      selectedScene = 'random';
       startGame('allrounder');
-      let crimsonCount = 0;
-      for (let k = 0; k < 3; k++) {
-        bossCutscene = null;
-        const testRel = spawnSpecialRelic('blood_altar');
-        summonSpecialBoss(testRel);
-        if (bossCutscene) crimsonCount++;
+      if (typeof SpireDirector !== 'undefined') SpireDirector.advanceOrSkip(true);
+      for (let w = 1; w <= 16; w++) {
+        wave = w;
+        beginWave();
+        if (typeof SpireDirector !== 'undefined') {
+          for (let guard = 0; guard < 10 && SpireDirector.isBlockingGameplay(); guard++) SpireDirector.advanceOrSkip(true);
+        }
+        if (curScene.id !== expectedScene(w)) return { ok: false, reason: 'Wrong scene on wave ' + w + ': ' + curScene.id };
+        // Advance spawns so any queued boss/mini_boss materializes
+        player.weapons = []; player.hp = 99999; player.maxHp = 99999;
+        for (let k = 0; k < 30; k++) update(0.05);
+        const bosses = enemies.filter(e => e.type === 'boss').map(e => e.variant);
+        const minis = enemies.filter(e => e.type === 'mini_boss').map(e => e.variant);
+        const specials = enemies.filter(e => e.type === 'special_boss').length + relics.length;
+        if (specials > 0) return { ok: false, reason: 'Random special relic/boss appeared during story climb wave ' + w };
+        if (expectedBoss[w]) {
+          if (bosses.length !== 1 || bosses[0] !== expectedBoss[w]) {
+            return { ok: false, reason: 'Wave ' + w + ' expected single fixed boss ' + expectedBoss[w] + ', got ' + JSON.stringify(bosses) };
+          }
+          if (w === 16 && !enemies.find(e => e.type === 'boss').canPhase2) {
+            return { ok: false, reason: 'Wave 16 Final Boss solar_seraph must guarantee Phase 2 awakening' };
+          }
+        } else if (bosses.length !== 0) {
+          return { ok: false, reason: 'Non-boss wave ' + w + ' spawned boss: ' + JSON.stringify(bosses) };
+        }
+        if (expectedMini[w] && diff.midElite) {
+          if (diff.dualElite && w >= 10) {
+            if (minis.length !== 2 || !minis.includes(expectedMini[w])) {
+              return { ok: false, reason: 'Wave ' + w + ' D5 expected deterministic dual commander including ' + expectedMini[w] + ', got ' + JSON.stringify(minis) };
+            }
+          } else if (minis.length !== 1 || minis[0] !== expectedMini[w]) {
+            return { ok: false, reason: 'Wave ' + w + ' expected fixed commander ' + expectedMini[w] + ', got ' + JSON.stringify(minis) };
+          }
+        } else if (minis.length !== 0) {
+          return { ok: false, reason: 'Unexpected mini_boss on wave ' + w + ': ' + JSON.stringify(minis) };
+        }
       }
-      if (crimsonCount > maxSameBossInSingleRun) maxSameBossInSingleRun = crimsonCount;
-      bossCutscene = null;
-      wave = 12; beginWave();
-      const finalShown = !!bossCutscene;
-      if (crimsonCount > 0 && finalShown) runsWithBothEarlyAndFinal++;
     }
-
+    // Verify victory triggers on completing Floor 16 (and NOT on Floor 12!)
+    selectedDiff = 1;
     startGame('allrounder');
-    wave = 8; beginWave();
-    enemies = []; relics = []; drops = []; pendingCrates = 0;
-    const rel = spawnSpecialRelic('blood_altar');
-    summonSpecialBoss(rel, true);
-    const summonCutsceneActive = !!(bossCutscene && bossCutscene.mode === 'summon' && bossCutscene.t > 1.0);
-    const wtFrozen0 = waveTime;
-    update(0.05); // During bossCutscene, waveTime stays frozen while boss spawn ticks!
-    const timerStayedFrozen = Math.abs(waveTime - wtFrozen0) < 0.001;
-
-    // Render all 7 Boss Portraits in both normal & Mythic Phase 2 modes
-    const allVars = ['butcher', 'frost_queen', 'mech_colossus', 'void_weaver', 'crimson_lord', 'golden_golem', 'abyss_devourer'];
-    for (const v of allVars) {
-      bossCutscene = { t: 0.9, maxT: 1.3, mode: 'summon', variant: v, title: v, subtitle: 'TEST', extraTag: 'TAG', color: '#ff3b6b', accent: '#ffd166' };
-      draw();
-      bossCutscene.mode = 'mythic_phase2';
-      draw();
+    if (typeof SpireDirector !== 'undefined') {
+      while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
     }
-    bossCutscene = null;
-
-    // Trigger Hidden Mythic Phase 2 on Boss lethal hit (and verify max 1 Mythic Phase 2 per run)!
-    enemies = []; drops = [];
-    const b = createEnemy(650, 650, 'boss', 'frost_queen');
-    b.canPhase2 = true;
-    waveTime = 18;
-    hurtEnemy(b, b.maxHp + 99999, true);
-    const awakened = !!b.mythicPhase2 && b.hp > 0 && waveTime >= 75 && !!(bossCutscene && bossCutscene.mode === 'mythic_phase2');
-    draw(); // Render Mythic cutscene + Mythic Boss sprite!
-    bossCutscene = null;
-
-    // Second Boss in the same run must NOT awaken a second Mythic Phase 2
-    const bTwin = createEnemy(700, 650, 'boss', 'butcher');
-    bTwin.canPhase2 = true;
-    hurtEnemy(bTwin, bTwin.maxHp + 99999, true);
-    const secondMythicBlocked = !bTwin.mythicPhase2;
-
-    // Let Boss execute Terrain Alteration & Minion Summon during Phase 2
-    terrains = [];
-    b.terrainCd = 0.02; b.sumT = 0.02;
-    const terrainsBefore = terrains.length;
-    update(0.05);
-    const alteredTerrain = terrains.length > terrainsBefore;
-
-    // Defeat Phase 2 -> drops Mythic Crate & grants permanent trophy buff
-    const dmgBeforeKill = player.dmgMul;
-    hurtEnemy(b, b.maxHp + 99999, true);
-    const droppedMythic = drops.some(d => d.kind === 'crate' && d.isMythic);
-    const gotTrophyBuff = player.dmgMul > dmgBeforeKill + 0.14 && (player.critDmg || 0) >= 0.24;
-
-    // Pick up Mythic Crate and open Crate Menu -> guaranteed Tier 4 Legendary option!
-    for (const d of drops) { d.x = player.x; d.y = player.y; }
-    update(0.05);
-    showCrateMenu();
-    return { maxSameBossInSingleRun, runsWithBothEarlyAndFinal, summonCutsceneActive, timerStayedFrozen, awakened, secondMythicBlocked, alteredTerrain, droppedMythic, gotTrophyBuff };
+    wave = 12; pendingCrates = 0; pendingLevels = 0;
+    finishWave();
+    const stateAfter12 = state;
+    wave = 16; pendingCrates = 0; pendingLevels = 0;
+    finishWave();
+    const stateAfter16 = state;
+    return { ok: true, stateAfter12, stateAfter16 };
   })()`, s);
 
-  assert(mythicCheck.maxSameBossInSingleRun <= 1, `Same Boss variant must trigger at most 1 portrait cutscene per run (got ${mythicCheck.maxSameBossInSingleRun})`);
-  assert(mythicCheck.runsWithBothEarlyAndFinal > 0, 'Early Boss portrait must NOT block late-game Wave 12 Boss from showing its own portrait');
-  assert.strictEqual(mythicCheck.summonCutsceneActive, true, 'Rare/forced Special Boss summon must trigger full-screen time-stop cutscene');
-  assert.strictEqual(mythicCheck.timerStayedFrozen, true, 'waveTime must pause during Boss entrance cutscene');
-  assert.strictEqual(mythicCheck.awakened, true, 'Boss with canPhase2 must awaken Mythic Phase 2 on lethal hit, restoring HP, adding +60s, and playing hidden cutscene');
-  assert.strictEqual(mythicCheck.secondMythicBlocked, true, 'At most 1 Mythic Phase 2 awakening may occur per run');
-  assert.strictEqual(mythicCheck.alteredTerrain, true, 'Boss must actively alter battlefield terrain during combat');
-  assert.strictEqual(mythicCheck.droppedMythic, true, 'Defeating Mythic Phase 2 Boss must drop a Mythic Legendary Crate');
-  assert.strictEqual(mythicCheck.gotTrophyBuff, true, 'Defeating Mythic Phase 2 Boss must grant permanent +15% dmg & +25% critDmg trophy');
-  assert(els.crateTitle.textContent.includes('神话'), 'Opening Mythic Crate must display Mythic title in #crateMenu');
-  assert.strictEqual(stats.radialGradients, 0, 'Boss portraits, cutscenes & elemental overlays must create ZERO per-frame radial gradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'Boss portraits, cutscenes & elemental overlays must set ZERO shadowBlur');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 14 v1.2.0 verification');
+  assert.strictEqual(climbAudit.ok, true, climbAudit.reason || "16-floor climb audit failed");
+  assert.strictEqual(climbAudit.stateAfter12, "shop", "Floor 12 must proceed to inter-floor shop (NOT end the run early)");
+  assert.strictEqual(climbAudit.stateAfter16, "end", "Completing Floor 16 must trigger final victory");
+  assert.strictEqual(vm.runInContext("logErrCount", s), 0, "Zero runtime errors in Suite 1");
 }
 
-// 15. v1.3.0 One-Unique-Organic-Terrain-Per-Map, Wave 5 MINI_BOSS_DEFS Resilience, 32-Weapon / 68-Item Full Archetypes & All 10 Half-Body Portraits
+// ============================================================================
+// Suite 2: Left-Column Anime Half-Body Portraits & Restored Opening Cutscene + Story Director
+// ============================================================================
 {
-  const { sandbox: s, stats } = createEnv(false, 1440, 900, 2);
+  // 2a. Verify all 6 Left-Column Anime Half-Body Portraits on disk have tall portrait aspect ratio (768px tall, ~512-628px wide, NEVER square chibi!)
+  const charPortraitKeys = ["zero", "jinyu", "astria", "jialan", "qingyu", "eclipse"];
+  for (const k of charPortraitKeys) {
+    const rel = `assets/spire/port_${k}.jpg`;
+    const dims = assetDimsMap[rel];
+    assert(dims, `Missing dialogue portrait file: ${rel}`);
+    assert.strictEqual(dims.h, 768, `${rel} must preserve full 768px vertical art height (got ${dims.h})`);
+    assert(dims.w >= 500 && dims.w <= 640 && dims.h > dims.w * 1.2, `${rel} must be the left-column anime half-body portrait, not a square crop (got ${dims.w}x${dims.h})`);
+  }
 
-  const v13Check = vm.runInContext(`(() => {
-    startGame('engineer');
+  // Verify Opening Cutscene CGs & Boss Defeat Redemption CGs exist on disk
+  for (const rel of [
+    "assets/spire/cut_intro_1.jpg", "assets/spire/cut_intro_2.jpg", "assets/spire/cut_intro_3.jpg",
+    "assets/spire/cut_defeat_act1_1.jpg", "assets/spire/cut_defeat_act1_2.jpg",
+    "assets/spire/cut_defeat_act2_1.jpg", "assets/spire/cut_defeat_act2_2.jpg",
+    "assets/spire/cut_defeat_act3_1.jpg", "assets/spire/cut_defeat_act3_2.jpg",
+    "assets/spire/cut_defeat_act4_1.jpg", "assets/spire/cut_defeat_act4_2.jpg"
+  ]) {
+    assert(assetDimsMap[rel], `Missing cinematic CG asset: ${rel}`);
+  }
 
-    // 15a. Verify balanced weapon counts across all 6 sets (each set >= 5 weapons!)
-    const setCounts = {};
-    for (const w of Object.values(WEAPONS)) {
-      setCounts[w.set] = (setCounts[w.set] || 0) + 1;
+  // 2b. Verify Opening Cutscene triggers on startGame() AND via replayOpeningCutscene() button, and AVG renders tall Left-Column Standees
+  const { sandbox: s, els, directorDraws } = createEnv(false, 1440, 900, 2);
+
+  const directorAudit = vm.runInContext(`(() => {
+    // 1) Replay Opening Cutscene from Start Menu
+    state = 'menu';
+    replayOpeningCutscene();
+    const replayActive = SpireDirector.isActive() && SpireDirector.isBlockingGameplay();
+    update(0.05);
+    SpireDirector.render();
+    SpireDirector.advanceOrSkip(true);
+    const backToMenu = !SpireDirector.isActive() && state === 'menu';
+
+    // 2) Starting a new game automatically plays 3-shot Opening Cutscene -> Act I Curtain -> Floor 1 AVG Dialogue
+    startGame('allrounder');
+    const openingStartedOnNewRun = SpireDirector.isActive() && SpireDirector.isBlockingGameplay();
+    // Render Opening Cutscene frames (including crossfade window)
+    for (let i = 0; i < 25; i++) {
+      SpireDirector.update(0.12);
+      SpireDirector.render();
     }
+    // Advance past Opening Cutscene -> Act I Curtain -> into Floor 1 AVG Dialogue!
+    SpireDirector.advanceOrSkip(true); // skips cutscene -> now on Act I curtain
+    const curtainActive = SpireDirector.isActive();
+    SpireDirector.render();
+    SpireDirector.advanceOrSkip(true); // skips curtain -> now on Floor 1 AVG dialogue (Zero + Qingyu left/right standees)
+    const floor1AvgActive = SpireDirector.isActive();
+    for (let i = 0; i < 6; i++) {
+      SpireDirector.update(0.08);
+      SpireDirector.render();
+    }
+    while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
 
-    // 15b. Verify strictly ONE signature terrain feature per biome & non-circular geometry
-    const biomeReport = {};
-    for (const sc of SCENES) {
-      selectedScene = sc.id;
-      wave = 4;
+    // 3) Verify all 16 floors have scripted AVG dialogues & Floors 4/8/12/16 play Entrance CG + Phase2 + Redemption Defeat CG + Farewell AVG
+    const bossFloors = [4, 8, 12, 16];
+    let bossStoryCount = 0;
+    for (const bf of bossFloors) {
+      wave = bf;
       beginWave();
-      const tCount = terrains.length;
-      const pCount = portals.length;
-      let nonCircular = false;
-      if (sc.id === 'wasteland') {
-        nonCircular = (tCount === 0 && pCount === 2 && Array.isArray(portals[0].shards) && portals[0].shards.length >= 5);
-      } else if (tCount === 1 && pCount === 0) {
-        const tr = terrains[0];
-        if (tr.kind === 'chasm') {
-          nonCircular = Array.isArray(tr.spine) && tr.spine.length >= 6 && Array.isArray(tr.outerCliff) && tr.outerCliff.length >= 12;
-        } else if (Array.isArray(tr.verts) && tr.verts.length >= 12) {
-          const dists = tr.verts.map(v => Math.hypot(v.x - tr.x, v.y - tr.y));
-          nonCircular = (Math.max(...dists) - Math.min(...dists)) > 12;
-        }
-      }
-      biomeReport[sc.id] = { tCount, pCount, kind: terrains[0] ? terrains[0].kind : 'portals', nonCircular };
-      draw();
+      if (!SpireDirector.isBlockingGameplay()) return { ok: false, msg: 'Boss floor ' + bf + ' did not trigger entrance story' };
+      SpireDirector.update(0.2);
+      SpireDirector.render();
+      while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
+      player.weapons = []; player.hp = 99999; player.maxHp = 99999;
+      for (let k = 0; k < 25; k++) update(0.05);
+
+      const boss = enemies.find(e => e.type === 'boss');
+      if (!boss) return { ok: false, msg: 'Boss missing on floor ' + bf };
+      boss.canPhase2 = true;
+      hurtEnemy(boss, boss.maxHp + 99999, true); // Triggers Phase 2 + SpireDirector.onBossPhase2
+      SpireDirector.update(0.15);
+      SpireDirector.render();
+      while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
+
+      hurtEnemy(boss, boss.maxHp + 99999, true); // Kills Boss -> Triggers SpireDirector.onBossDefeated (Redemption CG + Farewell AVG)
+      if (!SpireDirector.isBlockingGameplay()) return { ok: false, msg: 'Boss defeat on floor ' + bf + ' did not trigger Redemption CG & Farewell dialogue' };
+      SpireDirector.update(0.25);
+      SpireDirector.render();
+      SpireDirector.advanceOrSkip(true); // skip Redemption CG -> Farewell AVG
+      SpireDirector.update(0.15);
+      SpireDirector.render();
+      while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
+      bossStoryCount++;
     }
 
-    // 15c. Regression test for Wave 5 Fungal Elite Wave & MINI_BOSS_DEFS resilience
-    selectedScene = 'fungal';
-    selectedDiff = 2; diff = DIFFS[2];
-    wave = 5;
-    beginWave();
-    const savedMini = globalThis.MINI_BOSS_DEFS;
-    globalThis.MINI_BOSS_DEFS = undefined;
-    const pickedFallback = pickMiniBossVariant();
-    const fallbackMini = createEnemy(600, 600, 'mini_boss', pickedFallback);
-    globalThis.MINI_BOSS_DEFS = savedMini;
-    const wave5Safe = !!(fallbackMini && fallbackMini.hp > 0);
+    // 4) Verify AVG auto-play toggle & Qingyu's Left-Column Half-Body Portrait + interactive click chat in Shop
+    SpireDirector.setAutoPlay(true);
+    const autoEnabled = SpireDirector.isAutoPlay();
+    SpireDirector.setAutoPlay(false);
 
-    // 15d. Test new Engineering Landmines, Floating Laser Turrets, Bouncing Grenade, Revolver 6th-Crit, Melee Shockwave & Blood Nova
-    player.weapons = [
-      makeWeapon('screwdriver', 3),
-      makeWeapon('drone_bay', 3),
-      makeWeapon('revolver', 2),
-      makeWeapon('grenade_launcher', 3),
-      makeWeapon('spiked_shield', 3),
-      makeWeapon('magma_blade', 4),
-      makeWeapon('emp_cannon', 4)
-    ];
-    for (const id of ['landmine_pack', 'overseer_chip', 'omega_factory', 'whirlwind_belt', 'crimson_pact', 'titan_heart', 'fortress_plate', 'trinity_orb']) {
-      player.items[id] = 1;
-      ITEMS.find(i => i.id === id).apply(player);
-    }
-    wave = 7;
-    beginWave();
-    const hasLaserTurret = turrets.some(t => t.kind === 'laser');
-    player.mineCd = 0.01;
-    const targetE = createEnemy(player.x + 95, player.y, 'brute');
-    targetE.hp = 20000; targetE.maxHp = 20000;
-    createEnemy(player.x + 150, player.y + 30, 'charger');
-    player.hp = Math.max(1, player.maxHp - 5);
-    for (let step = 0; step < 30; step++) {
-      for (const w of player.weapons) w.cd = 0;
-      update(0.05);
-      draw();
-    }
-    // Detonate a proximity mine directly
-    player.mineCd = 0.01;
-    update(0.05);
-    const spawnedMine = mines.length >= 1;
-    if (mines[0]) {
-      mines[0].armT = 0;
-      const victim = createEnemy(mines[0].x + 10, mines[0].y, 'chaser');
-      victim.hp = 500; victim.maxHp = 500;
-      update(0.05);
-    }
-
-    // 15e. Render all 10 Boss/SpecialBoss/Commander Half-Body Portraits (Normal + Mythic)
-    const all10Portraits = ['butcher', 'frost_queen', 'mech_colossus', 'void_weaver', 'crimson_lord', 'golden_golem', 'abyss_devourer', 'vanguard', 'pyro_lord', 'shadow_stalker'];
-    for (const v of all10Portraits) {
-      drawBossPortrait(v, 400, 300, 1.0, false);
-      drawBossPortrait(v, 400, 300, 1.0, true);
-    }
-
-    return { setCounts, biomeReport, wave5Safe, hasLaserTurret, spawnedMine };
-  })()`, s);
-
-  for (const [setKey, cnt] of Object.entries(v13Check.setCounts)) {
-    assert(cnt >= 5, `Weapon set ${setKey} must have >= 5 weapons for balanced build variety (got ${cnt})`);
-  }
-  for (const [scId, rep] of Object.entries(v13Check.biomeReport)) {
-    assert.strictEqual(rep.nonCircular, true, `Biome ${scId} must spawn strictly 1 non-circular signature terrain (got ${JSON.stringify(rep)})`);
-  }
-  assert.strictEqual(v13Check.wave5Safe, true, 'Wave 5 pickMiniBossVariant & createEnemy must never throw ReferenceError even if global MINI_BOSS_DEFS is stale');
-  assert.strictEqual(v13Check.hasLaserTurret, true, 'Drone Bay / Omega Factory must deploy floating laser turrets');
-  assert.strictEqual(v13Check.spawnedMine, true, 'Screwdriver / Landmine Pack must deploy proximity landmines');
-  assert.strictEqual(stats.radialGradients, 0, 'v1.3.0 organic terrains, mines, laser turrets & 10 portraits must use ZERO radialGradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'v1.3.0 organic terrains, mines, laser turrets & 10 portraits must use ZERO shadowBlurs');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 15 v1.3.0 verification');
-
-  // 15f. Verify Standalone Out-of-Game Developer Portrait Showcase HTML exists & compiles cleanly
-  const devShowcasePath = path.join(ROOT, 'tools/dev_portrait_showcase.html');
-  assert(fs.existsSync(devShowcasePath), 'Developer portrait showcase HTML must exist in tools/dev_portrait_showcase.html');
-  const devHtml = fs.readFileSync(devShowcasePath, 'utf8');
-  const scriptMatch = devHtml.match(/<script>([\s\S]*?)<\/script>/);
-  assert(scriptMatch && scriptMatch[1].length > 50000, 'Developer portrait showcase must inline full rendering script');
-  new vm.Script(scriptMatch[1], { filename: 'dev_portrait_showcase.js' });
-  assert(!indexHtml.includes('portraitModal'), 'Main game index.html must stay clean of developer-only portrait modal');
-}
-
-// 16. v1.3.2 25% Mythic Phase 2 Rate, Fast Monster '格挡' vs Long Hero Notices, Zero-Alloc Caches, Crash Guards & High-Load Perf Benchmark
-{
-  const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
-
-  // 16a. KeyboardEvent with undefined `key` (IME / browser autofill edge case) must NEVER throw
-  s.window.dispatch('keydown', {});
-  s.window.dispatch('keyup', { key: undefined });
-
-  const v132Check = vm.runInContext(`(() => {
-    startGame('ranger');
-    wave = 8; beginWave();
-
-    // 1) Verify Mythic Phase 2 probability is 25% (~0.25 across 600 boss spawns)
-    let phase2Rolls = 0;
-    const totalRolls = 600;
-    for (let i = 0; i < totalRolls; i++) {
-      enemies = [];
-      const b = createEnemy(600, 600, i % 2 === 0 ? 'boss' : 'special_boss', i % 2 === 0 ? 'butcher' : 'crimson_lord');
-      if (b.canPhase2) phase2Rolls++;
-    }
-    const empiricalRate = phase2Rolls / totalRolls;
-
-    // Verify per-wave reset allows subsequent Boss wave to awaken while blocking twin boss in same wave
-    enemies = [];
-    wave = 8; beginWave();
-    const bWave8 = createEnemy(600, 600, 'special_boss', 'crimson_lord');
-    bWave8.canPhase2 = true;
-    hurtEnemy(bWave8, bWave8.maxHp + 99999, true);
-    const wave8Awakened = !!bWave8.mythicPhase2;
-    const bWave8Twin = createEnemy(660, 600, 'special_boss', 'golden_golem');
-    bWave8Twin.canPhase2 = true;
-    hurtEnemy(bWave8Twin, bWave8Twin.maxHp + 99999, true);
-    const sameWaveTwinBlocked = !bWave8Twin.mythicPhase2;
-
-    wave = 12; beginWave(); bossCutscene = null;
-    const bWave12 = createEnemy(600, 600, 'boss', 'frost_queen');
-    bWave12.canPhase2 = true;
-    hurtEnemy(bWave12, bWave12.maxHp + 99999, true);
-    const wave12AwakenedToo = !!bWave12.mythicPhase2;
-    bossCutscene = null;
-
-    // 2) Verify '格挡' & monster prompts vanish quickly without dark pill, while hero notices stay >= 1.5s with pill
-    enemies = []; texts = [];
-    const sh = createEnemy(700, 500, 'shielder');
-    sh.hp = 5000; sh.maxHp = 5000; sh.faceA = 0;
-    for (let k = 0; k < 12; k++) {
-      // knockA = Math.PI hits shielder head-on (cos(pi - 0) = -1 < -0.25)
-      hurtEnemy(sh, 15, false, Math.PI, false, { noProc: true });
-    }
-    const blockTexts = texts.filter(t => t.txt === '格挡');
-    const blockFastAndClean = blockTexts.length === 1 && blockTexts[0].important === false && blockTexts[0].maxT <= 0.45;
-
-    applyFreeze(sh, 1.2);
-    const freezeTxt = texts.find(t => t.txt.includes('冰冻'));
-    const freezeFast = !!(freezeTxt && freezeTxt.important === false && freezeTxt.maxT <= 0.55);
-
-    const bmb = createEnemy(760, 500, 'bomber');
-    primeBomber(bmb);
-    const bombTxt = texts.find(t => t.txt.includes('自爆预警'));
-    const bombFast = !!(bombTxt && bombTxt.important === false && bombTxt.maxT <= 0.75);
-
-    // Major player notices stay long & important
-    addText(player.x, player.y - 36, '🧊 寒冰疾滑 +28%移速!', '#72efdd', 15, 1.8);
-    addText(player.x, player.y - 36, 'LEVEL UP!', '#ffd166', 22, 1.9, true);
-    const iceTxt = texts.find(t => t.txt.includes('寒冰疾滑'));
-    const lvTxt = texts.find(t => t.txt === 'LEVEL UP!');
-    const heroNoticesLong = !!(iceTxt && iceTxt.important === true && iceTxt.maxT >= 1.75 && lvTxt && lvTxt.important === true && lvTxt.maxT >= 1.85);
-
-    // 3) Verify getSetBonuses() zero-allocation object reuse & instant invalidation on weapon change
-    const sbRef1 = getSetBonuses();
-    const sbRef2 = getSetBonuses();
-    const cacheReused = sbRef1 === sbRef2;
-    const prevGuns = sbRef1.counts.gun;
-    player.weapons.push(makeWeapon('smg', 2));
-    const sbRef3 = getSetBonuses();
-    const cacheUpdatedInPlace = sbRef3 === sbRef1 && sbRef3.counts.gun === prevGuns + 1;
-
-    // 4) NaN damage guard & Exhausted-Item-Pool Crate fallback safety
-    const hpBeforeNaN = sh.hp;
-    hurtEnemy(sh, NaN, false, 0, true);
-    const nanSafe = Number.isFinite(sh.hp) && sh.hp === hpBeforeNaN;
-
-    const origFilter = ITEMS.filter;
-    ITEMS.filter = () => [];
-    pendingCrates = 1;
-    showCrateMenu();
-    ITEMS.filter = origFilter;
-
-    // 5) High-density Wave 12 D5 combat stress benchmark (100 enemies + 6 rapid weapons + turrets + mines)
-    selectedDiff = 4; diff = DIFFS[4];
-    startGame('multitasker');
-    player.weapons = [
-      makeWeapon('minigun', 4), makeWeapon('shotgun', 4), makeWeapon('flamethrower', 4),
-      makeWeapon('smg', 4), makeWeapon('katana', 4), makeWeapon('grenade_launcher', 4),
-      makeWeapon('drone_bay', 3), makeWeapon('screwdriver', 3)
-    ];
-    player.maxHp = 99999; player.hp = 99999;
-    wave = 12; beginWave(); bossCutscene = null;
-    for (let m = 0; m < 85; m++) {
-      const ang = (m / 85) * Math.PI * 2;
-      createEnemy(player.x + Math.cos(ang) * (150 + (m % 5) * 45), player.y + Math.sin(ang) * (150 + (m % 5) * 45), m % 6 === 0 ? 'shielder' : (m % 5 === 0 ? 'splitter' : 'chaser'));
-    }
-    const t0 = Date.now();
-    for (let f = 0; f < 180; f++) {
-      update(0.016);
-      if (f % 3 === 0) draw();
-    }
-    const benchMs = Date.now() - t0;
-
+    wave = 4;
+    openShop(true);
+    const initialWhisper = document.getElementById('shopSub').textContent;
+    document.getElementById('shopMerchantPortrait').click();
+    const clickedWhisper = document.getElementById('shopSub').textContent;
     return {
-      empiricalRate, wave8Awakened, sameWaveTwinBlocked, wave12AwakenedToo,
-      blockFastAndClean, freezeFast, bombFast, heroNoticesLong,
-      cacheReused, cacheUpdatedInPlace, nanSafe, benchMs
+      ok: true,
+      replayActive,
+      backToMenu,
+      openingStartedOnNewRun,
+      curtainActive,
+      floor1AvgActive,
+      bossStoryCount,
+      autoEnabled,
+      initialWhisper,
+      clickedWhisper
     };
   })()`, s);
 
-  assert(v132Check.empiricalRate >= 0.19 && v132Check.empiricalRate <= 0.31, `Mythic Phase 2 rate must be ~25% (got ${(v132Check.empiricalRate * 100).toFixed(1)}%)`);
-  assert.strictEqual(v132Check.wave8Awakened, true, 'Wave 8 Special Boss with canPhase2 must awaken Mythic Phase 2');
-  assert.strictEqual(v132Check.sameWaveTwinBlocked, true, 'Twin Boss in the same wave must NOT double-trigger Mythic Phase 2');
-  assert.strictEqual(v132Check.wave12AwakenedToo, true, 'New Boss wave must reset waveMythicAwakened so Wave 12 Boss still gets its 25% Mythic roll');
-  assert.strictEqual(v132Check.blockFastAndClean, true, 'Shielder 格挡 prompt must be non-important, <=0.45s fast-fading, and throttled against multi-pellet spam');
-  assert.strictEqual(v132Check.freezeFast, true, 'Monster 冰冻 prompt must be non-important and fast-fading (<=0.55s)');
-  assert.strictEqual(v132Check.bombFast, true, 'Bomber 自爆预警 prompt must be non-important and crisp (<=0.75s)');
-  assert.strictEqual(v132Check.heroNoticesLong, true, 'Hero terrain & LEVEL UP notices must remain important with pill backdrop and >=1.75s duration');
-  assert.strictEqual(v132Check.cacheReused, true, 'getSetBonuses() must reuse cached object with zero allocation when weapons are unchanged');
-  assert.strictEqual(v132Check.cacheUpdatedInPlace, true, 'getSetBonuses() must auto-detect weapon array mutation and update set counts');
-  assert.strictEqual(v132Check.nanSafe, true, 'hurtEnemy must safely ignore NaN damage without corrupting enemy HP');
-  assert(els.crateBox.children.length >= 1, 'Exhausted item pool in #crateMenu must still render fallback supply card without soft-locking');
-  assert(v132Check.benchMs < 2500, `180 frames of D5 Wave 12 85-mob bullet-hell stress test must run fast (took ${v132Check.benchMs}ms)`);
-  assert.strictEqual(stats.radialGradients, 0, 'v1.3.2 stress benchmark must create ZERO per-frame radial gradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'v1.3.2 stress benchmark must set ZERO shadowBlur');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 16 v1.3.2 verification');
+  assert.strictEqual(directorAudit.ok, true, directorAudit.msg || "SpireDirector audit failed");
+  assert.strictEqual(directorAudit.replayActive, true, "replayOpeningCutscene() must activate Opening Cutscene");
+  assert.strictEqual(directorAudit.backToMenu, true, "Skipping Menu Opening Replay must cleanly return to Start Menu");
+  assert.strictEqual(directorAudit.openingStartedOnNewRun, true, "startGame() must automatically play the 3-shot Opening Cutscene");
+  assert.strictEqual(directorAudit.curtainActive, true, "Act I Curtain must follow Opening Cutscene");
+  assert.strictEqual(directorAudit.floor1AvgActive, true, "Floor 1 AVG Dialogue must follow Act I Curtain");
+  assert.strictEqual(directorAudit.bossStoryCount, 4, "All 4 Act Bosses (Floors 4, 8, 12, 16) must play Entrance CG, Phase 2 & Defeat Redemption sequences");
+  assert.strictEqual(directorAudit.autoEnabled, true, "SpireDirector auto-play toggle must switch cleanly");
+  assert(els.shopMerchantPortrait.src.includes("port_qingyu.jpg"), "Shop header must display Qingyu's left-column anime portrait");
+  assert(directorAudit.initialWhisper.includes("烬羽"), "Post-Floor-4 shop whisper (#shopSub) must reflect Floor 4 story progression");
+  assert.notStrictEqual(directorAudit.clickedWhisper, directorAudit.initialWhisper, "Clicking Qingyu's shop portrait must cycle interactive dialogue");
+  const tallPortraitDraws = directorDraws.filter(d => d.img && d.img.height === 768 && d.args.length === 8 && d.args[7] >= 495);
+  assert(tallPortraitDraws.length >= 6, `AVG Director must render Left-Column 768px Half-Body Standees at tall >=55% viewport height (saw ${tallPortraitDraws.length} draws)`);
+  assert.strictEqual(vm.runInContext("logErrCount", s), 0, "Zero runtime errors in Suite 2");
 }
 
-// 17. v1.3.3 33% Per-Boss-Variant Portrait Unlock + Death Wave-Retry & Abandon-From-Scratch Mechanics
+// ============================================================================
+// Suite 3: Action Clarity (2.0x Retina DPR, 1.0x Floor Scale) & 4-Frame Sprite Sheet Fluidity + Zero Gradients/ShadowBlur
+// ============================================================================
 {
-  const { sandbox: s, els, stats } = createEnv(false, 1440, 900, 2);
+  const { sandbox: s, stats, gameDraws } = createEnv(false, 1440, 900, 2);
+  assert.strictEqual(vm.runInContext("dpr", s), 2, "Desktop Retina DPR must run at crisp 2.0x");
 
-  const v133Check = vm.runInContext(`(() => {
-    // 1) Verify ~33% empirical portrait probability on fresh Boss encounters (Regular Wave 12 Boss, Wave 5 Elite Commander, Special Boss)
-    let regularHits = 0, eliteHits = 0, specialHits = 0;
-    const N = 450;
-    for (let i = 0; i < N; i++) {
-      startGame('ranger');
-      selectedDiff = 1; diff = DIFFS[1];
-      bossCutscene = null;
-      wave = 5; beginWave();
-      if (bossCutscene && bossCutscene.mode === 'elite_boss') eliteHits++;
+  const actionAudit = vm.runInContext(`(() => {
+    startGame('brawler'); // Jinyu
+    while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
+    const sheetsValid = ['zero', 'jinyu', 'astria', 'jialan', 'qingyu', 'eclipse'].every(k => {
+      const shNorm = SpireAssets.getHeroSheet(k, false);
+      const shFlash = SpireAssets.getHeroSheet(k, true);
+      return shNorm && shFlash && shNorm.canvas && shFlash.canvas &&
+        shNorm.canvas.width === 1024 && shNorm.canvas.height === 256 &&
+        shFlash.canvas.width === 1024 && shFlash.canvas.height === 256 &&
+        shNorm.cellW === 256 && shNorm.frames === 4;
+    });
 
-      bossCutscene = null;
-      const rel = spawnSpecialRelic('void_cube');
-      summonSpecialBoss(rel, false);
-      if (bossCutscene && bossCutscene.mode === 'summon') specialHits++;
+    // Test hero idle -> running stride -> sudden turn flip interpolation -> weapon attack pose Frame 3 + lunge
+    player.weapons = []; enemies = []; trees = []; player._atkPoseT = 0;
+    keys['a'] = true;
+    for (let i = 0; i < 8; i++) { _advanceClock(40); update(0.04); draw(); }
+    const flipLeft = player._visFlip;
+    keys['a'] = false; keys['d'] = true;
+    _advanceClock(20); update(0.02); draw(); // mid-turn smooth flip interpolation
+    const midTurnFlip = player._visFlip;
+    for (let i = 0; i < 12; i++) { _advanceClock(40); update(0.04); draw(); }
+    keys['d'] = false;
 
-      bossCutscene = null;
-      wave = 12; beginWave();
-      if (bossCutscene && bossCutscene.mode === 'final_boss') regularHits++;
+    // Trigger melee & ranged attacks against a Boss -> must set _atkPoseT > 0 and render Frame 3 (sx = 768)
+    const boss = createEnemy(player.x + 95, player.y, 'boss', 'butcher');
+    boss.hp = 99999; boss.maxHp = 99999;
+    player.weapons = [makeWeapon('katana', 3), makeWeapon('pistol', 3)];
+    player.weapons[0].cd = 0; player.weapons[1].cd = 0;
+    _advanceClock(20); update(0.02);
+    const atkPoseTriggered = (player._atkPoseT || 0) > 0.05;
+    draw();
+
+    // Test Boss windup crouch & 3-ghost dash trail rendering across all 6 classes
+    boss.lockedAim = 0; boss.dashT = 0.25;
+    _advanceClock(35); draw();
+    boss.lockedAim = undefined; boss.dashing = true; boss.vx = 520; boss.vy = 0;
+    for (let i = 0; i < 6; i++) { _advanceClock(35); player.hp = player.maxHp; update(0.035); draw(); }
+
+    // Test Soul Dash across all 6 classes + enemy projectile slicing + 4 Act Bosses' Signature Named Skills
+    let dashArtsTested = 0;
+    for (const cls of CLASSES.map(c => c.id)) {
+      startGame(cls);
+      while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
+      player.dashCd = 0;
+      player.dashT = 0;
+      keys['d'] = true;
+      // Place an enemy bullet directly in front to verify dash projectile-slicing
+      eBullets.push({ x: player.x + 28, y: player.y, vx: -120, vy: 0, dmg: 5, r: 5, color: '#ff3b6b' });
+      const ebBefore = eBullets.length;
+      const fired = triggerSoulDash();
+      if (!fired) return { ok: false, reason: 'triggerSoulDash failed for ' + cls };
+      for (let k = 0; k < 5; k++) { _advanceClock(35); update(0.035); draw(); }
+      if (eBullets.length >= ebBefore) return { ok: false, reason: 'Soul Dash did not slice enemy projectile for ' + cls };
+      keys['d'] = false;
+      dashArtsTested++;
     }
 
-    // 2) Verify per-Boss-ID cap = 1 & Endless mode unlock:
-    // Force-showing vanguard, crimson_lord, and butcher must block repeats of THOSE 3, while still allowing frost_queen in Endless Wave 15!
-    startGame('allrounder');
-    shouldRollRareBossPortrait('vanguard', true);
-    shouldRollRareBossPortrait('crimson_lord', true);
-    shouldRollRareBossPortrait('butcher', true);
-    let repeatBlocked = true;
-    for (let k = 0; k < 30; k++) {
-      if (shouldRollRareBossPortrait('vanguard', false) || shouldRollRareBossPortrait('crimson_lord', false) || shouldRollRareBossPortrait('butcher', false)) {
-        repeatBlocked = false;
+    // Verify all 4 Fixed Act Bosses execute Signature Named Skills (windup telegraph + castLabel + burst execution)
+    let sigBossesVerified = 0;
+    for (const bVar of ['butcher', 'frost_queen', 'void_weaver', 'solar_seraph']) {
+      enemies.length = 0; eBullets.length = 0; hazards.length = 0;
+      const b = createEnemy(player.x + 190, player.y, 'boss', bVar);
+      b.hp = 99999; b.maxHp = 99999;
+      b.sigSkillT = 0.02;
+      b.dashT = 9.0;
+      _advanceClock(40); update(0.04); // enters sigWindupT
+      if (!(b.sigWindupT > 0 && b.castLabel)) {
+        return { ok: false, reason: 'Boss ' + bVar + ' did not enter signature skill windup' };
       }
-    }
-    let endlessFrostTriggered = false;
-    endlessMode = true;
-    for (let k = 0; k < 40; k++) {
-      player.shownBossPortraits.frost_queen = false;
-      bossCutscene = null;
-      wave = 15;
-      beginWave({ isRetry: true, sceneId: 'glacier', waveBossIds: ['frost_queen'] });
-      if (bossCutscene && bossCutscene.variant === 'frost_queen') { endlessFrostTriggered = true; break; }
+      hudAcc = 1.0; update(0.02); draw(); // renders geometric telegraph + overhead badge + #bossCastSub
+      // Advance past windup (0.88s) so signature pattern unleashes
+      for (let k = 0; k < 22; k++) { _advanceClock(45); update(0.045); draw(); }
+      if (b.sigWindupT !== 0) {
+        return { ok: false, reason: 'Boss ' + bVar + ' signature windup did not finish cleanly' };
+      }
+      sigBossesVerified++;
     }
 
-    // 3) Verify Death Wave-Retry ('retryFailedWave') restores exact pre-wave checkpoint without leaking mid-wave drops/levels
-    selectedScene = 'random';
-    startGame('brawler');
-    player.lv = 6;
-    player.xp = 18;
-    player.xpNeed = 55;
-    player.mats = 92;
-    player.kills = 110;
-    player.maxHp = 58;
-    player.weapons = [makeWeapon('katana', 3), makeWeapon('spiked_shield', 2)];
-    player.items = { cyber_heart: 1, armor_plate: 2 };
-    shopOffers = [{ kind: 'weapon', id: 'katana', tier: 3, price: 40, locked: true }];
-    wave = 9;
-    beginWave();
-    bossCutscene = null;
-    const preMaxHp = player.maxHp;
-    const preSceneId = curScene.id;
-    const preBossIds = waveCheckpoint && waveCheckpoint.waveBossIds ? waveCheckpoint.waveBossIds.slice() : [];
-    player.shownBossPortraits.pyro_lord = true; // Simulate Boss portrait shown during Attempt 1
+    return { ok: true, sheetsValid, flipLeft, midTurnFlip, atkPoseTriggered, floorScale: curFloorScale, dashArtsTested, sigBossesVerified };
+  })()`, s);
 
-    // Mutate state mid-wave before dying
-    player.mats += 44;
-    player.kills += 19;
-    player.lv = 8;
-    player.maxHp += 12;
-    pendingLevels = 2;
-    pendingCrates = 1;
-    player.bossCratesQueued = 1;
-    player.dodge = 0; player.invuln = 0; player.shield = 0; player.armor = 0;
-    hurtPlayer(99999);
-    const deadState = state === 'end' && player.hp === 0;
-    const retryBtnVisibleOnLoss = !document.getElementById('retryWaveBtn').classList.contains('hidden');
-    const abandonBtnVisibleOnLoss = !document.getElementById('abandonRestartBtn').classList.contains('hidden');
-    const retryLabel = document.getElementById('retryWaveBtn').textContent;
+  assert.strictEqual(actionAudit.ok, true, actionAudit.reason || "Action & Boss Signature audit failed");
+  assert.strictEqual(actionAudit.sheetsValid, true, "All 6 1024x256 4-frame hero sprite sheets (normal + hit-flash) must pre-bake cleanly");
+  assert(actionAudit.flipLeft < -0.5 && Math.abs(actionAudit.midTurnFlip) < 0.95, "Hero turn-around must smoothly interpolate _visFlip instead of snapping");
+  assert.strictEqual(actionAudit.atkPoseTriggered, true, "Weapon fire/slash must trigger hero _atkPoseT attack animation pose");
+  assert.strictEqual(actionAudit.floorScale, 1.0, "Desktop floor texture must bake at crisp 1.0x native resolution");
+  assert.strictEqual(actionAudit.dashArtsTested, 6, "All 6 heroes must execute their signature Soul Dash arts & slice projectiles");
+  assert.strictEqual(actionAudit.sigBossesVerified, 4, "All 4 Fixed Act Bosses must telegraph and unleash their signature named skills");
 
-    // Trigger Retry Failed Wave!
+  // Confirm 4-frame sprite sheet slicing (sw=256, sh=256 across sx = 0, 256, 512, 768) actually executed on game canvas
+  const seenFrameSx = new Set(
+    gameDraws
+      .filter(d => d.img && d.img.width === 1024 && d.img.height === 256 && d.args.length === 8 && d.args[2] === 256 && d.args[3] === 256)
+      .map(d => d.args[0])
+  );
+  assert(seenFrameSx.has(768) && seenFrameSx.size >= 3, `Hero/Boss 4-frame sheet must slice distinct frames including attack frame sx=768 (saw sx=${JSON.stringify([...seenFrameSx])})`);
+  assert.strictEqual(stats.radialGradients, 0, "Combat draw() must create ZERO per-frame radial gradients");
+  assert.strictEqual(stats.shadowBlurs, 0, "Combat draw() must use ZERO expensive shadowBlur");
+  assert.strictEqual(vm.runInContext("logErrCount", s), 0, "Zero runtime errors in Suite 3");
+}
+
+// ============================================================================
+// Suite 4: Core Gameplay Systems + Main Screen Mode Split (Story=Protagonist Only / Endless=All Heroes) + Mobile Portrait & Landscape AVG/Cutscene
+// ============================================================================
+{
+  const { sandbox: s, els, stats, directorDraws: mobDirDraws } = createEnv(true, 390, 844, 3);
+  s.window.dispatch("pointerdown", {});
+
+  const coreCheck = vm.runInContext(`(() => {
+    // 0) Verify Main Screen -> Story Mode locks strictly to protagonist ('allrounder'), Endless Mode allows all 6 heroes
+    const bootOnHome = menuStage === 'home' && !document.getElementById('menuHomeView').classList.contains('hidden');
+    openMenuStage('story');
+    const storyViewShown = menuStage === 'story' && !document.getElementById('menuStoryView').classList.contains('hidden');
+    // Attempt to pass non-protagonist into story mode -> must clamp strictly to 'allrounder'
+    startGame('brawler', { mode: 'story' });
+    const storyLockedToZero = (player.cls === 'allrounder' && endlessMode === false);
+
+    // Render Mobile Portrait (390x844) Opening Cutscene -> Act I Curtain -> Floor 1 AVG Dialogue
+    for (let i = 0; i < 8; i++) { SpireDirector.update(0.12); SpireDirector.render(); }
+    SpireDirector.advanceOrSkip(true); // -> Act I Curtain on 390x844 portrait
+    SpireDirector.update(0.15); SpireDirector.render();
+    SpireDirector.advanceOrSkip(true); // -> Floor 1 AVG Dialogue on 390x844 portrait
+    for (let i = 0; i < 8; i++) { SpireDirector.update(0.10); SpireDirector.render(); }
+    while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
+
+    // Switch to Mobile Landscape (844x390) and verify AVG & Cutscene render cleanly without errors
+    window.innerWidth = 844; window.innerHeight = 390;
+    resize();
+    replayOpeningCutscene();
+    SpireDirector.update(0.15); SpireDirector.render();
+    SpireDirector.advanceOrSkip(true);
+    window.innerWidth = 390; window.innerHeight = 844;
+    resize();
+
+    // Return to Start Menu -> must reset to Main Title Screen ('home'), then enter Endless Mode and pick other heroes
+    showStart();
+    const returnedHome = menuStage === 'home';
+    openMenuStage('endless');
+    const endlessRosterCount = document.getElementById('classGrid').children.length;
+    const diffBtnsCount = document.getElementById('diffTabs').children.length;
+    const sceneBtnsCount = document.getElementById('sceneTabs').children.length;
+
+    // v2.7.0: Verify multi-level Hero Dossier Tabs ('traits' <-> 'combat') & Prep Tabs ('diff' <-> 'scene')
+    setHeroDossierTab('combat');
+    const combatHtmlOk = document.getElementById('endlessHeroShowcase').innerHTML.includes('STARTING ARMAMENTS');
+    setHeroDossierTab('traits');
+    const traitsHtmlOk = document.getElementById('endlessHeroShowcase').innerHTML.includes('trait-chip-grid');
+
+    setEndlessPrepTab('scene');
+    const scenePaneShown = !document.getElementById('endlessScenePane').classList.contains('hidden') &&
+      document.getElementById('endlessDiffPane').classList.contains('hidden');
+    setEndlessPrepTab('diff');
+    const diffPaneRestored = !document.getElementById('endlessDiffPane').classList.contains('hidden') &&
+      document.getElementById('endlessScenePane').classList.contains('hidden');
+
+    // v2.7.0: Verify keyboard 1..6 & ArrowRight character tab switching in Endless Mode
+    window.dispatch('keydown', { key: '3', preventDefault() {} });
+    const keyDigitHero = selectedEndlessCls;
+    window.dispatch('keydown', { key: 'ArrowRight', preventDefault() {} });
+    const keyArrowHero = selectedEndlessCls;
+
+    selectEndlessHero('ranger');
+    startEndlessMode();
+    const endlessRangerOk = (player.cls === 'ranger' && endlessMode === true && !SpireDirector.isBlockingGameplay());
+    openShop(true);
+    const endlessShopTitle = document.getElementById('shopTitle').textContent;
+
+    // 1) Boss Floor One-Shot Protection (<= 42% maxHp single-hit cap on Boss floors 4/8/12/16)
+    wave = 4; beginWave();
+    player.maxHp = 100; player.hp = 100; player.armor = 0; player.dodge = 0; player.shield = 0; player.invuln = 0;
+    hurtPlayer(500);
+    const hpAfterBossNuke = player.hp;
+
+    // 2) Codex all 5 tabs render cleanly with 6 heroes, 4 Spire scenes, 32 weapons, 68 items
+    openCodex('weapons'); const wCnt = document.getElementById('codexGrid').children.length;
+    setCodexTab('items'); const iCnt = document.getElementById('codexGrid').children.length;
+    setCodexTab('heroes'); const hCnt = document.getElementById('codexGrid').children.length;
+    setCodexTab('monsters'); const mCnt = document.getElementById('codexGrid').children.length;
+    setCodexTab('world'); setCodexFilter('scene'); const sCnt = document.getElementById('codexGrid').children.length;
+    closeCodex();
+
+    // 3) Death Wave-Retry on Story Mode Floor 8 restores exact Floor 8 Boss ('frost_queen') & pre-wave state
+    selectedDiff = 2;
+    startStoryMode();
+    while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
+    player.mats = 88;
+    wave = 8; beginWave();
+    while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
+    const preHp = player.maxHp;
+    player.mats += 50;
+    player.dodge = 0; player.armor = 0; player.shield = 0; player.invuln = 0;
+    // Deal 3 hits to bypass one-shot protection and die cleanly
+    for (let k = 0; k < 4; k++) { player.invuln = 0; hurtPlayer(999); }
+    const diedCleanly = state === 'end';
     retryFailedWave();
-    bossCutscene = null;
-    const retryRestoredCleanly = (
-      state === 'wave' &&
-      wave === 9 &&
-      player.hp === preMaxHp &&
-      player.maxHp === preMaxHp &&
-      player.lv === 6 &&
-      player.xp === 18 &&
-      player.mats === 92 &&
-      player.kills === 110 &&
-      pendingLevels === 0 &&
-      pendingCrates === 0 &&
-      player.bossCratesQueued === 0 &&
-      player.weapons.length === 2 &&
-      player.weapons[0].id === 'katana' &&
-      player.items.armor_plate === 2 &&
-      shopOffers.length === 1 && shopOffers[0].locked === true &&
-      curScene.id === preSceneId &&
-      JSON.stringify(waveCheckpoint.waveBossIds) === JSON.stringify(preBossIds) &&
-      player.shownBossPortraits.pyro_lord === true &&
-      player.retryCount === 1
-    );
-
-    // 4) Die again and choose 'abandonAndRestart' -> must start fresh from Wave 1!
-    player.dodge = 0; player.invuln = 0;
-    hurtPlayer(99999);
-    const endDescHasRetry = document.getElementById('endDesc').innerHTML.includes('重试');
-    abandonAndRestart();
-    const restartedFromScratch = (
-      state === 'wave' &&
-      wave === 1 &&
-      player.cls === 'brawler' &&
-      player.lv === 1 &&
-      player.kills === 0 &&
-      player.retryCount === 0 &&
-      Object.keys(player.shownBossPortraits).length === 0
-    );
-
-    // 5) Victory screen hides retry/abandon buttons and shows Endless button
-    endGame(true);
-    const winHidesRetry = document.getElementById('retryWaveBtn').classList.contains('hidden') &&
-      document.getElementById('abandonRestartBtn').classList.contains('hidden') &&
-      !document.getElementById('endlessBtn').classList.contains('hidden');
+    while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
+    for (let k = 0; k < 25; k++) update(0.05);
+    const retryBoss = enemies.find(e => e.type === 'boss');
+    const retryOk = state === 'wave' && wave === 8 && player.cls === 'allrounder' && !endlessMode && player.mats === 88 && player.hp === preHp && retryBoss && retryBoss.variant === 'frost_queen';
 
     return {
-      regularRate: regularHits / N,
-      eliteRate: eliteHits / N,
-      specialRate: specialHits / N,
-      repeatBlocked,
-      endlessFrostTriggered,
-      deadState,
-      retryBtnVisibleOnLoss,
-      abandonBtnVisibleOnLoss,
-      retryLabel,
-      retryRestoredCleanly,
-      endDescHasRetry,
-      restartedFromScratch,
-      winHidesRetry
+      bootOnHome, storyViewShown, storyLockedToZero, returnedHome,
+      endlessRosterCount, diffBtnsCount, sceneBtnsCount,
+      combatHtmlOk, traitsHtmlOk, scenePaneShown, diffPaneRestored,
+      keyDigitHero, keyArrowHero,
+      endlessRangerOk, endlessShopTitle,
+      hpAfterBossNuke, wCnt, iCnt, hCnt, mCnt, sCnt, diedCleanly, retryOk
     };
   })()`, s);
 
-  assert(v133Check.regularRate >= 0.25 && v133Check.regularRate <= 0.41, `Regular Wave 12 Boss portrait rate must be ~33% (got ${(v133Check.regularRate * 100).toFixed(1)}%)`);
-  assert(v133Check.eliteRate >= 0.25 && v133Check.eliteRate <= 0.41, `Wave 5/9 Elite Boss portrait rate must be ~33% (got ${(v133Check.eliteRate * 100).toFixed(1)}%)`);
-  assert(v133Check.specialRate >= 0.25 && v133Check.specialRate <= 0.41, `Special Boss portrait rate must be ~33% (got ${(v133Check.specialRate * 100).toFixed(1)}%)`);
-  assert.strictEqual(v133Check.repeatBlocked, true, 'Each Boss variant must trigger portrait at most 1 time per run');
-  assert.strictEqual(v133Check.endlessFrostTriggered, true, 'Unseen Boss variants in late-game / Endless waves must still be able to trigger their portrait');
-  assert.strictEqual(v133Check.deadState, true, 'Lethal damage must enter end state');
-  assert.strictEqual(v133Check.retryBtnVisibleOnLoss, true, '#retryWaveBtn must be visible upon defeat');
-  assert.strictEqual(v133Check.abandonBtnVisibleOnLoss, true, '#abandonRestartBtn must be visible upon defeat');
-  assert(v133Check.retryLabel.includes('第 9 波'), `Retry button must display exact failed wave label (got "${v133Check.retryLabel}")`);
-  assert.strictEqual(v133Check.retryRestoredCleanly, true, 'retryFailedWave() must restore exact pre-wave stats, weapons, items, scene & boss without leaking mid-wave gains');
-  assert.strictEqual(v133Check.endDescHasRetry, true, 'Defeat summary must display retry count after retrying');
-  assert.strictEqual(v133Check.restartedFromScratch, true, 'abandonAndRestart() must discard progress and start fresh at Wave 1');
-  assert.strictEqual(v133Check.winHidesRetry, true, 'Victory screen must hide retry/abandon buttons and show Endless button');
-  assert.strictEqual(stats.radialGradients, 0, 'v1.3.3 suite must create ZERO per-frame radial gradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'v1.3.3 suite must set ZERO shadowBlur');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 17 v1.3.3 verification');
+  assert.strictEqual(coreCheck.bootOnHome, true, "Mobile & Desktop must boot onto uncluttered Main Title Screen");
+  assert.strictEqual(coreCheck.storyViewShown, true, "Clicking Story Mode portal must open Story preparation stage");
+  assert.strictEqual(coreCheck.storyLockedToZero, true, "Story Mode must strictly lock character to protagonist Zero ('allrounder')");
+  assert.strictEqual(coreCheck.returnedHome, true, "showStart() must return cleanly to Main Title Screen");
+  assert.strictEqual(coreCheck.endlessRosterCount, 6, "Endless Mode must expose all 6 Spire characters in symmetrical character tabs");
+  assert.strictEqual(coreCheck.diffBtnsCount, 6, "Difficulty matrix must render 6 symmetrical D0..D5 buttons (3x2)");
+  assert.strictEqual(coreCheck.sceneBtnsCount, 5, "Scene vista tabs must render 5 symmetrical cards (1 wide + 2x2)");
+  assert.strictEqual(coreCheck.combatHtmlOk, true, "Hero dossier 'combat' tab must render armaments & Soul Dash specs");
+  assert.strictEqual(coreCheck.traitsHtmlOk, true, "Hero dossier 'traits' tab must render structured positive/negative trait chips");
+  assert.strictEqual(coreCheck.scenePaneShown, true, "Prep 'scene' tab must reveal #endlessScenePane and hide #endlessDiffPane");
+  assert.strictEqual(coreCheck.diffPaneRestored, true, "Prep 'diff' tab must restore #endlessDiffPane cleanly");
+  assert.strictEqual(coreCheck.keyDigitHero, "ranger", "Pressing '3' on Endless Mode must switch character tab to 3rd hero ('ranger')");
+  assert.strictEqual(coreCheck.keyArrowHero, "engineer", "Pressing 'ArrowRight' on Endless Mode must advance character tab to 'engineer'");
+  assert.strictEqual(coreCheck.endlessRangerOk, true, "Endless Mode must launch selected non-protagonist directly into endless run without story blocking");
+  assert(coreCheck.endlessShopTitle.includes("无尽第 1 层"), `Endless Mode shop header must display endless floor label (got ${coreCheck.endlessShopTitle})`);
+  const mobPortraitStandees = mobDirDraws.filter(d => d.img && d.img.height === 768 && d.args.length === 8);
+  assert(mobPortraitStandees.length >= 4, "Mobile Portrait AVG must render both foreground speaker and background listener standees cleanly");
+  assert(coreCheck.hpAfterBossNuke >= 58, `Boss floor one-shot protection must cap single hit at <=42% maxHp (HP left: ${coreCheck.hpAfterBossNuke})`);
+  assert.strictEqual(coreCheck.wCnt, 32, "Codex must render 32 weapons");
+  assert.strictEqual(coreCheck.iCnt, 68, "Codex must render 68 items");
+  assert.strictEqual(coreCheck.hCnt, 6, "Codex must render 6 Spire heroes");
+  assert.strictEqual(coreCheck.mCnt, 33, "Codex must render 33 Spire monsters & bosses");
+  assert.strictEqual(coreCheck.sCnt, 4, "Codex must render 4 Spire scenes");
+  assert.strictEqual(coreCheck.diedCleanly, true, "Multi-hit lethal damage must transition to end state");
+  assert.strictEqual(coreCheck.retryOk, true, "retryFailedWave() on Floor 8 must restore exact checkpoint and fixed Boss frost_queen");
+  assert(els.retryWaveBtn.textContent.includes("第 8 / 16 层"), "Retry button must use '第 X / 16 层' Spire terminology");
+  assert.strictEqual(stats.radialGradients, 0, "Mobile combat & UI suite must create ZERO per-frame radial gradients");
+  assert.strictEqual(stats.shadowBlurs, 0, "Mobile combat & UI suite must use ZERO shadowBlur");
+  assert.strictEqual(vm.runInContext("logErrCount", s), 0, "Zero runtime errors in Suite 4");
 }
 
-// 18. v1.3.4 10 Boss Summer Anime Beauty Bust Portraits (Data Integrity, GPU Mask Composite & 33%/25% Cutscene Rendering)
+// ============================================================================
+// Suite 5: Standalone Single-File Offline Bundle (`烬塔残响_单文件离线版.html`) Verification
+// ============================================================================
 {
-  const { sandbox: s, stats } = createEnv(false, 1440, 900, 2);
-
-  // Inject mock Image class into sandbox to exercise full RGB+Alpha offscreen composite & ctx.drawImage path
-  let drawnPortraits = 0;
-  const drawnImgRefs = [];
-  const liveCtx = vm.runInContext('ctx', s);
-  const origDrawImg = liveCtx.drawImage;
-  liveCtx.drawImage = function (img, ...args) {
-    if (img && img.width === 440 && img.height === 516) {
-      drawnPortraits++;
-      drawnImgRefs.push(img);
-    }
-    return origDrawImg.call(this, img, ...args);
-  };
-
-  s.Image = class MockImage {
-    constructor() {
-      this.naturalWidth = 440;
-      this.naturalHeight = 516;
-      this.width = 440;
-      this.height = 516;
-      this.onload = null;
-    }
-    set src(val) {
-      this._src = val;
-      if (typeof this.onload === 'function') this.onload();
-    }
-    get src() { return this._src; }
-  };
-
-  const v134Check = vm.runInContext(`(() => {
-    const expectedVariants = [
-      'butcher', 'frost_queen', 'mech_colossus', 'void_weaver', 'plague_empress', 'solar_seraph',
-      'crimson_lord', 'golden_golem', 'abyss_devourer',
-      'vanguard', 'pyro_lord', 'shadow_stalker', 'venom_matriarch', 'glacial_valkyrie', 'iron_warden', 'storm_siren'
-    ];
-    const allPresent = expectedVariants.every(v => {
-      const spec = BOSS_PORTRAIT_DATA[v];
-      return spec &&
-        spec.w === 440 &&
-        spec.h === 516 &&
-        typeof spec.personaName === 'string' && spec.personaName.length > 2 &&
-        typeof spec.summerTitle === 'string' && spec.summerTitle.includes('夏装') &&
-        typeof spec.mythicTitle === 'string' && spec.mythicTitle.length > 2 &&
-        spec.mythicTitle !== spec.summerTitle &&
-        typeof spec.rgb === 'string' && spec.rgb.startsWith('data:image/jpeg;base64,') && spec.rgb.length > 10000 &&
-        typeof spec.mask === 'string' && spec.mask.startsWith('data:image/png;base64,') && spec.mask.length > 2000 &&
-        typeof spec.mythicRgb === 'string' && spec.mythicRgb.startsWith('data:image/jpeg;base64,') && spec.mythicRgb.length > 10000 &&
-        typeof spec.mythicMask === 'string' && spec.mythicMask.startsWith('data:image/png;base64,') && spec.mythicMask.length > 2000 &&
-        spec.mythicRgb !== spec.rgb;
-    });
-
-    preloadAllBossPortraits();
-    const allCompositedAndDistinct = expectedVariants.every(v => {
-      const c1 = getBossAnimePortrait(v, false);
-      const c2 = getBossAnimePortrait(v, true);
-      return c1 && c2 && c1 !== c2 && c1.width === 440 && c1.height === 516 && c2.width === 440 && c2.height === 516;
-    });
-
-    startGame('ranger');
-    wave = 12;
-    beginWave();
-    for (const v of expectedVariants) {
-      startBossCutscene('final_boss', v, '测试首领', '✨ 稀有真身显圣', '测试标签', '#ff4d6d', '#ffd166', 1.15);
-      draw();
-      startBossCutscene('mythic_phase2', v, '测试神话二阶段', '🔥 神话觉醒', '测试神话标签', '#ff2a55', '#ffd166', 1.65);
-      draw();
-    }
-    return { allPresent, allCompositedAndDistinct, count: Object.keys(BOSS_PORTRAIT_DATA).length };
-  })()`, s);
-
-  assert.strictEqual(v134Check.count, 16, 'BOSS_PORTRAIT_DATA must define all 16 Bosses');
-  assert.strictEqual(v134Check.allPresent, true, 'All 16 Bosses must carry distinct Phase 1 summer & Hidden Phase 2 mythic costume data URIs');
-  assert.strictEqual(v134Check.allCompositedAndDistinct, true, 'getBossAnimePortrait(v, false) and getBossAnimePortrait(v, true) must return distinct 440x516 canvases');
-  assert(drawnPortraits >= 32, `Expected >= 32 anime Boss portrait drawImage calls across 16 Phase-1 + 16 Phase-2 cutscenes (got ${drawnPortraits})`);
-  assert.strictEqual(new Set(drawnImgRefs).size, 32, 'Cutscenes must render 32 distinct canvas instances (16 Phase-1 + 16 Hidden Phase-2)');
-  assert.strictEqual(stats.radialGradients, 0, 'v1.3.4/v1.3.5 anime Boss cutscenes must create ZERO per-frame radial gradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'v1.3.4/v1.3.5 anime Boss cutscenes must set ZERO shadowBlur');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 18 Boss portrait verification');
-}
-
-// 19. v1.3.5: 100% Full-Corridor Linear Dash Travel (All 10 Dashers), Melee Parry + Bullet-Slicing, Late-Game Mob Caps & D0..D5 Progression
-{
-  const { sandbox: s, stats } = createEnv(false, 1440, 900, 2);
-  const v135Res = vm.runInContext(`(() => {
-    selectedDiff = 5;
-    startGame('brawler');
-    // Wave 5 on D5 must spawn 1 Commander, whereas Wave 9 on D5 spawns Dual Commanders
-    wave = 5; beginWave(); bossCutscene = null;
-    for (let k = 0; k < 25; k++) update(0.05);
-    const w5MiniCnt = enemies.filter(e => e.type === 'mini_boss').length;
-
-    wave = 9; beginWave(); bossCutscene = null;
-    for (let k = 0; k < 25; k++) update(0.05);
-    const w9MiniCnt = enemies.filter(e => e.type === 'mini_boss').length;
-
-    // Verify all 10 linear dashers travel >= 98% of their drawn warning corridor even with blockers on path
-    wave = 10; beginWave(); bossCutscene = null;
-    terrains = []; portals = []; trees = [];
-    const dashCases = [
-      { type: 'charger', variant: '' },
-      { type: 'sand_worm', variant: '' },
-      { type: 'mini_boss', variant: 'vanguard' },
-      { type: 'mini_boss', variant: 'shadow_stalker' },
-      { type: 'mini_boss', variant: 'glacial_valkyrie' },
-      { type: 'mini_boss', variant: 'storm_siren' },
-      { type: 'boss', variant: 'butcher' },
-      { type: 'boss', variant: 'frost_queen' },
-      { type: 'boss', variant: 'solar_seraph' },
-      { type: 'special_boss', variant: 'crimson_lord' },
-      { type: 'charger', variant: '', nearWall: true }
-    ];
-    const dashRatios = [];
-    for (const c of dashCases) {
-      enemies = []; hazards = []; eBullets = []; spawns = [];
-      player.hp = 9999; player.maxHp = 9999; player.weapons = [];
-      const startX = c.nearWall ? WORLD.w - 170 : 800;
-      player.x = startX + 150; player.y = 750;
-      const e = createEnemy(startX, 750, c.type, c.variant);
-      e.hp = 999999; e.maxHp = 999999;
-      e.dashT = 0.62;
-      e.meteorT = 99; e.sumT = 99; e.ringCd = 99; e.terrainCd = 99; e.shotT = 99;
-      if (!c.nearWall) {
-        const b1 = createEnemy(startX + 90, 750, 'chaser'); b1.hp = 99999; b1.spd = 0;
-        const b2 = createEnemy(startX + 190, 750, 'brute'); b2.hp = 99999; b2.spd = 0; b2.slamCd = 99;
-      }
-      let warnLen = 0, x0 = null, y0 = null, sawDash = false, x1 = null, y1 = null;
-      for (let step = 0; step < 120; step++) {
-        player.hp = 9999;
-        if (e.lockedAim !== undefined) { player.x = startX + 150; player.y = 1050; }
-        update(0.02);
-        if (e.lockedAim !== undefined && !e.dashing && x0 === null) {
-          warnLen = e.dashWarnLen;
-          x0 = e.x; y0 = e.y;
-          draw();
-        }
-        if (e.dashing) sawDash = true;
-        if (sawDash && !e.dashing) { x1 = e.x; y1 = e.y; break; }
-      }
-      const dist = (x0 !== null && x1 !== null) ? Math.hypot(x1 - x0, y1 - y0) : 0;
-      dashRatios.push({ name: c.variant || c.type, warnLen, dist, ratio: dist / (warnLen || 1) });
-    }
-
-    // Verify Melee bullet-slicing & Melee Parry mitigation
-    enemies = []; eBullets = [];
-    player.x = 900; player.y = 750;
-    player.weapons = [makeWeapon('katana', 2), makeWeapon('katana', 2), makeWeapon('katana', 2), makeWeapon('katana', 2)];
-    player.weapons[0].cd = 0;
-    const dummy = createEnemy(985, 750, 'chaser'); dummy.hp = 9999; dummy.spd = 0;
-    eBullets.push({ x: 955, y: 750, vx: -60, vy: 0, dmg: 10, r: 6, color: '#ff4d6d' });
-    update(0.02);
-    const slicedBullet = eBullets.length === 0;
-
-    player.armor = 0; player.dodge = 0; player.invuln = 0; player.shield = 0;
-    player.hp = 100; player.maxHp = 100;
-    enemies = [];
-    hurtPlayer(40); // 4 melee weapons -> 10% parry -> 36 dmg instead of 40
-    const dmgWithParry = 100 - player.hp;
-
-    // Verify D0..D5 monotonic difficulty progression, reasonable D5 ceiling & unified <=80 cap on late + Boss waves
-    let diffMonotonic = DIFFS.length === 6 && DIFFS[5].hpMul <= 2.20 && DIFFS[5].dmgMul <= 1.80;
-    for (let i = 1; i < DIFFS.length; i++) {
-      if (!(DIFFS[i].hpMul > DIFFS[i - 1].hpMul && DIFFS[i].dmgMul > DIFFS[i - 1].dmgMul)) diffMonotonic = false;
-    }
-
-    // Verify unified <=80 active monster cap on both Wave 11 (late regular) and Wave 12 (Boss wave)
-    selectedDiff = 5;
-    wave = 11; beginWave(); bossCutscene = null;
-    player.weapons = []; player.hp = 99999; player.maxHp = 99999;
-    let peakW11 = 0;
-    for (let step = 0; step < 360; step++) {
-      player.hp = 99999; waveTime = Math.max(waveTime, 10);
-      update(0.05);
-      if (enemies.length + spawns.length > peakW11) peakW11 = enemies.length + spawns.length;
-    }
-    wave = 12; beginWave(); bossCutscene = null;
-    player.weapons = []; player.hp = 99999; player.maxHp = 99999;
-    let peakW12 = 0;
-    for (let step = 0; step < 450; step++) {
-      player.hp = 99999; waveTime = Math.max(waveTime, 10);
-      update(0.05);
-      if (enemies.length + spawns.length > peakW12) peakW12 = enemies.length + spawns.length;
-    }
-    return { w5MiniCnt, w9MiniCnt, dashRatios, slicedBullet, dmgWithParry, diffMonotonic, peakW11, peakW12 };
-  })()`, s);
-
-  assert.strictEqual(v135Res.w5MiniCnt, 1, 'Wave 5 even on D5 must spawn 1 Elite Commander');
-  assert.strictEqual(v135Res.w9MiniCnt, 2, 'Wave 9 on D5 must spawn 2 Elite Commanders');
-  for (const dr of v135Res.dashRatios) {
-    assert(dr.warnLen >= 120 && dr.ratio >= 0.98 && dr.ratio <= 1.02, `Linear dasher ${dr.name} must travel ~100% of warning corridor (got warn=${dr.warnLen}, dist=${dr.dist.toFixed(1)}, ratio=${dr.ratio.toFixed(3)})`);
+  let singlePath = path.join(ROOT, "烬塔残响_单文件离线版.html");
+  let tempBuilt = false;
+  if (!fs.existsSync(singlePath)) {
+    singlePath = path.join(os.tmpdir(), `spire_singlefile_verify_${process.pid}.html`);
+    execFileSync(process.execPath, [path.join(ROOT, "scripts/build-singlefile.mjs"), "--out", singlePath], { stdio: "ignore" });
+    tempBuilt = true;
   }
-  assert.strictEqual(v135Res.slicedBullet, true, 'Melee slash must slice incoming enemy projectiles within arc');
-  assert.strictEqual(v135Res.dmgWithParry, 36, '4 melee weapons must grant 10% innate Melee Parry reduction (40 -> 36)');
-  assert.strictEqual(v135Res.diffMonotonic, true, 'D0..D5 multipliers must increase monotonically within winnable bounds');
-  assert(v135Res.peakW11 >= 72 && v135Res.peakW11 <= 80, `Wave 11 active monster density must hit ~80 cap without exceeding 80 (got ${v135Res.peakW11})`);
-  assert(v135Res.peakW12 >= 72 && v135Res.peakW12 <= 80, `Wave 12 Boss wave active monster density must match ~80 cap without exceeding 80 (got ${v135Res.peakW12})`);
-  assert.strictEqual(stats.radialGradients, 0, 'Suite 19 must create ZERO per-frame radial gradients');
-  assert.strictEqual(stats.shadowBlurs, 0, 'Suite 19 must set ZERO shadowBlur');
-  assert.strictEqual(vm.runInContext('logErrCount', s), 0, 'Zero runtime errors across Suite 19 v1.3.5 verification');
+  try {
+    assert(fs.existsSync(singlePath), "Single-file bundle HTML must exist");
+    const singleHtml = fs.readFileSync(singlePath, "utf8");
+    assert(!/<script\s+defer\s+src=/.test(singleHtml), "Single-file HTML must not leave external <script defer src=...> tags");
+    assert(!/<link\s+rel="stylesheet"/.test(singleHtml), "Single-file HTML must not leave external stylesheet links");
+    assert(!/\b(?:src|href)="assets\//.test(singleHtml), "Single-file HTML must inline all static HTML src/href asset references");
+
+    const scripts = [...singleHtml.matchAll(/<script(?:\s+[^>]*)?>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+    assert.strictEqual(scripts.length, 2, "Single-file HTML should contain 2 inline <script> blocks (inline assets + game bundle)");
+    new vm.Script(scripts[0], { filename: "singlefile_inline_assets.js" });
+    new vm.Script(scripts[1], { filename: "singlefile_game_bundle.js" });
+
+    const assetCheckBox = { window: {} };
+    vm.createContext(assetCheckBox);
+    vm.runInContext(scripts[0], assetCheckBox);
+    const map = assetCheckBox.window.__SPIRE_INLINE_ASSETS__;
+    assert(map && typeof map === "object", "window.__SPIRE_INLINE_ASSETS__ must be populated");
+    for (const key of [
+      "assets/spire/port_zero.jpg", "assets/spire/port_jinyu.jpg", "assets/spire/port_astria.jpg",
+      "assets/spire/port_jialan.jpg", "assets/spire/port_qingyu.jpg", "assets/spire/port_eclipse.jpg",
+      "assets/spire/hero_zero_sheet.png", "assets/spire/hero_jinyu_sheet.png", "assets/spire/hero_astria_sheet.png",
+      "assets/spire/hero_jialan_sheet.png", "assets/spire/hero_qingyu_sheet.png", "assets/spire/hero_eclipse_sheet.png",
+      "assets/spire/cut_intro_1.jpg", "assets/spire/cut_intro_2.jpg", "assets/spire/cut_intro_3.jpg",
+      "assets/spire/cut_defeat_act1_1.jpg", "assets/spire/cut_defeat_act4_2.jpg"
+    ]) {
+      assert(typeof map[key] === "string" && map[key].startsWith("data:image/"), `Single-file bundle missing inline data URI for ${key}`);
+    }
+  } finally {
+    if (tempBuilt && fs.existsSync(singlePath)) fs.unlinkSync(singlePath);
+  }
 }
 
-console.log(`ALL 19 SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+console.log(`ALL 5 V1.3.6 VERIFICATION SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);

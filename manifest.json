@@ -1,18 +1,18 @@
 {
-  "name": "迷你土豆兄弟 HD (Mini Brotato)",
-  "short_name": "土豆兄弟HD",
-  "description": "32把武器 · 68件道具 · 一图一异形地形 · 37种异星怪物与16位二次元美少女首领 · 双端自适应肉鸽射击网页游戏",
+  "name": "烬塔残响：第999次救赎 · ECHOES OF THE ASHEN SPIRE",
+  "short_name": "烬塔残响",
+  "description": "《烬塔残响：第999次救赎》(ECHOES OF THE ASHEN SPIRE: 999th Redemption) · 暗黑哥特魂灯动作肉鸽 · 四幕守誓首领剧场演出与场景环境音景",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0d0b14",
-  "theme_color": "#140f22",
+  "background_color": "#080b13",
+  "theme_color": "#0c121e",
   "icons": [
     {
-      "src": "assets/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "assets/spire/app_icon.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     }
   ]

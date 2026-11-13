@@ -1,4 +1,4 @@
-// 独立判定手机竖屏 / 手机横屏 / 电脑网页端 UI 模式（支持自动识别 + 手动锁定【手机触控大按钮版 / 电脑网页版】）
+// 独立判定手机竖屏 / 手机横屏 / 电脑网页端 UI 模式 + Retina 高帧率填充率调优
 let uiMode = 'desktop', mobDrawerOpen = false, uiPref = 'auto';
 try {
   const savedPref = typeof localStorage !== 'undefined' ? localStorage.getItem('brotato_mini_ui_pref') : null;
@@ -28,11 +28,11 @@ function detectUIMode() {
 function refreshUIPrefControls() {
   const mt = document.getElementById('uiModeTabs');
   if (mt) {
-    const autoSub = uiMode === 'desktop' ? '电脑' : '手机';
+    const autoSub = uiMode === 'desktop' ? '桌面' : '触控';
     const opts = [
-      { id: 'auto', label: `🔄 自动(${autoSub})` },
-      { id: 'mobile', label: '📱 手机触控版' },
-      { id: 'desktop', label: '💻 电脑网页版' }
+      { id: 'auto', label: `自动 (${autoSub})` },
+      { id: 'mobile', label: '触控视界' },
+      { id: 'desktop', label: '桌面视界' }
     ];
     mt.innerHTML = '';
     opts.forEach(op => {
@@ -46,9 +46,16 @@ function refreshUIPrefControls() {
   const pb = document.getElementById('pauseUiBtn');
   if (pb) {
     const modeTxt = uiPref === 'mobile'
-      ? '📱 手机大按钮版'
-      : (uiPref === 'desktop' ? '💻 电脑网页版' : `🔄 自动(${uiMode === 'desktop' ? '电脑' : '手机'})`);
-    pb.textContent = `界面: ${modeTxt} (点击切换)`;
+      ? '触控视界'
+      : (uiPref === 'desktop' ? '桌面视界' : `自动 (${uiMode === 'desktop' ? '桌面' : '触控'})`);
+    pb.textContent = `视界模式 · ${modeTxt}`;
+  }
+  const hb = document.getElementById('homeUiBtn');
+  if (hb) {
+    const shortTxt = uiPref === 'mobile'
+      ? '视界 · 触控'
+      : (uiPref === 'desktop' ? '视界 · 桌面' : `视界 · 自动 (${uiMode === 'desktop' ? '桌面' : '触控'})`);
+    hb.textContent = shortTxt;
   }
 }
 
@@ -94,15 +101,15 @@ function toggleMobDrawer() {
   beep(460, 0.035, 'triangle', 0.03);
 }
 
-// 全面扩容竞技场地图尺寸（手机竖屏 1180×1960、手机横屏 1920×1220、电脑端 2200×1500，走位空间翻倍）
+// 竞技场尺寸与地面贴图精准缓存同步（消除 bakedSceneKey 与 wantKey 不一致导致的重复重烘焙）
 function syncArenaAndZoom(forceBake = false) {
   syncUIMode();
   const portraitPhone = uiMode === 'mobile-portrait';
   const landscapePhone = uiMode === 'mobile-landscape';
   const targetW = portraitPhone ? 1180 : (landscapePhone ? 1920 : 2200);
   const targetH = portraitPhone ? 1960 : (landscapePhone ? 1220 : 1500);
-  const nextScale = (uiMode !== 'desktop' || isTouch) ? 0.65 : 0.80;
-  const activeSceneId = (curScene && curScene.id) ? curScene.id : 'wasteland';
+  const nextScale = (uiMode !== 'desktop' || isTouch) ? 0.78 : 1.0;
+  const activeSceneId = (curScene && curScene.id) ? curScene.id : 'foundry';
   const wantKey = `${targetW}x${targetH}_${nextScale}_${activeSceneId}_${sceneSeed}`;
 
   if (forceBake || WORLD.w !== targetW || WORLD.h !== targetH || bakedSceneKey !== wantKey) {
@@ -137,7 +144,6 @@ function syncArenaAndZoom(forceBake = false) {
   }
 }
 
-// 镜头贴边限位：走到墙边时不再露出大片死黑背景
 function clampCam() {
   const halfW = (viewW / camZoom) * 0.5;
   const halfH = (viewH / camZoom) * 0.5;
@@ -159,15 +165,23 @@ function resize() {
   viewH = window.innerHeight || 844;
   syncUIMode();
   const mobilePerf = uiMode !== 'desktop' || isTouch;
-  dpr = Math.min(window.devicePixelRatio || 1, mobilePerf ? 1.5 : 2.0);
+  // Retina 高清渲染：桌面端完整解锁 2.0x DPR 锐利立绘与动作精灵，移动端提升至 1.50x
+  dpr = Math.min(window.devicePixelRatio || 1, mobilePerf ? 1.50 : 2.0);
   const cw = Math.max(1, Math.round(viewW * dpr));
   const ch = Math.max(1, Math.round(viewH * dpr));
   if (cv.width !== cw || cv.height !== ch) {
     cv.width = cw;
     cv.height = ch;
   }
+  if (ctx) {
+    ctx.imageSmoothingEnabled = true;
+    try { ctx.imageSmoothingQuality = 'high'; } catch (_) {}
+  }
   syncArenaAndZoom();
   if (bootReady) clampCam();
+  if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.onResize === 'function') {
+    SpireDirector.onResize(viewW, viewH, dpr);
+  }
 }
 window.addEventListener('resize', resize);
 window.addEventListener('wheel', e => {
@@ -175,3 +189,16 @@ window.addEventListener('wheel', e => {
   camZoom = Math.max(0.38, Math.min(1.55, camZoom - e.deltaY * 0.0005));
   if (bootReady) clampCam();
 }, { passive: true });
+
+/* SPIRE_V2_3_1_PATCHED */
+(function() {
+  function applyRetinaSmoothing() {
+    var c = (typeof ctx !== 'undefined' && ctx) ? ctx : window.ctx;
+    if (c) {
+      c.imageSmoothingEnabled = true;
+      if ('imageSmoothingQuality' in c) c.imageSmoothingQuality = 'high';
+    }
+  }
+  window.addEventListener('resize', applyRetinaSmoothing);
+  setTimeout(applyRetinaSmoothing, 0);
+})();

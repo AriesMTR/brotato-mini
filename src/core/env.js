@@ -1,4 +1,4 @@
-// 核心画布环境、DPR 像素比与全局品质常量
+// 核心画布环境、DPR 像素比与全局品质常量（v1.3.6《烬塔残响：第999次救赎》双模式与黑曜镌金 UI 实装版）
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
     const rad = Math.min(typeof r === 'number' ? r : 4, Math.abs(w) * 0.5, Math.abs(h) * 0.5);
@@ -11,17 +11,27 @@ if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D
     return this;
   };
 }
-const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: false });
-let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.08, userZoomed = false;
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: false, desynchronized: true });
+let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.06, userZoomed = false;
 let isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let bootReady = false;
-const APP_VERSION = 'v1.3.5';
-const APP_BUILD_DATE = '2026-11-12';
+const APP_VERSION = 'v1.3.6';
+const APP_BUILD_DATE = '2026-11-13';
 
-// 游戏内置版本更新日志数据（供开局主界面「📜 更新日志」弹窗展示）
+// 游戏内置版本更新日志数据（供开局主界面「纪元志」弹窗展示）
 const CHANGELOG_HISTORY = [
   {
-    ver: 'v1.3.5', date: '2026-11-12', tag: '当前版本 · 16首领池扩充 + 直线冲锋修复 + 全难度平衡',
+    ver: 'v1.3.6', date: '2026-11-13', tag: '当前版本 · 《烬塔残响》16层固定首领剧情/无尽双模式 · 黑曜镌金多维选项卡 UI',
+    title: '🕯️ 实装《烬塔残响：第999次救赎》全设定原画、16层四幕固定首领与宽银幕立绘剧场、剧情/无尽双模式分流及「黑曜镌金」高定选项卡 UI',
+    items: [
+      '🏛️ 极简主殿与「黑曜镌金」多维对称选项卡 UI：重绘 1px 黑曜细金线镶边、香槟暗金金属铭牌按钮与衬线书卷排版，彻底去除廉价页游感；分离【剧情模式（唯一主角「零号·白衣」限定）】与【无尽模式（六角色开放）】，实装六等分人物选择选项卡（手机竖屏 2×3 对称矩阵，支持键盘 1-6 / 方向键切换）、角色「契约特质 / 兵装与瞬步」档案选项卡及「轮回厄度（3×2） / 起始层域（1+2×2）」整备选项卡。',
+      '🗼 严格 16 层四幕攀登与四大固定首领署名大招：第 1~4 层雨夜长桥（第 4 层固定镇守：绯红断刃剑姬·烬羽）、第 5~8 层永冻冰窟（第 8 层固定镇守：永冻星使·艾丝特莉亚）、第 9~12 层倒悬钟楼（第 12 层固定镇守：紫电弦月人偶·伽蓝）、第 13~16 层日蚀镜界（第 16 层终战：日蚀圣女，必进二阶段真我破茧），搭载首领专属咏唱大招，全程 0 随机首领顶替。',
+      '🎬 宽银幕开场/终章过场与双端自适应 AVG 立绘演出：恢复《序幕·第999次石棺苏醒》宽银幕交叉溶解动画与第 16 层《终章·第一千道黎明》破晓群像结局；全 16 层对白与青羽行商全面采用设定集左侧二次元半身立绘，并针对手机竖/横屏重构保真宽银幕画框、动态高度对话框与双立绘远近景排布。',
+      '⚡ 六角色专属【灵魂瞬步】与 60/120FPS 超清动作管线：实装空格/Shift/右键/触屏拇指一键发动的无敌灵魂瞬步与六角色差异化残响战技；校准 1024×256 四帧精灵动作表质心基线、Retina 2.0x 超清渲染与离屏零滤镜受击剪影缓存（全程 0 每帧径向渐变、0 shadowBlur 满帧运行）。'
+    ]
+  },
+  {
+    ver: 'v1.3.5', date: '2026-11-12', tag: '16首领池扩充 + 直线冲锋修复 + 全难度平衡',
     title: '👑 首领阵容扩充至 16 位 (32套立绘) + 直线冲锋 100% 满程贯通修复 + 远近战/D0~D5 深度平衡',
     items: [
       '👑 首领池重磅扩充（终局 Boss 4➔6 位，精英统领 3➔7 位，共 16 位首领 / 32 套二次元立绘）：新增终局主宰【🦋碧落腐生毒皇·萝莎莉亚】与【☀️炽阳裁决圣女·赫利俄丝】，以及第 5/9 波精英统领【🐍碧鳞剧毒统领·琉璃】、【🧊凛霜圣枪统领·塞蕾丝】、【🛡️曜铁圣盾统领·瓦伦蒂娜】、【🌪️苍雷风暴统领·岚音】；每位新首领均配备专属招式、夏装立绘与隐藏二阶段泳装换装立绘！',

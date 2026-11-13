@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-const defaultOut = path.resolve(ROOT, '../brotato_mini.html');
+const defaultOut = path.join(ROOT, '烬塔残响_单文件离线版.html');
 
 const argIdx = process.argv.indexOf('--out');
 const outPath = argIdx !== -1 && process.argv[argIdx + 1]
@@ -13,8 +13,44 @@ const outPath = argIdx !== -1 && process.argv[argIdx + 1]
   : defaultOut;
 
 const indexHtml = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-
 const stripQuery = u => u.split('?')[0];
+
+const MIME_BY_EXT = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.svg': 'image/svg+xml'
+};
+
+function toDataUri(absPath) {
+  const ext = path.extname(absPath).toLowerCase();
+  if (ext === '.svg') {
+    const svgRaw = fs.readFileSync(absPath, 'utf8').trim();
+    return `data:image/svg+xml,${encodeURIComponent(svgRaw)}`;
+  }
+  const mime = MIME_BY_EXT[ext] || 'application/octet-stream';
+  return `data:${mime};base64,${fs.readFileSync(absPath).toString('base64')}`;
+}
+
+// Build window.__SPIRE_INLINE_ASSETS__ map for full offline file:// support
+const inlineAssets = {};
+if (fs.existsSync(path.join(ROOT, 'assets/icon.png'))) {
+  inlineAssets['assets/icon.png'] = toDataUri(path.join(ROOT, 'assets/icon.png'));
+}
+if (fs.existsSync(path.join(ROOT, 'assets/icon.svg'))) {
+  inlineAssets['assets/icon.svg'] = toDataUri(path.join(ROOT, 'assets/icon.svg'));
+}
+const spireDir = path.join(ROOT, 'assets/spire');
+if (fs.existsSync(spireDir)) {
+  for (const name of fs.readdirSync(spireDir).sort()) {
+    const abs = path.join(spireDir, name);
+    if (!fs.statSync(abs).isFile()) continue;
+    const ext = path.extname(name).toLowerCase();
+    if (!MIME_BY_EXT[ext]) continue;
+    inlineAssets[`assets/spire/${name}`] = toDataUri(abs);
+  }
+}
 
 // Collect all CSS <link rel="stylesheet" href="...">
 const cssLinks = [...indexHtml.matchAll(/<link\s+rel="stylesheet"\s+href="([^"]+)"\s*>/g)];
@@ -33,14 +69,21 @@ const combinedJs = scriptTags
   .map(m => fs.readFileSync(path.join(ROOT, stripQuery(m[1])), 'utf8').trim())
   .join('\n\n');
 
-// Inline SVG icon as data URI for offline standalone HTML
-const svgRaw = fs.readFileSync(path.join(ROOT, 'assets/icon.svg'), 'utf8').trim();
-const svgDataUri = `data:image/svg+xml,${encodeURIComponent(svgRaw)}`;
-
 let bundled = indexHtml
-  .replace(/^\s*<link\s+rel="manifest"\s+href="[^"]+"\s*>\r?\n/m, '')
-  .replace(/<link\s+rel="icon"\s+type="image\/svg\+xml"\s+href="assets\/icon\.svg"\s*>/, `<link rel="icon" type="image/svg+xml" href="${svgDataUri}">`)
-  .replace(/<link\s+rel="apple-touch-icon"\s+href="assets\/icon\.svg"\s*>/, `<link rel="apple-touch-icon" href="${svgDataUri}">`);
+  .replace(/^\s*<link\s+rel="manifest"\s+href="[^"]+"\s*>\r?\n/m, '');
+
+// Replace any static src="assets/..." or href="assets/..." in HTML with inline data URIs
+bundled = bundled.replace(/\b(src|href)="(assets\/[^"]+)"/g, (full, attr, rawRef) => {
+  const cleanRef = stripQuery(rawRef);
+  if (inlineAssets[cleanRef]) {
+    return `${attr}="${inlineAssets[cleanRef]}"`;
+  }
+  const abs = path.join(ROOT, cleanRef);
+  if (fs.existsSync(abs) && fs.statSync(abs).isFile()) {
+    return `${attr}="${toDataUri(abs)}"`;
+  }
+  return full;
+});
 
 // Replace stylesheet links with inline <style>
 bundled = bundled.replace(
@@ -48,11 +91,16 @@ bundled = bundled.replace(
   `  <style>\n${combinedCss}\n  </style>\n`
 );
 
-// Replace script tags with inline <script>
+// Replace script tags with inline asset registry + combined JS <script>
+const inlineAssetsScript = `<script id="spire-inline-assets-v240">\nwindow.__SPIRE_INLINE_ASSETS__ = ${JSON.stringify(inlineAssets)};\n</script>`;
+const scriptBlockRegex = /(?:\s*<!--[^\n]*脚本[^\n]*-->\r?\n)?(?:\s*<script\s+defer\s+src="[^"]+"\s*><\/script>\r?\n)+/;
+if (!scriptBlockRegex.test(bundled)) {
+  throw new Error('Failed to locate deferred script block in index.html for replacement');
+}
 bundled = bundled.replace(
-  /\s*<!-- 模块化脚本[\s\S]*?-->\r?\n(?:\s*<script\s+defer\s+src="[^"]+"\s*><\/script>\r?\n)+/,
-  `\n<script>\n${combinedJs}\n</script>\n`
+  scriptBlockRegex,
+  `\n${inlineAssetsScript}\n<script>\n${combinedJs}\n</script>\n`
 );
 
 fs.writeFileSync(outPath, bundled, 'utf8');
-console.log(`Bundled standalone single-file HTML -> ${outPath} (${(bundled.length / 1024).toFixed(1)} KB)`);
+console.log(`Bundled standalone single-file HTML -> ${outPath} (${(bundled.length / (1024 * 1024)).toFixed(2)} MB, ${Object.keys(inlineAssets).length} inline assets)`);

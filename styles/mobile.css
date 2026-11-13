@@ -1,13 +1,17 @@
 /* =========================================================================
-   📱 手机端专属【一屏全显 · 零下拉】触控 UI（100dvh 单屏自适应 + 宽大拇指热区按钮）
+   《烬塔残响》手机端专属【黑曜镌金 · 一屏全显】触控与选项卡适配 (styles/mobile.css v1.3.6)
    ========================================================================= */
 body.m-ui .m-only { display: flex !important; }
 body.m-ui .d-only { display: none !important; }
+body.m-ui #hud:not(.hidden) ~ .dash-touch-btn { display: flex !important; }
 
-/* 锁定单屏高度（100vh + 100dvh 双重兜底适配旧版 iOS 微信内置浏览器），彻底告别整页上下拖拽滚动 */
 body.m-ui .overlay {
-  height: 100%; max-height: 100vh; max-height: 100dvh; overflow: hidden; justify-content: center;
-  padding: calc(6px + env(safe-area-inset-top, 0px)) 10px calc(8px + env(safe-area-inset-bottom, 0px)) 10px;
+  height: 100%;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden;
+  justify-content: center;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px)) 12px;
   gap: 6px;
 }
 body.m-ui .overlay::before,
@@ -15,116 +19,185 @@ body.m-ui .overlay::after { display: none; }
 body.m-ui #startMenu,
 body.m-ui #shopMenu { justify-content: space-between; }
 
+body.m-ui .start-frame-ornament { inset: 6px; }
 body.m-ui .hud-right small { display: none; }
 body.m-ui .kicker-pill { display: none; }
-body.m-ui .err-toast { min-height: 38px; padding: 6px 14px; font-size: 13px; display: inline-flex; align-items: center; }
 
-/* 移动端全局按钮基线与 Emoji 光学对齐（消除 iOS 微信/Safari 中文字体与表情行高偏移） */
-body.m-ui .btn,
-body.m-ui .lock-pin,
-body.m-ui .icon-pill-btn,
-body.m-ui .pause-btn,
-body.m-ui .mode-btn,
-body.m-ui .diff-btn,
-body.m-ui .scene-btn {
-  line-height: 1;
-  box-sizing: border-box;
-}
-body.m-ui .btn > span,
-body.m-ui .lock-pin > span {
+body.m-ui .pause-btn {
+  min-height: 40px;
+  min-width: 78px;
+  padding: 0 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border-radius: 5px;
   display: inline-flex;
   align-items: center;
-  line-height: 1;
+  justify-content: center;
+}
+body.m-ui .icon-pill-btn {
+  height: 34px;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* 战斗顶栏暂停按钮 & 顶部胶囊按钮：等高同轴、醒目好点且不挤占单屏空间 */
-body.m-ui .pause-btn {
-  min-height: 44px; min-width: 94px; padding: 0 13px; font-size: 15.5px; font-weight: 900;
-  border-radius: 12px; background: linear-gradient(180deg, #4b3f69, #2f2744);
-  border: 1.5px solid rgba(255, 209, 102, 0.58); border-bottom: 3px solid #171222;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.52); display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+/* =========================================================================
+   1. 手机端主界面 + 二级模式选项卡 + 六角色人物选项卡单屏精调
+   ========================================================================= */
+body.m-ui #startMenu {
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 14px calc(12px + env(safe-area-inset-bottom, 0px)) 14px;
 }
-body.m-ui .icon-pill-btn,
-body.m-ui .top-bar-btns .btn {
-  height: 36px; min-height: 36px; padding: 0 11px; font-size: 13px; font-weight: 900;
-  border-radius: 10px; border-width: 1.5px 1.5px 3px 1.5px; border-style: solid;
-  display: inline-flex; align-items: center; justify-content: center; gap: 4px; margin: 0;
+body.m-ui .menu-stage {
+  gap: 8px;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
-body.m-ui .icon-pill-btn { border-bottom-color: #171222; }
-body.m-ui .codex-head .icon-pill-btn,
-body.m-ui .log-head .icon-pill-btn {
-  height: 38px; min-height: 38px; min-width: 80px; padding: 0 12px; font-size: 14px;
+body.m-ui .menu-stage::-webkit-scrollbar { display: none; }
+
+body.m-ui .ghost-pill-btn { padding: 6px 11px; font-size: 11.5px; }
+body.m-ui .stage-mode-tab { padding: 5px 12px; font-size: 12.5px; gap: 4px; }
+body.m-ui .brand-app-icon { width: 52px; height: 52px; }
+body.m-ui .brand-en-sub { font-size: 9px; letter-spacing: 3px; }
+body.m-ui .home-main-title { font-size: 36px; letter-spacing: 8px; padding-left: 8px; }
+body.m-ui .home-ornament-rule { margin: 0 0 12px; max-width: 300px; gap: 7px; }
+body.m-ui .rule-sub { font-size: 11px; letter-spacing: 2px; }
+
+body.m-ui .mode-portal { padding: 15px 17px; gap: 6px; border-radius: 6px; }
+body.m-ui .portal-roman { font-size: 42px; top: 8px; right: 12px; }
+body.m-ui .portal-title { font-size: 19px; }
+body.m-ui .portal-desc { font-size: 11.5px; line-height: 1.48; }
+body.m-ui .portal-cta { font-size: 11.5px; padding-top: 5px; }
+body.m-ui .footer-link-btn { font-size: 11px; }
+
+/* 手机端人物选项卡与角色档案舞台 */
+body.m-ui .roster-strip { gap: 6px; }
+body.m-ui .ctab-head { padding: 2.5px 6px; }
+body.m-ui .ctab-code { font-size: 8.5px; }
+body.m-ui .ctab-role { font-size: 9px; }
+body.m-ui .ctab-port-wrap { height: 46px; }
+body.m-ui .roster-avatar-name { font-size: 11.5px; padding: 4px 4px; }
+
+body.m-ui .hero-spotlight-card {
+  grid-template-columns: 112px minmax(0, 1fr);
+  min-height: 0;
+  flex-shrink: 0;
+}
+body.m-ui .spotlight-chibi-frame { left: 6px; bottom: 6px; padding: 3px 5px 2px; }
+body.m-ui .spotlight-chibi { width: 34px; height: 34px; }
+body.m-ui .chibi-cap { font-size: 8px; }
+body.m-ui .spotlight-info-col { padding: 10px 12px; gap: 7px; }
+body.m-ui .spotlight-en { font-size: 9px; letter-spacing: 1px; }
+body.m-ui .spotlight-tag { font-size: 9.5px; padding: 1.5px 6px; }
+body.m-ui .spotlight-name { font-size: 16.5px; }
+body.m-ui .dossier-tabs { gap: 14px; }
+body.m-ui .dossier-tab { padding: 3px 2px 5px; font-size: 11.5px; }
+body.m-ui .dossier-pane { gap: 6px; }
+body.m-ui .trait-chip { font-size: 10.5px; padding: 2.5px 7px; }
+body.m-ui .spotlight-bio {
+  font-size: 11.5px;
+  line-height: 1.42;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+body.m-ui .spotlight-quick-strip { padding-top: 5px; font-size: 10.5px; gap: 4px 10px; }
+body.m-ui .combat-spec-box { padding: 6px 9px; gap: 4px; }
+body.m-ui .cs-label { font-size: 9.5px; }
+body.m-ui .weapon-spec-pill { font-size: 11px; padding: 2.5px 8px; }
+body.m-ui .cs-desc { font-size: 11px; line-height: 1.38; }
+
+body.m-ui .depart-panel { padding: 10px 12px; gap: 8px; }
+body.m-ui .prep-tabs { gap: 6px; }
+body.m-ui .prep-tab { padding: 6px 9px; gap: 2px; }
+body.m-ui .pt-top { font-size: 8.5px; }
+body.m-ui .pt-title { font-size: 12.5px; }
+body.m-ui .pt-badge { font-size: 9.5px; padding: 1px 5px; }
+
+body.m-ui .diff-tabs { gap: 5px; }
+body.m-ui .diff-btn { padding: 5px 8px; gap: 2px; }
+body.m-ui .diff-code { font-size: 9px; }
+body.m-ui .diff-name { font-size: 12px; }
+body.m-ui .diff-desc { padding: 5px 9px; }
+body.m-ui .desc-title { font-size: 10.5px; }
+body.m-ui .desc-body {
+  font-size: 11px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-/* 开局主菜单：标题与按钮单行合一 + 紧凑战前配置 + 8 英雄同屏网格 */
-body.m-ui #startMenu .hero-banner {
-  flex-direction: row-reverse; justify-content: space-between; align-items: center;
-  gap: 8px; flex-shrink: 0;
-}
-body.m-ui #startMenu .hero-top-bar { width: auto; flex-shrink: 0; }
-body.m-ui #startMenu .hero-banner .sub { display: none; }
-body.m-ui #startMenu h1 { font-size: 20px; line-height: 1.15; text-align: left; text-shadow: 0 2px 0 #7c4d0b; }
+body.m-ui .scene-tabs { gap: 5px; }
+body.m-ui .scene-btn { min-height: 36px; padding: 6px 10px; }
+body.m-ui .scene-btn.wide { min-height: 33px; }
+body.m-ui .scene-code { font-size: 8.5px; }
+body.m-ui .scene-name { font-size: 12px; }
 
-body.m-ui .diff-box { padding: 7px 9px; gap: 5px; border-radius: 12px; flex-shrink: 0; }
-body.m-ui .setup-divider { display: none; }
-body.m-ui .setup-label { display: none; }
-body.m-ui .setup-row { width: 100%; gap: 5px; }
-body.m-ui .mode-btn, body.m-ui .diff-btn, body.m-ui .scene-btn {
-  height: 32px; min-height: 32px; padding: 0 8px; font-size: 12.5px; border-radius: 8px;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-body.m-ui .diff-desc {
-  font-size: 11.5px; line-height: 1.3; padding: 3px 8px; border-radius: 7px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+body.m-ui .story-route-box { padding: 7px 9px; gap: 5px; }
+body.m-ui .act-node { padding: 4px 6px; font-size: 10.5px; gap: 5px; }
+body.m-ui .depart-summary-line { font-size: 10.5px; }
+body.m-ui .btn-story-go,
+body.m-ui .endless-go-btn {
+  min-height: 42px;
+  font-size: 14px;
+  padding: 10px 14px;
 }
 
-body.m-ui .classes {
-  flex: 1; min-height: 0; align-content: stretch;
-}
-body.m-ui .cls-card {
-  padding: 7px 9px; border-radius: 11px; gap: 3px; min-height: 0; justify-content: center;
-}
-body.m-ui .cls-head { gap: 7px; }
-body.m-ui .cls-avatar { width: 32px; height: 32px; font-size: 18px; border-radius: 8px; }
-body.m-ui .cls-title-wrap h3 { font-size: 13.5px; }
-body.m-ui .cls-role { font-size: 10px; padding: 1px 5px; }
-body.m-ui .cls-loadout { font-size: 11px; margin-top: 1px; }
-body.m-ui .cls-perks {
-  font-size: 11px; line-height: 1.28; flex: 0 1 auto;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-body.m-ui .cls-go { display: none; }
-
-/* 商店界面：单行等高顶栏 + 单屏横排商品条（右侧独立双按键列像素级对齐）+ 单行 6 槽军械库 */
+/* =========================================================================
+   2. 手机端行商、共鸣强化、遗物匣、驻留弹窗与圣典下划线选项卡适配
+   ========================================================================= */
 body.m-ui .shop-head {
-  padding: 6px 10px; border-radius: 12px; flex-direction: row; align-items: center;
-  justify-content: space-between; gap: 6px; flex-shrink: 0;
+  padding: 6px 10px;
+  gap: 6px;
+  flex-shrink: 0;
 }
-body.m-ui #shopTitle { font-size: 15.5px; line-height: 1.15; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-body.m-ui .shop-sub { display: none; }
-body.m-ui .shop-wallet-group { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-body.m-ui .wallet-pill,
-body.m-ui .shop-wallet-group .icon-pill-btn {
-  height: 34px; min-height: 34px; padding: 0 10px; border-radius: 10px;
-  display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box;
+body.m-ui .shop-witch-portrait { width: 40px; height: 50px; cursor: pointer; }
+body.m-ui .shop-title-group { gap: 2px; }
+body.m-ui #shopTitle { font-size: 14px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.m-ui .shop-sub {
+  font-size: 10.5px;
+  line-height: 1.25;
+  padding: 1px 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-body.m-ui .wallet-pill { font-size: 15px; }
+body.m-ui .wallet-pill { height: 34px; font-size: 14.5px; padding: 0 10px; display: inline-flex; align-items: center; }
 
 body.m-ui .mob-drawer-btn {
-  width: 100%; min-height: 33px; background: linear-gradient(180deg, rgba(35, 29, 50, 0.96), rgba(24, 20, 36, 0.96));
-  color: #f3eeff; border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 5px 10px;
-  font-size: 12.5px; font-weight: 800; justify-content: space-between; align-items: center;
-  cursor: pointer; touch-action: manipulation; flex-shrink: 0; gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  background: rgba(13, 18, 29, 0.95);
+  color: var(--ivory);
+  border: 1px solid var(--gold-line);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  gap: 6px;
 }
-body.m-ui .mob-drawer-btn:active { background: #33294a; }
-body.m-ui .mob-quick-stats { display: flex; gap: 6px; flex-wrap: nowrap; overflow: hidden; align-items: center; font-size: 12px; color: #eae4f6; }
-body.m-ui .mob-quick-stats b { color: #ffd166; }
+body.m-ui .mob-quick-stats { display: flex; gap: 7px; flex-wrap: nowrap; overflow: hidden; align-items: center; font-size: 11px; color: var(--slate); }
+body.m-ui .mob-quick-stats b { color: var(--gold-bright); margin-left: 2px; }
 body.m-ui .mob-drawer-pill {
-  font-size: 11.5px; font-weight: 900; color: #ffd166; background: rgba(255,209,102,0.18);
-  padding: 2.5px 9px; border-radius: 99px; white-space: nowrap; flex-shrink: 0; line-height: 1.1;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--gold-bright);
+  background: rgba(223, 192, 132, 0.14);
+  border: 1px solid rgba(223, 192, 132, 0.30);
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
 }
 
-/* 展开角色属性详情时在单屏区域内原位切换显示，不撑高整页 */
 body.m-ui #shopMenu:not(.drawer-open) #statsRow,
 body.m-ui #shopMenu:not(.drawer-open) #setRow { display: none; }
 body.m-ui #shopMenu.drawer-open #shopCards,
@@ -132,280 +205,306 @@ body.m-ui #shopMenu.drawer-open .shop-bottom { display: none; }
 body.m-ui #shopMenu.drawer-open #statsRow { flex-shrink: 0; }
 body.m-ui #shopMenu.drawer-open #setRow { flex: 1; min-height: 0; overflow-y: auto; align-content: flex-start; }
 
-/* 商店卡片：左信息列（.card-main）与右按键列（.card-side）完全解耦，彻底消除锁定/购买按钮上下错位与文字偏斜 */
 body.m-ui #shopCards { flex: 1; min-height: 0; }
 body.m-ui #shopCards .card:not(.sold-out) {
-  min-height: 0; padding: 9px 9px 6px 10px; border-radius: 12px;
-  display: flex; flex-direction: row; align-items: stretch; justify-content: space-between; gap: 9px;
+  min-height: 0;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 9px;
 }
 body.m-ui #shopCards .card-main {
-  display: flex; flex-direction: column; justify-content: center; gap: 3px; flex: 1; min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
 }
 body.m-ui #shopCards .card-body { display: contents; }
 body.m-ui #shopCards .card-head { padding-right: 0; gap: 7px; min-width: 0; }
-body.m-ui #shopCards .item-emblem { width: 32px; height: 32px; font-size: 18px; border-radius: 8px; }
+body.m-ui #shopCards .item-emblem { width: 32px; height: 32px; font-size: 17px; }
 body.m-ui #shopCards .card-meta { gap: 2px; flex: 1; min-width: 0; }
-body.m-ui #shopCards .card-title { font-size: 14.5px; line-height: 1.18; }
+body.m-ui #shopCards .card-title { font-size: 13.5px; line-height: 1.2; }
 body.m-ui #shopCards .card-badges { flex-wrap: nowrap; overflow: hidden; gap: 4px; }
-body.m-ui #shopCards .tag { font-size: 10px; padding: 1.5px 5px; line-height: 1.15; flex-shrink: 0; }
+body.m-ui #shopCards .tag { font-size: 9.5px; padding: 1px 5px; flex-shrink: 0; }
 body.m-ui #shopCards .card-desc {
-  font-size: 12px; line-height: 1.28;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 11.5px;
+  line-height: 1.28;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 body.m-ui #shopCards .stat-chips { gap: 4px; flex-wrap: nowrap; overflow: hidden; }
-body.m-ui #shopCards .stat-chip { font-size: 10.5px; padding: 1.5px 5px; line-height: 1.15; white-space: nowrap; }
+body.m-ui #shopCards .stat-chip { font-size: 10px; padding: 1px 5px; white-space: nowrap; }
 
 body.m-ui #shopCards .card-side {
-  display: flex; flex-direction: column; justify-content: center; align-items: stretch;
-  gap: 5px; width: 112px; flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  gap: 5px;
+  width: 106px;
+  flex-shrink: 0;
 }
 body.m-ui .lock-pin {
-  position: static; width: 100%; height: 31px; min-height: 31px; margin: 0; padding: 0 6px; gap: 4px;
-  border-radius: 9px; font-size: 12.5px; font-weight: 900;
-  display: flex; align-items: center; justify-content: center; white-space: nowrap;
-  background: linear-gradient(180deg, #43385c, #2b233d);
-  border-style: solid; border-width: 1.5px 1.5px 3px 1.5px;
-  border-color: rgba(255, 255, 255, 0.28); border-bottom-color: #171222;
-  color: #f8f5ff; box-shadow: 0 2px 6px rgba(0,0,0,0.36);
+  position: static;
+  width: 100%;
+  height: 28px;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 6px;
+  font-size: 11px;
 }
-body.m-ui .lock-pin:active { transform: translateY(1px); border-bottom-width: 2px; }
-body.m-ui .lock-pin.is-locked {
-  background: linear-gradient(180deg, #ffe082, #f5b83d);
-  color: #1b1324; border-color: #fff3b0; border-bottom-color: #a16207;
-  box-shadow: 0 3px 10px rgba(255, 209, 102, 0.45);
-}
-body.m-ui #shopCards .card-actions {
-  margin: 0; width: 100%; display: flex;
-}
+body.m-ui #shopCards .card-actions { margin: 0; width: 100%; display: flex; }
 body.m-ui #shopCards .card-actions .btn {
-  width: 100%; height: 35px; min-height: 35px; margin: 0; padding: 0 6px; gap: 4px;
-  font-size: 13px; font-weight: 900; border-radius: 9px;
-  display: flex; align-items: center; justify-content: center; white-space: nowrap;
-  border-style: solid; border-width: 1.5px 1.5px 3px 1.5px;
+  width: 100%;
+  height: 34px;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 7px;
+  font-size: 12px;
+  justify-content: space-between;
 }
-body.m-ui #shopCards .card-actions .btn:active:not(:disabled) {
-  transform: translateY(1px); border-bottom-width: 2px;
-}
-body.m-ui #shopCards .card.sold-out {
-  min-height: 0; padding: 4px 10px; flex-direction: row; border-radius: 12px;
-}
-body.m-ui .sold-stamp { font-size: 12.5px; padding: 3px 12px; }
+body.m-ui #shopCards .card.sold-out { min-height: 0; padding: 4px 10px; flex-direction: row; }
 
-/* 升级强化界面：4 项强化单屏紧凑横排卡片 */
-body.m-ui #levelMenu h2 { font-size: 19px; flex-shrink: 0; }
-body.m-ui #lvlCards {
-  width: 100%; flex: 0 1 auto; display: grid; grid-template-columns: 1fr; gap: 7px;
-}
+body.m-ui #levelMenu h2,
+body.m-ui #crateMenu h2 { font-size: 18px; flex-shrink: 0; }
+body.m-ui #lvlCards { width: 100%; display: grid; grid-template-columns: 1fr; gap: 7px; }
 body.m-ui #lvlCards .card {
-  min-height: 0; padding: 10px 10px 7px 11px; border-radius: 12px;
-  display: grid; grid-template-columns: minmax(0, 1fr) 104px; grid-template-rows: auto 1fr;
-  gap: 2px 9px; align-items: center;
+  min-height: 0;
+  padding: 9px 11px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 100px;
+  grid-template-rows: auto 1fr;
+  gap: 2px 9px;
+  align-items: center;
 }
 body.m-ui #lvlCards .card-body { display: contents; }
 body.m-ui #lvlCards .card-head { grid-column: 1; grid-row: 1; padding-right: 0; gap: 8px; }
-body.m-ui #lvlCards .item-emblem { width: 34px; height: 34px; font-size: 19px; border-radius: 9px; }
-body.m-ui #lvlCards .card-title { font-size: 15px; }
-body.m-ui #lvlCards .card-desc { grid-column: 1; grid-row: 2; font-size: 12.5px; line-height: 1.3; }
+body.m-ui #lvlCards .item-emblem { width: 32px; height: 32px; font-size: 18px; }
+body.m-ui #lvlCards .card-title { font-size: 14px; }
+body.m-ui #lvlCards .card-desc { grid-column: 1; grid-row: 2; font-size: 12px; line-height: 1.32; }
 body.m-ui #lvlCards .card-actions { grid-column: 2; grid-row: 1 / 3; margin: 0; display: flex; align-items: center; }
-body.m-ui #lvlCards .card-actions .btn {
-  width: 100%; height: 40px; min-height: 40px; font-size: 13px; padding: 0 8px;
-  border-radius: 9px; justify-content: center; border-width: 1.5px 1.5px 3px 1.5px; margin: 0;
-}
+body.m-ui #lvlCards .card-actions .btn { width: 100%; height: 38px; font-size: 12.5px; padding: 0 8px; justify-content: center; }
 
-/* 战利品箱二选一单屏居中（竖屏紧凑双层，横屏并排双列，绝不溢出滚动） */
-body.m-ui #crateMenu h2 { font-size: 18px; }
-body.m-ui #crateMenu .sub { font-size: 12px; line-height: 1.3; }
 body.m-ui .crate-card-wrap { gap: 8px; max-width: 440px; grid-template-columns: 1fr; }
-body.m-ui #crateMenu .card { min-height: 0; padding: 10px 11px; gap: 7px; border-radius: 13px; }
+body.m-ui #crateMenu .card { min-height: 0; padding: 10px 11px; gap: 7px; }
 body.m-ui #crateMenu .card-head { padding-right: 0; gap: 8px; }
-body.m-ui #crateMenu .item-emblem { width: 38px; height: 38px; font-size: 20px; border-radius: 10px; }
-body.m-ui #crateMenu .card-title { font-size: 14.5px; }
-body.m-ui #crateMenu .card-desc { font-size: 12px; line-height: 1.35; }
-body.m-ui .crate-btns { gap: 7px; margin-top: 2px; }
-body.m-ui .crate-btns .btn {
-  height: 38px; min-height: 38px; font-size: 13px; padding: 0 8px;
-  border-radius: 9px; border-width: 1.5px 1.5px 3px 1.5px; margin: 0;
-}
+body.m-ui .crate-btns .btn { height: 36px; font-size: 12.5px; padding: 0 8px; }
 
-/* 单行 6 槽随身军械库（超 6 把时横向轻滑，绝不纵向换行撑破单屏） */
 body.m-ui .shop-bottom {
-  flex-direction: column; align-items: stretch; padding: 6px 9px; gap: 4px; border-radius: 12px; flex-shrink: 0;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 6px 9px;
+  gap: 4px;
+  flex-shrink: 0;
 }
-body.m-ui .arsenal-head { margin-bottom: 3px; }
-body.m-ui .slot-hint { font-size: 11.5px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.m-ui .arsenal-head { margin-bottom: 2px; }
+body.m-ui .slot-hint { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 body.m-ui .slots {
-  display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 25px) / 6);
-  gap: 5px; width: 100%; overflow-x: auto; scrollbar-width: none;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: calc((100% - 25px) / 6);
+  gap: 5px;
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 body.m-ui .slots::-webkit-scrollbar { display: none; }
-body.m-ui .slot, body.m-ui .slot-empty {
-  width: 100%; height: 48px; padding: 3px 2px; border-radius: 9px; font-size: 10px; gap: 1px;
-}
-body.m-ui .slot-icon { font-size: 17px; line-height: 1; }
+body.m-ui .slot, body.m-ui .slot-empty { width: 100%; height: 46px; padding: 3px 2px; font-size: 10px; gap: 1px; }
+body.m-ui .slot-icon { font-size: 16px; }
 body.m-ui .slot-name { font-size: 9.5px; }
 body.m-ui .slot-sub { display: none !important; }
-body.m-ui .merge-badge { font-size: 9px; padding: 1px 4px; top: -4px; right: -3px; }
-body.m-ui .sell-tip { font-size: 11px; border-radius: 8px; padding: 2px; line-height: 1.15; }
 
-/* 底部刷新 + 出发下一波常驻双大键（严格等高等边框同基线） */
 body.m-ui .mob-shop-bar {
-  position: static; width: 100%; gap: 8px; align-items: center;
-  background: linear-gradient(180deg, rgba(24, 19, 36, 0.98), rgba(14, 11, 22, 0.99));
-  padding: 6px 8px; border: 1px solid rgba(255,255,255,0.18); border-radius: 12px;
-  box-shadow: 0 -4px 16px rgba(0,0,0,0.5); flex-shrink: 0;
+  width: 100%;
+  gap: 8px;
+  align-items: center;
+  background: rgba(12, 16, 26, 0.98);
+  padding: 6px 8px;
+  border: 1px solid var(--gold-line);
+  border-radius: 6px;
+  flex-shrink: 0;
 }
-body.m-ui .mob-shop-bar .btn {
-  height: 44px; min-height: 44px; font-size: 15px; border-radius: 10px;
-  padding: 0 12px; margin: 0; border-width: 1.5px 1.5px 3px 1.5px; justify-content: center;
-}
+body.m-ui .mob-shop-bar .btn { height: 42px; font-size: 13.5px; padding: 0 12px; justify-content: center; }
 body.m-ui .mob-shop-bar .btn-sec { flex: 1; }
-body.m-ui .mob-shop-bar .btn-go { flex: 1.35; font-size: 15px; }
+body.m-ui .mob-shop-bar .btn-go { flex: 1.4; font-size: 14px; }
 
-/* 暂停菜单 & 结算菜单：双列紧凑按钮矩阵，单屏完整居中呈现 */
-body.m-ui #pauseMenu h1, body.m-ui #endMenu h1 { font-size: 23px; line-height: 1.2; }
-body.m-ui #pauseInfo, body.m-ui #endDesc { font-size: 12.5px; line-height: 1.4; }
+body.m-ui .modal-plaque {
+  padding: 16px 15px;
+  gap: 10px;
+  max-height: calc(100dvh - 20px);
+  overflow-y: auto;
+}
+body.m-ui #pauseMenu h1,
+body.m-ui #endMenu h1 { font-size: 21px; line-height: 1.25; }
+body.m-ui #pauseInfo,
+body.m-ui #endDesc { font-size: 12px; line-height: 1.45; }
 body.m-ui .stats-row {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;
-  font-size: 11.5px; padding: 7px 8px; text-align: left;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  font-size: 11px;
+  padding: 6px 8px;
+  text-align: left;
 }
-body.m-ui .stats-row span { padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-body.m-ui #pauseSets { max-height: 58px; overflow-y: auto; gap: 4px; margin-top: 0; justify-content: flex-start; }
-body.m-ui .set-pill { font-size: 11px; padding: 2.5px 8px; }
-body.m-ui .pause-actions, body.m-ui .end-actions {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; width: 100%; max-width: 440px; margin-top: 2px;
+body.m-ui .stats-row span { padding: 3.5px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.m-ui #pauseSets { max-height: 56px; overflow-y: auto; gap: 4px; justify-content: flex-start; }
+body.m-ui .pause-actions,
+body.m-ui .end-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 440px;
 }
-body.m-ui .pause-actions .btn, body.m-ui .end-actions .btn {
-  width: 100%; min-height: 43px; font-size: 14px; padding: 8px 10px; border-radius: 10px;
-}
+body.m-ui .pause-actions .btn,
+body.m-ui .end-actions .btn { width: 100%; min-height: 40px; font-size: 13px; padding: 7px 10px; }
 body.m-ui .pause-actions .btn-go,
 body.m-ui .end-actions .btn-go,
 body.m-ui #endlessBtn,
-body.m-ui .pause-actions .btn:last-child { grid-column: 1 / -1; min-height: 46px; font-size: 15.5px; }
+body.m-ui .pause-actions .btn:last-child { grid-column: 1 / -1; min-height: 44px; font-size: 14.5px; }
 
-/* 图鉴与日志弹窗：外框严格锁在单屏内，仅内部列表平滑滚动 */
-body.m-ui .codex-box, body.m-ui .log-box {
-  padding: 10px 11px; height: 100%; max-height: calc(100dvh - 16px); gap: 7px; border-radius: 14px;
+body.m-ui .codex-box,
+body.m-ui .log-box {
+  padding: 12px 13px;
+  height: 100%;
+  max-height: calc(100dvh - 16px);
+  gap: 8px;
 }
-body.m-ui .codex-head h2, body.m-ui .log-head h2 { font-size: 17px; }
+body.m-ui .codex-head h2,
+body.m-ui .log-head h2 { font-size: 16.5px; }
 body.m-ui .codex-tabs {
-  flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; gap: 6px; flex-shrink: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 2px;
+  flex-shrink: 0;
 }
 body.m-ui .codex-tabs::-webkit-scrollbar { display: none; }
-body.m-ui .codex-tab { min-height: 36px; padding: 6px 12px; font-size: 13px; border-radius: 9px; flex-shrink: 0; }
-body.m-ui .codex-filter { min-height: 30px; padding: 4px 10px; font-size: 12px; }
-body.m-ui .codex-banner { font-size: 11.5px; line-height: 1.35; padding: 5px 8px; flex-shrink: 0; }
-body.m-ui .codex-scroll, body.m-ui .log-view { min-height: 0; flex: 1; }
-body.m-ui .log-actions .btn { flex: 1 1 45%; min-height: 40px; font-size: 13.5px; padding: 7px 10px; border-radius: 10px; }
+body.m-ui .codex-tab { padding: 7px 11px 9px; font-size: 12.5px; gap: 5px; flex-shrink: 0; }
+body.m-ui .codex-filters {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+body.m-ui .codex-filters::-webkit-scrollbar { display: none; }
+body.m-ui .codex-scroll,
+body.m-ui .log-view { min-height: 0; flex: 1; }
 
-/* 📱 手机竖屏细节适配 */
+/* =========================================================================
+   3. 手机竖屏 (m-portrait) 专属排版：2×3 对称人物选项卡 + 堆叠分栏
+   ========================================================================= */
 body.m-portrait .hud {
   top: calc(6px + env(safe-area-inset-top, 0px));
   left: 10px; right: 10px;
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 4px 7px; align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 4px 7px;
+  align-items: center;
 }
 body.m-portrait .hud-center,
 body.m-portrait .hud-right,
 body.m-portrait .hud-right-top { display: contents; }
 body.m-portrait .wave-badge {
   grid-column: 1; grid-row: 1; justify-self: start;
-  background: rgba(18, 15, 28, 0.94); border: 1px solid rgba(255,209,102,0.38);
-  border-radius: 9px; padding: 3.5px 8px; font-size: 12px; font-weight: 900;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+  padding: 3.5px 8px; font-size: 11.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
 }
 body.m-portrait .mat-num {
   grid-column: 1; grid-row: 2; justify-self: start;
-  background: rgba(16, 28, 28, 0.94); border: 1px solid rgba(110, 231, 183, 0.42);
-  border-radius: 9px; padding: 2.5px 9px; font-size: 15.5px; line-height: 1.2;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.42);
+  background: rgba(11, 15, 24, 0.94); border: 1px solid var(--gold-line);
+  border-radius: 4px; padding: 2px 9px; font-size: 14.5px;
 }
 body.m-portrait .timer-capsule {
   grid-column: 2; grid-row: 1 / 3; justify-self: center;
-  min-width: 106px; padding: 2px 14px 5px; border-radius: 13px;
-  border-width: 2px; background: linear-gradient(180deg, #271e38, #140f20);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.65), 0 0 18px rgba(255, 209, 102, 0.28);
+  min-width: 96px; padding: 2px 12px 5px;
 }
-body.m-portrait .timer-icon { font-size: 16px; }
-body.m-portrait .wave-timer { font-size: 32px; line-height: 1.02; margin: 0; }
-body.m-portrait .timer-track { height: 5px; margin-top: 2px; }
+body.m-portrait .wave-timer { font-size: 28px; }
 body.m-portrait .pause-btn {
   grid-column: 3; grid-row: 1 / 3; justify-self: end;
-  min-height: 46px; min-width: 98px; padding: 9px 14px; font-size: 16px; border-radius: 13px;
+  min-height: 44px; min-width: 82px; font-size: 14px;
 }
 body.m-portrait .hud-left {
   grid-column: 1 / -1; grid-row: 3; width: 100%;
-  display: grid; grid-template-columns: 1.28fr 1fr; gap: 5px 9px;
-  padding: 6px 10px; border-radius: 11px; box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  display: grid; grid-template-columns: 1.28fr 1fr; gap: 5px 9px; padding: 6px 10px;
 }
-body.m-portrait .boss-bar-wrap {
-  grid-column: 1 / -1; grid-row: 4; width: 100%; margin-top: 0; padding: 5px 10px;
-}
-body.m-portrait .boss-name { font-size: 13px; margin-bottom: 2px; }
-body.m-portrait .bar-boss { height: 13px; }
-body.m-portrait .bar { height: 21px; border-radius: 10px; }
-body.m-portrait .bar-text { font-size: 13px; }
-body.m-portrait .bar-xp { height: 21px; }
-body.m-portrait .xp-text { font-size: 12.5px; }
-body.m-portrait .hud-mini-stats { grid-column: 1 / -1; font-size: 12.5px; margin-top: 0; }
+body.m-portrait .boss-bar-wrap { grid-column: 1 / -1; grid-row: 4; width: 100%; margin-top: 0; padding: 5px 10px; }
+body.m-portrait .hud-mini-stats { grid-column: 1 / -1; font-size: 11.5px; }
 
-body.m-portrait .mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; gap: 5px; }
-body.m-portrait .mode-btn { padding: 5px 4px; font-size: 12px; text-align: center; }
-body.m-portrait .diff-tabs { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; gap: 5px; }
-body.m-portrait .diff-btn { padding: 5px 4px; font-size: 12px; text-align: center; }
-body.m-portrait .scene-tabs {
-  display: flex; flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto;
-  width: 100%; gap: 5px; scrollbar-width: none;
+body.m-portrait .home-ver-pill { display: none; }
+body.m-portrait .home-topbar { justify-content: center; }
+body.m-portrait .mode-portal-grid {
+  grid-template-columns: 1fr;
+  gap: 11px;
+  max-width: 420px;
 }
-body.m-portrait .scene-tabs::-webkit-scrollbar { display: none; }
-body.m-portrait .scene-btn { flex-shrink: 0; }
-body.m-portrait .classes {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(4, minmax(0, 1fr));
+
+/* 竖屏 2×3 对称六角色选项卡：每格宽敞清晰，绝不挤成窄条 */
+body.m-portrait .roster-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+}
+body.m-portrait .ctab-port-wrap { height: 48px; }
+
+body.m-portrait .story-stage-body,
+body.m-portrait .endless-stage-body {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  max-width: 460px;
+  flex: 0 1 auto;
 }
 body.m-portrait #shopCards {
   grid-template-columns: 1fr;
   grid-template-rows: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
-body.m-portrait .codex-grid, body.m-portrait .codex-grid.wide { grid-template-columns: 1fr; gap: 8px; }
-body.m-portrait .codex-card { padding: 10px 11px; gap: 6px; }
-body.m-portrait .codex-card-title { font-size: 15px; }
-body.m-portrait .codex-card-desc { font-size: 12.5px; line-height: 1.42; }
+body.m-portrait .codex-grid,
+body.m-portrait .codex-grid.wide { grid-template-columns: 1fr; gap: 8px; }
 
-/* 📱 手机横屏细节适配（375px 超矮高度下同样一屏全显） */
-body.m-landscape .overlay { padding: 5px 12px 6px 12px; gap: 5px; }
+/* =========================================================================
+   4. 手机横屏 (m-landscape) 专属紧凑双栏排版
+   ========================================================================= */
+body.m-landscape .overlay { padding: 6px 14px; gap: 5px; }
 body.m-landscape .hud { top: calc(5px + env(safe-area-inset-top, 0px)); left: 12px; right: 12px; }
-body.m-landscape .hud-left { width: 220px; padding: 7px 10px; gap: 4px; }
-body.m-landscape .bar { height: 19px; }
-body.m-landscape .bar-text { font-size: 12.5px; }
-body.m-landscape .bar-xp { height: 17px; }
-body.m-landscape .xp-text { font-size: 11.5px; }
-body.m-landscape .hud-mini-stats { font-size: 12px; }
-body.m-landscape .wave-badge { font-size: 13px; padding: 4px 12px; }
-body.m-landscape .timer-capsule { min-width: 104px; padding: 2px 13px 4px; }
-body.m-landscape .wave-timer { font-size: 30px; }
-body.m-landscape .mat-num { font-size: 18px; }
-body.m-landscape .diff-box { padding: 5px 9px; gap: 4px; }
-body.m-landscape .diff-desc { display: none; }
-body.m-landscape .classes {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
+body.m-landscape .hud-left { width: 215px; padding: 6px 10px; gap: 4px; }
+body.m-landscape .wave-timer { font-size: 26px; }
+
+body.m-landscape .home-emblem-wrap { display: none; }
+body.m-landscape .home-main-title { font-size: 30px; }
+body.m-landscape .home-ornament-rule { margin-bottom: 8px; }
+body.m-landscape .mode-portal { padding: 11px 15px; gap: 4px; }
+body.m-landscape .portal-title { font-size: 17px; }
+body.m-landscape .portal-desc { font-size: 11px; line-height: 1.35; }
+
+body.m-landscape .ctab-head { display: none; }
+body.m-landscape .ctab-port-wrap { height: 34px; }
+body.m-landscape .roster-avatar-name { font-size: 10.5px; padding: 3px 2px; }
+
+body.m-landscape .hero-spotlight-card { grid-template-columns: 92px minmax(0, 1fr); }
+body.m-landscape .spotlight-info-col { padding: 7px 10px; gap: 4px; }
+body.m-landscape .spotlight-name { font-size: 14.5px; }
+body.m-landscape .spotlight-bio { -webkit-line-clamp: 1; }
+body.m-landscape .spotlight-quick-strip { display: none; }
+body.m-landscape .story-route-box { display: none; }
+body.m-landscape .depart-summary-line { display: none; }
+body.m-landscape .btn-story-go,
+body.m-landscape .endless-go-btn { min-height: 36px; padding: 7px 12px; font-size: 13px; }
+
 body.m-landscape #shopCards {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
-body.m-landscape .crate-card-wrap {
+body.m-landscape .crate-card-wrap,
+body.m-landscape #lvlCards,
+body.m-landscape .codex-grid,
+body.m-landscape .codex-grid.wide {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  max-width: 680px;
+  gap: 7px;
 }
-body.m-landscape #shopCards .card:not(.sold-out) { padding: 7px 8px 4px 9px; gap: 7px; }
-body.m-landscape #shopCards .card-side { width: 104px; gap: 4px; }
-body.m-landscape .lock-pin { height: 27px; min-height: 27px; font-size: 12px; }
-body.m-landscape #shopCards .card-actions .btn { height: 30px; min-height: 30px; font-size: 12px; }
-body.m-landscape #lvlCards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-body.m-landscape .codex-grid, body.m-landscape .codex-grid.wide { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-body.m-landscape .stats-row { grid-template-columns: repeat(4, 1fr); }
+body.m-landscape .stats-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }

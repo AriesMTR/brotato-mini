@@ -1,84 +1,77 @@
 // ============================================================================
-// 🗺️ 5 大异星生态战场（随机轮换或手动指定，全部预烘焙至离屏贴图，0 实时渲染负担）
+// 🗼 《烬塔残响：第999次救赎》四大核心层域战场配置（100% 对应设定集原画底图与环境音景）
 // ============================================================================
 const SCENES = [
   {
-    id: 'wasteland', icon: '🌑', name: '紫晶废土',
-    exclMob: 'rad_scorpion', exclMobName: '🦂 辐射裂变蝎',
-    terrainSummary: '🌀 专属地形：双生虚空晶裂门（A ↔ B 跃迁）',
-    eventId: 'rad_meteor', eventIcon: '☄️', eventName: '紫晶流星雨',
-    eventDesc: '第 3 波起概率出现：间歇坠落紫晶辐射流星（无差别炸伤范围目标，并在坑内爆出额外晶石！）',
-    voidBg: '#0e0b14', centerCol: '#383047', midCol: '#2b2538', edgeCol: '#201b2a',
-    patchDark: 'rgba(18, 14, 26, 0.25)', patchLight: 'rgba(86, 72, 112, 0.16)',
-    gridCol: 'rgba(216, 198, 255, 0.030)', wallMain: '#584b6e', wallDark: '#191423', rivetCol: '#9d8ec4',
-    pebble1: '#4d4361', pebble2: '#1c1726', accent1: '#9d4edd', accent2: '#e0aaff'
+    id: 'foundry', icon: '🌧️', name: '一层·雨夜长桥', subTitle: 'LAYER I · CRIMSON RAIN BRIDGE',
+    vistaImg: 'assets/spire/scene_1_vista.jpg', arenaImg: 'assets/spire/scene_1_arena.jpg', propKey: 'prop_s1_lantern',
+    bossHint: '守层主宰：绯红断刃剑姬 · 烬羽',
+    exclMob: 'magma_imp', exclMobName: '🏮 断魂赤纸伞妖',
+    terrainSummary: '🔥 专属地形：余烬残火裂池（引怪灼烧） · 可破坏物：青苔石灯笼',
+    eventId: 'geysers', eventIcon: '🏮', eventName: '孤桥魂灯喷涌',
+    eventDesc: '第 3 波起概率出现：长桥地脉余烬定时喷发绯红火柱，引燃圈内守塔傀儡与贪刀目标（配乐：凄雨残响钢琴）',
+    voidBg: '#080c14', centerCol: '#1b2636', midCol: '#141d2a', edgeCol: '#0d141e',
+    patchDark: 'rgba(8, 13, 22, 0.24)', patchLight: 'rgba(225, 29, 72, 0.10)',
+    gridCol: 'rgba(229, 184, 105, 0.032)', wallMain: '#7c2d3e', wallDark: '#090d16', rivetCol: '#f6d379',
+    pebble1: '#334155', pebble2: '#0f172a', accent1: '#fb7185', accent2: '#f6d379'
   },
   {
-    id: 'desert', icon: '🏜️', name: '赤砂荒原',
-    exclMob: 'sand_worm', exclMobName: '🐍 沙暴钻地虫',
-    terrainSummary: '🕳️ 专属地形：荒漠断层大裂谷（锯齿岩壑掩体）',
-    eventId: 'sandstorm', eventIcon: '🌪️', eventName: '赤砂顺风热浪',
-    eventDesc: '第 3 波起概率出现：周期刮起狂沙顺风（风场期间角色移速 +14%，并额外催生荒漠晶树）',
-    voidBg: '#160f0a', centerCol: '#61432e', midCol: '#4d3423', edgeCol: '#382518',
-    patchDark: 'rgba(38, 21, 11, 0.24)', patchLight: 'rgba(148, 102, 62, 0.17)',
-    gridCol: 'rgba(255, 219, 168, 0.032)', wallMain: '#8c5a3b', wallDark: '#24150d', rivetCol: '#e9c46a',
-    pebble1: '#7f5539', pebble2: '#2e1c12', accent1: '#f4a261', accent2: '#f3e5ab'
+    id: 'glacier', icon: '❄️', name: '二层·永冻冰窟', subTitle: 'LAYER II · FROZEN CROWN CAVERN',
+    vistaImg: 'assets/spire/scene_2_vista.jpg', arenaImg: 'assets/spire/scene_2_arena.jpg', propKey: 'prop_s2_crystal',
+    bossHint: '守层主宰：永冻星使 · 艾丝特莉亚',
+    exclMob: 'frost_wisp', exclMobName: '❄️ 眠冬冰冠亡灵',
+    terrainSummary: '🧊 专属地形：碎冕多棱寒冰镜（+28%疾滑） · 可破坏物：极寒冰晶簇',
+    eventId: 'blizzard', eventIcon: '🌨️', eventName: '碎冕寒霜脉冲',
+    eventDesc: '第 3 波起概率出现：艾丝特莉亚的极寒叹息席卷冰窟，冻结减速部分机关并凝结冰刺预警圈（配乐：寒风八音盒圆舞曲）',
+    voidBg: '#061019', centerCol: '#193547', midCol: '#122736', edgeCol: '#0b1924',
+    patchDark: 'rgba(7, 20, 32, 0.24)', patchLight: 'rgba(114, 239, 221, 0.12)',
+    gridCol: 'rgba(165, 243, 252, 0.036)', wallMain: '#2d6a87', wallDark: '#08131d', rivetCol: '#72efdd',
+    pebble1: '#4882a3', pebble2: '#0d1f2d', accent1: '#38bdf8', accent2: '#e0fbfc'
   },
   {
-    id: 'glacier', icon: '❄️', name: '极寒冰窟',
-    exclMob: 'frost_wisp', exclMobName: '🧊 霜晶冰魄灵',
-    terrainSummary: '🧊 专属地形：极寒多棱碎晶冰湖（+28%疾滑）',
-    eventId: 'blizzard', eventIcon: '🌨️', eventName: '极光寒霜脉冲',
-    eventDesc: '第 3 波起概率出现：极光寒潮冻结全场部分怪物减速，同时在地面凝结寒冰尖刺预警圈',
-    voidBg: '#08121a', centerCol: '#26495c', midCol: '#1d394a', edgeCol: '#142936',
-    patchDark: 'rgba(9, 24, 36, 0.25)', patchLight: 'rgba(114, 202, 232, 0.15)',
-    gridCol: 'rgba(165, 243, 252, 0.042)', wallMain: '#467b99', wallDark: '#0b1b26', rivetCol: '#90e0ef',
-    pebble1: '#5c95b5', pebble2: '#102533', accent1: '#38bdf8', accent2: '#e0fbfc'
+    id: 'wasteland', icon: '🕰️', name: '三层·倒悬钟楼', subTitle: 'LAYER III · INVERTED CLOCKWORK SPIRE',
+    vistaImg: 'assets/spire/scene_3_vista.jpg', arenaImg: 'assets/spire/scene_3_arena.jpg', propKey: 'prop_s3_pillar',
+    bossHint: '守层主宰：紫电弦月人偶 · 伽蓝',
+    exclMob: 'rad_scorpion', exclMobName: '⚙️ 逆转发条猎蝎',
+    terrainSummary: '🌀 专属地形：双生星晷裂隙门（A ↔ B 跃迁） · 可破坏物：黄铜齿轮断柱',
+    eventId: 'rad_meteor', eventIcon: '⚡', eventName: '星晷紫电坠星',
+    eventDesc: '第 3 波起概率出现：倒悬钟楼坠落紫电星晷碎块，无差别轰击范围目标并迸出额外封魂晶石（配乐：钟摆羽管键琴）',
+    voidBg: '#090913', centerCol: '#242038', midCol: '#1b182b', edgeCol: '#110f1d',
+    patchDark: 'rgba(12, 10, 24, 0.24)', patchLight: 'rgba(168, 85, 247, 0.12)',
+    gridCol: 'rgba(229, 184, 105, 0.035)', wallMain: '#8a6d3b', wallDark: '#0e0c1a', rivetCol: '#f6d379',
+    pebble1: '#463f66', pebble2: '#161326', accent1: '#c084fc', accent2: '#f6d379'
   },
   {
-    id: 'foundry', icon: '⚙️', name: '机械熔炉',
-    exclMob: 'magma_imp', exclMobName: '🔥 熔岩火精',
-    terrainSummary: '🌋 专属地形：裂地多瓣熔岩火池（双向灼烧）',
-    eventId: 'geysers', eventIcon: '🌋', eventName: '熔炉地热喷涌',
-    eventDesc: '第 3 波起概率出现：地底熔铁泄压阀定时喷发烈焰火柱，对圈内怪物与贪刀玩家同时造成高额灼伤',
-    voidBg: '#111013', centerCol: '#383a45', midCol: '#2b2d36', edgeCol: '#1f2027',
-    patchDark: 'rgba(14, 14, 18, 0.28)', patchLight: 'rgba(92, 96, 114, 0.16)',
-    gridCol: 'rgba(251, 191, 36, 0.042)', wallMain: '#6e5a47', wallDark: '#16161b', rivetCol: '#fbbf24',
-    pebble1: '#525666', pebble2: '#181920', accent1: '#f97316', accent2: '#fde047'
-  },
-  {
-    id: 'fungal', icon: '🍄', name: '荧光菌丛',
-    exclMob: 'spore_mother', exclMobName: '🍄 剧毒孢子母体',
-    terrainSummary: '🧪 专属地形：腐殖曲岸剧毒泥沼（聚怪毒蚀）',
-    eventId: 'spore_tide', eventIcon: '✨', eventName: '灵能治愈孢潮',
-    eventDesc: '第 3 波起概率出现：地面绽放翠绿荧光灵能法阵，踏入阵内每秒回复生命并提升 +14% 攻速',
-    voidBg: '#09130f', centerCol: '#213f33', midCol: '#193128', edgeCol: '#12241d',
-    patchDark: 'rgba(8, 22, 16, 0.28)', patchLight: 'rgba(74, 158, 118, 0.16)',
-    gridCol: 'rgba(110, 231, 183, 0.035)', wallMain: '#386652', wallDark: '#0c1a14', rivetCol: '#6ee7b7',
-    pebble1: '#2f5947', pebble2: '#0e1f18', accent1: '#10b981', accent2: '#72efdd'
+    id: 'desert', icon: '🌑', name: '终层·日蚀镜界', subTitle: 'FINAL LAYER · ECLIPSE MIRROR SANCTUM',
+    vistaImg: 'assets/spire/scene_4_vista.jpg', arenaImg: 'assets/spire/scene_4_arena.jpg', propKey: 'prop_s4_monolith',
+    bossHint: '终幕真我：第999号 · 日蚀圣女',
+    exclMob: 'sand_worm', exclMobName: '🕯️ 蚀影潜渊骨蛇',
+    terrainSummary: '🕳️ 专属地形：黑曜镜界断层裂谷（隔渊掩体） · 可破坏物：黑曜裂纹方碑',
+    eventId: 'sandstorm', eventIcon: '🌑', eventName: '黑日引力潮汐',
+    eventDesc: '第 3 波起概率出现：黑水圣所掀起日蚀引力暗潮，期间角色移速 +14%，并催生黑曜封魂方碑（配乐：黑水圣咏大提琴）',
+    voidBg: '#06070d', centerCol: '#1a1c2b', midCol: '#121420', edgeCol: '#0a0c14',
+    patchDark: 'rgba(5, 6, 12, 0.30)', patchLight: 'rgba(229, 184, 105, 0.11)',
+    gridCol: 'rgba(246, 211, 121, 0.034)', wallMain: '#9a7b3e', wallDark: '#080910', rivetCol: '#fde68a',
+    pebble1: '#3b3e54', pebble2: '#10121c', accent1: '#f59e0b', accent2: '#fef08a'
   }
 ];
 
 const TERRAIN_CODEX = [
   {
-    id: 'portal', icon: '🌀', name: '虚空晶裂传送门', badge: '紫晶废土专属', scenes: '🌑 紫晶废土（唯一标志地形）',
-    desc: '撕裂空间的棱晶次元裂隙（<b>A ↔ B 双向连通</b>，浮空紫晶簇环绕）。踏入就绪的裂隙门可<b>瞬间跃迁至另一端</b>，赋予<b>短暂无敌并在落点震退杀伤周遭虫群</b>（共享 4.5 秒充能冷却）！'
+    id: 'lava', icon: '🔥', name: '余烬残火裂池', badge: '一层·雨夜长桥专属', scenes: '🌧️ 一层·雨夜长桥（标志机关）',
+    desc: '烬羽九百九十八次挥剑残留在长桥石板上的不灭余烬池。<b>守塔傀儡踏入会持续挂上高频灼烧并减速 -18%</b>（可绕着火池边缘引怪触发融毁/超载！）；角色持续踩入超过 0.35 秒也会受灼伤（苍翠风翼可免疫）。'
   },
   {
-    id: 'lava', icon: '🌋', name: '裂地熔岩火池', badge: '机械熔炉专属', scenes: '⚙️ 机械熔炉（唯一标志地形）',
-    desc: '地壳崩裂形成的不规则多瓣玄武岩火池。<b>异虫踏入会持续挂上高频灼烧并减速 -18%</b>（可绕着火池边缘引怪群烧！）；玩家持续踩入超过 0.35 秒也会受到滚烫灼伤（赫尔墨斯飞翼可免疫）。'
+    id: 'ice_sheet', icon: '🧊', name: '碎冕多棱寒冰镜', badge: '二层·永冻冰窟专属', scenes: '❄️ 二层·永冻冰窟（标志机关）',
+    desc: '艾丝特莉亚冰封王城时凝结的天然多面体寒冰镜湖。<b>角色踏上冰镜立即获得 +28% 疾滑移速加成</b>，而守塔怪物在冰面上打滑移速降低 -15%，身法拉扯极其飘逸！'
   },
   {
-    id: 'swamp', icon: '🧪', name: '腐殖剧毒泥沼', badge: '荧光菌丛专属', scenes: '🍄 荧光菌丛（唯一标志地形）',
-    desc: '蜿蜒曲折、岸边生长荧光毒菇的异星泥沼湿地。<b>踏入泥沼的怪物移速大幅降低 -38% 并叠毒腐蚀</b>，非常适合范围与元素武器聚怪洗地；玩家涉水轻微减速（受 72% 移速保底保护）。'
+    id: 'portal', icon: '🌀', name: '双生星晷裂隙门', badge: '三层·倒悬钟楼专属', scenes: '🕰️ 三层·倒悬钟楼（标志机关）',
+    desc: '伽蓝以逆转发条撕开的空间星晷裂隙（<b>A ↔ B 双向连通</b>，浮空紫电棱晶环绕）。踏入就绪的裂隙门可<b>瞬间跃迁至另一端</b>，赋予<b>短暂无敌并在落点震退杀伤周遭傀儡</b>（共享 4.5 秒充能冷却）！'
   },
   {
-    id: 'chasm', icon: '🕳️', name: '荒漠断层大裂谷', badge: '赤砂荒原专属', scenes: '🏜️ 赤砂荒原（唯一标志地形）',
-    desc: '横亘沙原的折线锯齿岩层深渊。<b>阻挡玩家与地面异虫通行</b>（沿岩壁自动顺滑绕行，绝不卡位），但<b>所有远程子弹、激光与榴弹均可直接飞越裂谷</b>，是隔谷风筝与卡位聚怪的绝佳掩体！'
-  },
-  {
-    id: 'ice_sheet', icon: '🧊', name: '极寒碎晶冰湖', badge: '极寒冰窟专属', scenes: '❄️ 极寒冰窟（唯一标志地形）',
-    desc: '棱角分明、内蕴冰裂纹的天然多边形寒冰湖面。<b>玩家踏上冰湖立即获得 +28% 疾滑移速加成</b>，而异虫在冰面上打滑移速降低 -15%，拉扯走位极其飘逸！'
+    id: 'chasm', icon: '🕳️', name: '黑曜镜界大裂谷', badge: '终层·日蚀镜界专属', scenes: '🌑 终层·日蚀镜界（标志机关）',
+    desc: '横亘黑水镜界的折线锯齿黑曜石深渊。<b>阻挡角色与地面怪物通行</b>（沿断崖自动顺滑绕行，绝不卡位），但<b>所有远程魂弹、圣枪光束与爆破均可直接飞越裂谷</b>，是隔渊风筝的绝佳掩体！'
   }
 ];
 let selectedScene = 'random', curScene = SCENES[0], sceneSeed = 1024, bakedSceneKey = '';
