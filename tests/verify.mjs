@@ -476,6 +476,15 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running", preferences 
   assert.strictEqual(vm.runInContext("MAX_WEAPON_TIER", s), 5, "MAX_WEAPON_TIER must be 5");
   assert.strictEqual(vm.runInContext("MAX_WAVE", s), 16, "MAX_WAVE must be strictly 16 floors");
   assert.strictEqual(vm.runInContext("menuStage", s), "home", "Game must boot onto clean Main Title Screen (menuStage === 'home')");
+  assert.strictEqual(vm.runInContext("bootIntegrityPassed && document.getElementById('bootGate').classList.contains('hidden') && SpireBootGate.verifyModules().ok", s), true, "SpireBootGate must verify all 20 modules and hide #bootGate once ready");
+  assert.strictEqual(vm.runInContext(`(() => {
+    bootIntegrityPassed = false;
+    player = null;
+    startGame('allrounder', { mode: 'story' });
+    const blocked = (player === null && state === 'menu');
+    bootIntegrityPassed = true;
+    return blocked;
+  })()`, s), true, "SpireBootGate must block startGame() when bootIntegrityPassed is false");
 
   // Verify v2.1.2: 32 weapons x 2 evolutions = 64 unique evolutions, T4+T4 -> T5 merge + 2-choice evolution modal,
   // HD baked sprites across all 32 weapons, softened W1-W5 early difficulty with preserved 2.0x late cap,

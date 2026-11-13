@@ -66,6 +66,10 @@ function refreshSpireHome() {
 }
 
 function continueSpireStory() {
+  if (typeof bootIntegrityPassed !== 'undefined' && !bootIntegrityPassed) {
+    if (typeof SpireBootGate !== 'undefined' && SpireBootGate) SpireBootGate.runFullCheck('user_guard');
+    return;
+  }
   const saved = SpireSave.load();
   if (!saved) { refreshSpireHome(); openMenuStage('story'); return; }
   closePresentationModal();
