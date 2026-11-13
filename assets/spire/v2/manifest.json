@@ -1,0 +1,257 @@
+{
+  "version": 2,
+  "artDirection": "Cold Japanese animated-film cinematography, preserving the approved character designs.",
+  "usage": "Use clean backgrounds for live UI; scene atlases only through their per-panel safe crop. Portraits remain assets/spire/port_*.jpg.",
+  "assets": [
+    {
+      "file": "awakening-atlas.png",
+      "url": "assets/spire/v2/awakening-atlas.png",
+      "source": "../output/design/revision-v2/images/01-awakening.png",
+      "role": "cinematic-atlas",
+      "columns": 2,
+      "rows": 2,
+      "width": 1672,
+      "height": 941,
+      "bytes": 2807250,
+      "sha256": "b89e4782957ae0269b35d45fc5cd8d2991b1c61242655b7f0f076a54b6153f92",
+      "panelOrder": [
+        "top-left",
+        "top-right",
+        "bottom-left",
+        "bottom-right"
+      ],
+      "safeRectWithinPanel": {
+        "x": 0.012,
+        "y": 0.11,
+        "width": 0.976,
+        "height": 0.878
+      },
+      "note": "Crop at render time to hide baked design labels and gutters; never show the whole atlas as one scene."
+    },
+    {
+      "file": "qingyu-atlas.png",
+      "url": "assets/spire/v2/qingyu-atlas.png",
+      "source": "../output/design/revision-v2/images/02-qingyu.png",
+      "role": "cinematic-atlas",
+      "columns": 3,
+      "rows": 1,
+      "width": 1672,
+      "height": 941,
+      "bytes": 2954070,
+      "sha256": "cae8ae5ced1acb250a1ccc2ed271283e171693dfccc085f8a40315cc3c309d52",
+      "panelOrder": "left-to-right",
+      "safeRectWithinPanel": {
+        "x": 0.015,
+        "y": 0.006,
+        "width": 0.97,
+        "height": 0.875
+      },
+      "note": "Crop at render time to hide baked design labels and gutters; never show the whole atlas as one scene."
+    },
+    {
+      "file": "jinyu-atlas.png",
+      "url": "assets/spire/v2/jinyu-atlas.png",
+      "source": "../output/design/revision-v2/images/03-jinyu-stages.png",
+      "role": "cinematic-atlas",
+      "columns": 2,
+      "rows": 2,
+      "width": 1672,
+      "height": 941,
+      "bytes": 2956554,
+      "sha256": "b772ab9bbb8a48a8673ddab6453be037202a45790a517fd26b1a61cefe193398",
+      "panelOrder": [
+        "top-left",
+        "top-right",
+        "bottom-left",
+        "bottom-right"
+      ],
+      "safeRectWithinPanel": {
+        "x": 0.012,
+        "y": 0.11,
+        "width": 0.976,
+        "height": 0.878
+      },
+      "note": "Crop at render time to hide baked design labels and gutters; never show the whole atlas as one scene."
+    },
+    {
+      "file": "astria-atlas.png",
+      "url": "assets/spire/v2/astria-atlas.png",
+      "source": "../output/design/revision-v2/images/04-astria-stages.png",
+      "role": "cinematic-atlas",
+      "columns": 2,
+      "rows": 2,
+      "width": 1672,
+      "height": 941,
+      "bytes": 3075947,
+      "sha256": "d696f9696ca80c391c26de4ddff9e047ea15f13bd8ea834d7e132dfccd7a79de",
+      "panelOrder": [
+        "top-left",
+        "top-right",
+        "bottom-left",
+        "bottom-right"
+      ],
+      "safeRectWithinPanel": {
+        "x": 0.012,
+        "y": 0.11,
+        "width": 0.976,
+        "height": 0.878
+      },
+      "note": "Crop at render time to hide baked design labels and gutters; never show the whole atlas as one scene."
+    },
+    {
+      "file": "jialan-atlas.png",
+      "url": "assets/spire/v2/jialan-atlas.png",
+      "source": "../output/design/revision-v2/images/05-jialan-stages.png",
+      "role": "cinematic-atlas",
+      "columns": 2,
+      "rows": 2,
+      "width": 1672,
+      "height": 941,
+      "bytes": 2864231,
+      "sha256": "349959567bdf880d1f839773604435fdf388a9a37c3f10712e1c7379e34315f6",
+      "panelOrder": [
+        "top-left",
+        "top-right",
+        "bottom-left",
+        "bottom-right"
+      ],
+      "safeRectWithinPanel": {
+        "x": 0.012,
+        "y": 0.11,
+        "width": 0.976,
+        "height": 0.878
+      },
+      "note": "Crop at render time to hide baked design labels and gutters; never show the whole atlas as one scene."
+    },
+    {
+      "file": "eclipse-atlas.png",
+      "url": "assets/spire/v2/eclipse-atlas.png",
+      "source": "../output/design/revision-v2/images/06-eclipse-stages.png",
+      "role": "cinematic-atlas",
+      "columns": 2,
+      "rows": 2,
+      "width": 1672,
+      "height": 941,
+      "bytes": 3206420,
+      "sha256": "ebbe511143b110dc777d8c7efbf307bc9fee5e499bd8a303cc131758e90fe19b",
+      "panelOrder": [
+        "top-left",
+        "top-right",
+        "bottom-left",
+        "bottom-right"
+      ],
+      "safeRectWithinPanel": {
+        "x": 0.012,
+        "y": 0.11,
+        "width": 0.976,
+        "height": 0.878
+      },
+      "note": "Crop at render time to hide baked design labels and gutters; never show the whole atlas as one scene."
+    },
+    {
+      "file": "dialogue-reference.png",
+      "url": "assets/spire/v2/dialogue-reference.png",
+      "source": "../output/design/revision-v2/images/07-dialogue-tension.png",
+      "role": "design-reference-only",
+      "columns": 1,
+      "rows": 1,
+      "width": 1672,
+      "height": 941,
+      "bytes": 2647726,
+      "sha256": "36574144dba7a3cfa96093633ebbb68f879bcca02208facbb16fee190c926631",
+      "note": "Baked UI exists in this reference. Do not use as a production background."
+    },
+    {
+      "file": "player-defeat-reference.png",
+      "url": "assets/spire/v2/player-defeat-reference.png",
+      "source": "../output/design/revision-v2/images/08-player-defeat-final.png",
+      "role": "design-reference-only",
+      "columns": 1,
+      "rows": 1,
+      "width": 1672,
+      "height": 941,
+      "bytes": 2365333,
+      "sha256": "4da40b95c58a1778e38dc8a8e7f52406c4eb911439ae13a7922b753e350a0470",
+      "note": "Baked UI exists in this reference. Do not use as a production background."
+    },
+    {
+      "file": "title-reference.png",
+      "url": "assets/spire/v2/title-reference.png",
+      "source": "../output/design/images/01-title.png",
+      "role": "design-reference-only",
+      "columns": 1,
+      "rows": 1,
+      "width": 1672,
+      "height": 941,
+      "bytes": 2233499,
+      "sha256": "c6b0a0f691eda91b7e901e58ebc7c7efbc2802ffe95dd29f21d96e876b9d1ce5",
+      "note": "Baked UI exists in this reference. Do not use as a production background."
+    },
+    {
+      "file": "preparation-reference.png",
+      "url": "assets/spire/v2/preparation-reference.png",
+      "source": "../output/design/images/02-preparation.png",
+      "role": "design-reference-only",
+      "columns": 1,
+      "rows": 1,
+      "width": 1672,
+      "height": 941,
+      "bytes": 2248285,
+      "sha256": "05d42671cd5ac51868b277a6fca72a244123335bf4c3ddbe04f6f0632e51ee64",
+      "note": "Baked UI exists in this reference. Do not use as a production background."
+    },
+    {
+      "file": "endings-atlas.png",
+      "url": "assets/spire/v2/endings-atlas.png",
+      "source": "../output/design/images/08-endings.png",
+      "role": "cinematic-atlas",
+      "columns": 2,
+      "rows": 1,
+      "width": 1672,
+      "height": 941,
+      "bytes": 2662277,
+      "sha256": "2b1a1ef2b0d8cd54dbf6f33b0c8c39f08687be2a137e64fe8357238421427ec1",
+      "panelOrder": "left-to-right",
+      "safeRectWithinPanel": {
+        "x": 0.012,
+        "y": 0.065,
+        "width": 0.976,
+        "height": 0.923
+      },
+      "note": "Crop at render time to hide baked design labels and gutters; never show the whole atlas as one scene."
+    },
+    {
+      "file": "title-clean.png",
+      "url": "assets/spire/v2/title-clean.png",
+      "role": "production-background",
+      "generatedWith": "built-in image_gen",
+      "promptManifest": "image-prompts.json",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2193111,
+      "sha256": "9e49f174cf95f0221e8ff83f6e4674d92cb169e67c1af2ca99f4c4ec91bfd677"
+    },
+    {
+      "file": "wind-pavilion.png",
+      "url": "assets/spire/v2/wind-pavilion.png",
+      "role": "production-background",
+      "generatedWith": "built-in image_gen",
+      "promptManifest": "image-prompts.json",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2541716,
+      "sha256": "6dd74f9d40980284a50f317a7360a837c017b8c8470cbe4b18ce1e24afc3f3ed"
+    },
+    {
+      "file": "player-defeat-clean.png",
+      "url": "assets/spire/v2/player-defeat-clean.png",
+      "role": "production-background",
+      "generatedWith": "built-in image_gen",
+      "promptManifest": "image-prompts.json",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2367292,
+      "sha256": "7e41ccbd39a498b5751e4ef8a8958a4e176b10a019e66b0986ef0a33fd398caf"
+    }
+  ]
+}

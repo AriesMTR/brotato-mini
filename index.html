@@ -9,11 +9,13 @@
   <meta name="apple-mobile-web-app-title" content="烬塔残响">
   <meta name="format-detection" content="telephone=no,email=no">
   <title>烬塔残响：第999次救赎 · ECHOES OF THE ASHEN SPIRE</title>
-  <link rel="icon" type="image/jpeg" href="assets/spire/app_icon.jpg?v=1.4.3">
-  <link rel="apple-touch-icon" href="assets/spire/app_icon.jpg?v=1.4.3">
-  <link rel="manifest" href="manifest.json?v=1.4.3">
-  <link rel="stylesheet" href="styles/base.css?v=1.4.3">
-  <link rel="stylesheet" href="styles/mobile.css?v=1.4.3">
+  <link rel="icon" type="image/jpeg" href="assets/spire/app_icon.jpg?v=2.1.2">
+  <link rel="apple-touch-icon" href="assets/spire/app_icon.jpg?v=2.1.2">
+  <link rel="manifest" href="manifest.json?v=2.1.2">
+  <link rel="stylesheet" href="styles/base.css?v=2.1.2">
+  <link rel="stylesheet" href="styles/mobile.css?v=2.1.2">
+  <link rel="stylesheet" href="styles/presentation.css?v=2.1.2">
+  <link rel="stylesheet" href="styles/narrative.css?v=2.1.2">
 </head>
 <body>
 
@@ -119,65 +121,35 @@
 
   <!-- 《烬塔残响》黑曜镌金主界面 + 剧情模式(唯一主角) / 无尽模式(高定人物选项卡) -->
   <div id="startMenu" class="overlay start-hub" data-stage="home">
-    <div id="heroKeyArtBg" class="start-bg-art" style="background-image:url('assets/spire/cut_intro_1.jpg')"></div>
+    <div id="heroKeyArtBg" class="start-bg-art"></div>
     <div class="start-bg-vignette"></div>
     <div class="start-frame-ornament" aria-hidden="true"></div>
 
     <!-- 视图 A：极简书卷原画主界面 -->
     <section id="menuHomeView" class="menu-stage">
       <header class="home-topbar">
-        <span id="startVersionPill" class="home-ver-pill">ECHOES OF THE ASHEN SPIRE  ·  v1.4.1</span>
-        <nav class="home-top-actions" aria-label="主殿导航">
+        <span id="startVersionPill" class="home-ver-pill">ECHOES OF THE ASHEN SPIRE · v2.1.2</span>
+        <nav class="home-top-actions" aria-label="声音设置">
           <button id="menuAudioBtn" class="ghost-pill-btn" onclick="openAudioModal()">🔊 音量 · 28%</button>
           <button id="menuBgmBtn" class="ghost-pill-btn" onclick="toggleSpireAudio()">音景 · 开启</button>
-          <button class="ghost-pill-btn" onclick="replayOpeningCutscene()">序章影像</button>
-          <button class="ghost-pill-btn gold" onclick="openCodex('heroes')">烬塔圣典</button>
         </nav>
       </header>
-
       <div class="home-centerpiece">
-        <div class="home-emblem-wrap">
-          <img id="brandAppIcon" src="assets/spire/app_icon.jpg" alt="烬塔残响" class="brand-app-icon">
-        </div>
-        <div class="brand-en-sub">THE 999TH REDEMPTION</div>
+        <p class="brand-en-sub">ECHOES OF THE ASHEN SPIRE</p>
         <h1 class="home-main-title">烬塔残响</h1>
-        <div class="home-ornament-rule">
-          <span class="rule-line"></span>
-          <span class="rule-gem">◆</span>
-          <span class="rule-sub">第 九 百 九 十 九 次 救 赎</span>
-          <span class="rule-gem">◆</span>
-          <span class="rule-line"></span>
-        </div>
-
-        <div id="modePortalGrid" class="mode-portal-grid">
-          <button id="portalStoryBtn" class="mode-portal story-portal" onclick="openMenuStage('story')">
-            <span class="portal-roman" aria-hidden="true">I</span>
-            <span class="portal-badge">MODE I  ·  唯一主角限定</span>
-            <div class="portal-title-row">
-              <span class="portal-title">剧情模式</span>
-            </div>
-            <p class="portal-desc">执唯一主角「零号·白衣」之青焰魂灯，循十六层宿命对白与四幕固定首领迎向破晓终章</p>
-            <span class="portal-cta">进入宿命整备  →</span>
-          </button>
-
-          <button id="portalEndlessBtn" class="mode-portal endless-portal" onclick="openMenuStage('endless')">
-            <span class="portal-roman" aria-hidden="true">II</span>
-            <span class="portal-badge cyan">MODE II  ·  六位誓约者开放</span>
-            <div class="portal-title-row">
-              <span class="portal-title">无尽模式</span>
-            </div>
-            <p class="portal-desc">通过人物选项卡自由择定其他角色与全部六位誓约者，自选起始层域深入无限构筑试炼</p>
-            <span class="portal-cta cyan">择定誓约角色  →</span>
-          </button>
-        </div>
+        <p class="home-subtitle">第 999 次救赎</p>
+        <nav id="modePortalGrid" class="title-menu" aria-label="开始游戏">
+          <button id="continueStoryBtn" class="title-link primary hidden" onclick="continueSpireStory()"><span class="title-diamond" aria-hidden="true">◇</span><span>继续登塔<small id="continueStoryHint"></small></span></button>
+          <button id="portalStoryBtn" class="title-link primary" onclick="openMenuStage('story')"><span class="title-diamond" aria-hidden="true">◇</span><span id="newStoryLabel">提灯启程</span></button>
+          <button id="portalEndlessBtn" class="title-link" onclick="openMenuStage('endless')"><span class="title-diamond" aria-hidden="true">◇</span><span>无尽试炼</span></button>
+        </nav>
+        <p class="home-poem">雨还没有停。灯在等你。</p>
       </div>
-
       <footer class="home-footer">
-        <button id="homeUiBtn" class="footer-link-btn" onclick="cycleUIPref()">视界 · 自动</button>
-        <span class="footer-dot">·</span>
-        <button class="footer-link-btn" onclick="openChangelogModal()">纪元志</button>
-        <span class="footer-dot">·</span>
-        <button class="footer-link-btn" onclick="openLogModal()">运行诊断</button>
+        <button class="footer-link-btn" onclick="openSpireGallery()"><span aria-hidden="true">▧</span> 演出预览</button>
+        <button class="footer-link-btn" onclick="openCodex('weapons')">烬塔圣典</button>
+        <button class="footer-link-btn home-settings" onclick="openSpireSettings()"><span aria-hidden="true">⚙</span> 设置</button>
+        <span id="saveStatus" class="save-status" role="status"></span>
         <div id="uiModeTabs" class="hidden" aria-hidden="true"></div>
       </footer>
     </section>
@@ -202,25 +174,18 @@
 
         <div class="depart-panel story-depart">
           <div class="depart-block">
-            <div class="section-overline-row">
-              <span class="depart-label">TRIAL TIER  ·  择定轮回厄度</span>
-              <span class="sub-lock-pill">唯一主角限定</span>
-            </div>
+            <p class="prep-overline">THE FIRST STEP</p>
+            <h2 class="prep-title">剧情模式</h2>
+            <p class="prep-location">第一幕 · 雨夜长桥</p>
+            <div class="prep-act-dots" aria-label="共四幕，当前第一幕"><span class="active">Ⅰ</span><i></i><span>Ⅱ</span><i></i><span>Ⅲ</span><i></i><span>Ⅳ</span></div>
+            <div class="section-overline-row"><span class="depart-label">试炼难度</span></div>
             <div id="storyDiffTabs" class="diff-tabs"></div>
+            <button id="moreDifficultyBtn" class="text-action" onclick="toggleMoreStoryDifficulties()" aria-expanded="false">更多难度 ＋</button>
             <div id="storyDiffDesc" class="diff-desc"></div>
           </div>
-
-          <div class="story-route-box">
-            <div class="route-box-head">FOUR ACTS  ·  十六层固定宿命航线</div>
-            <div class="story-act-grid">
-              <div class="act-node"><span class="act-num">I</span><span class="act-txt">雨夜长桥 · 4F 烬羽</span></div>
-              <div class="act-node"><span class="act-num">II</span><span class="act-txt">永冻冰窟 · 8F 星使</span></div>
-              <div class="act-node"><span class="act-num">III</span><span class="act-txt">倒悬钟楼 · 12F 伽蓝</span></div>
-              <div class="act-node"><span class="act-num">IV</span><span class="act-txt">日蚀镜界 · 16F 圣女</span></div>
-            </div>
-          </div>
-
-          <button id="startStoryBtn" class="btn btn-story-go" onclick="startStoryMode()">◆  提灯入塔 · 开启第 999 次救赎  →</button>
+          <p class="prep-controls">自动攻击 <span>·</span> 移动躲避 <span>·</span> 瞬步穿越</p>
+          <button id="startStoryBtn" class="btn btn-story-go" onclick="startStoryMode()">提灯启程 <span aria-hidden="true">→</span></button>
+          <p class="prep-save-note">抵达新层时自动记录，可从本层起点继续。</p>
         </div>
       </div>
     </section>
@@ -276,6 +241,13 @@
           </div>
         </div>
       </div>
+    </section>
+  </div>
+
+  <div id="presentationModal" class="overlay presentation-modal hidden" role="dialog" aria-modal="true" aria-labelledby="presentationTitle">
+    <section class="presentation-panel">
+      <header class="presentation-head"><div><p id="presentationOverline" class="prep-overline"></p><h2 id="presentationTitle"></h2></div><button id="presentationClose" class="quiet-button" onclick="closePresentationModal()" aria-label="关闭">关闭 ×</button></header>
+      <div id="presentationBody" class="presentation-body"></div>
     </section>
   </div>
 
@@ -382,7 +354,7 @@
   <div id="changelogModal" class="overlay log-modal hidden">
     <div class="log-box changelog-box">
       <div class="log-head">
-        <h2 id="changelogTitle">烬塔纪元志 · v1.4.1</h2>
+        <h2 id="changelogTitle">烬塔纪元志 · v2.1.2</h2>
         <button class="icon-pill-btn" onclick="closeChangelogModal()">✕ 关闭</button>
       </div>
       <div id="changelogList" class="changelog-list"></div>
@@ -450,24 +422,26 @@
   </div>
 </div>
 
-  <!-- 模块化脚本按依赖拓扑顺序统一 defer 加载（v1.4.3） -->
-  <script defer src="src/core/env.js?v=1.4.3"></script>
-  <script defer src="src/core/logger.js?v=1.4.3"></script>
-  <script defer src="src/data/scenes.js?v=1.4.3"></script>
-  <script defer src="src/data/boss_portraits.js?v=1.4.3"></script>
-  <script defer src="src/world/textures.js?v=1.4.3"></script>
-  <script defer src="src/ui/viewport.js?v=1.4.3"></script>
-  <script defer src="src/core/audio.js?v=1.4.3"></script>
-  <script defer src="src/data/arsenal.js?v=1.4.3"></script>
-  <script defer src="src/data/monsters.js?v=1.4.3"></script>
-  <script defer src="src/ui/codex.js?v=1.4.3"></script>
-  <script defer src="src/game/director.js?v=1.4.3"></script>
-  <script defer src="src/ui/menus.js?v=1.4.3"></script>
-  <script defer src="src/game/spawner.js?v=1.4.3"></script>
-  <script defer src="src/game/combat.js?v=1.4.3"></script>
-  <script defer src="src/game/update.js?v=1.4.3"></script>
-  <script defer src="src/ui/shop.js?v=1.4.3"></script>
-  <script defer src="src/render/sprites.js?v=1.4.3"></script>
-  <script defer src="src/render/renderer.js?v=1.4.3"></script>
+  <!-- 模块化脚本按依赖拓扑顺序统一 defer 加载（v2.1.2） -->
+  <script defer src="src/core/env.js?v=2.1.2"></script>
+  <script defer src="src/core/logger.js?v=2.1.2"></script>
+  <script defer src="src/data/scenes.js?v=2.1.2"></script>
+  <script defer src="src/data/boss_portraits.js?v=2.1.2"></script>
+  <script defer src="src/world/textures.js?v=2.1.2"></script>
+  <script defer src="src/ui/viewport.js?v=2.1.2"></script>
+  <script defer src="src/core/audio.js?v=2.1.2"></script>
+  <script defer src="src/data/arsenal.js?v=2.1.2"></script>
+  <script defer src="src/data/monsters.js?v=2.1.2"></script>
+  <script defer src="src/ui/codex.js?v=2.1.2"></script>
+  <script defer src="src/data/story-v2.js?v=2.1.2"></script>
+  <script defer src="src/game/director.js?v=2.1.2"></script>
+  <script defer src="src/ui/menus.js?v=2.1.2"></script>
+  <script defer src="src/ui/presentation.js?v=2.1.2"></script>
+  <script defer src="src/game/spawner.js?v=2.1.2"></script>
+  <script defer src="src/game/combat.js?v=2.1.2"></script>
+  <script defer src="src/game/update.js?v=2.1.2"></script>
+  <script defer src="src/ui/shop.js?v=2.1.2"></script>
+  <script defer src="src/render/sprites.js?v=2.1.2"></script>
+  <script defer src="src/render/renderer.js?v=2.1.2"></script>
 </body>
 </html>

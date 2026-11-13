@@ -3,6 +3,7 @@ let menuStage = 'home'; // 'home' | 'story' | 'endless'
 let selectedEndlessCls = 'brawler';
 let heroDossierTab = 'traits'; // 'traits' | 'combat'
 let endlessPrepTab = 'diff';   // 'diff' | 'scene'
+let moreStoryDifficulties = false;
 
 const HERO_SHORT_NAMES = {
   allrounder: '零号·白衣',
@@ -41,6 +42,8 @@ function _renderDiffButtons(containerId, descId) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `diff-btn tone-${d.tone || 'gold'}${d.id === selectedDiff ? ' active' : ''}`;
+      if (containerId === 'storyDiffTabs' && d.id > 2 && !moreStoryDifficulties && selectedDiff <= 2) b.classList.add('hidden');
+      b.setAttribute('aria-pressed', String(d.id === selectedDiff));
       b.innerHTML = `
         <span class="diff-btn-top">
           <span class="diff-dot"></span>
@@ -63,6 +66,14 @@ function _renderHeroSpotlight(containerId, clsObj, isStoryLocked) {
   const box = document.getElementById(containerId);
   if (!box || !clsObj) return;
   const portUrl = _menuAssetUrl(clsObj.portrait);
+  if (isStoryLocked) {
+    // The story hero never changes. Keep the decoded portrait when only the
+    // difficulty selection changes instead of replacing the image element.
+    if (box.dataset.heroId === clsObj.id) return;
+    box.dataset.heroId = clsObj.id;
+    box.innerHTML = `<img src="${portUrl}" alt="零，白衣提灯少女" class="prep-zero-portrait" decoding="async"><div class="prep-hero-caption"><span>提灯人</span><h2>零<span> · 白衣</span></h2><p>她忘记了自己的名字。<br>手中的灯，却仍为某个人亮着。</p></div>`;
+    return;
+  }
   const chibiUrl = _menuAssetUrl(clsObj.chibi);
   const roleTag = isStoryLocked ? '唯一主角 · 提灯人' : clsObj.tag;
   const traitsArr = Array.isArray(clsObj.traits) ? clsObj.traits : [];
@@ -137,7 +148,7 @@ function openMenuStage(stage) {
   if (ev) ev.classList.toggle('hidden', menuStage !== 'endless');
   const keyArtEl = document.getElementById('heroKeyArtBg');
   if (keyArtEl) {
-    const bgRel = menuStage === 'endless' ? 'assets/spire/logo_banner.jpg' : 'assets/spire/cut_intro_1.jpg';
+    const bgRel = menuStage === 'endless' ? 'assets/spire/scene_1_vista.jpg' : 'assets/spire/v2/title-clean.png';
     keyArtEl.style.backgroundImage = `url('${_menuAssetUrl(bgRel)}')`;
   }
   beep(menuStage === 'home' ? 420 : 520, 0.04, 'triangle', 0.035);
@@ -152,8 +163,19 @@ function selectEndlessHero(clsId) {
 }
 
 function startStoryMode() {
+  if (typeof SpireSave !== 'undefined' && SpireSave.load() && typeof confirmSpireNewRun === 'function') {
+    confirmSpireNewRun();
+    return;
+  }
   selectedScene = 'random';
   startGame('allrounder', { mode: 'story' });
+}
+
+function toggleMoreStoryDifficulties() {
+  moreStoryDifficulties = !moreStoryDifficulties;
+  const b = document.getElementById('moreDifficultyBtn');
+  if (b) { b.setAttribute('aria-expanded', String(moreStoryDifficulties)); b.textContent = moreStoryDifficulties ? '收起难度 −' : '更多难度 ＋'; }
+  _renderDiffButtons('storyDiffTabs', 'storyDiffDesc');
 }
 
 function startEndlessMode(clsId) {
@@ -171,19 +193,23 @@ function initMenuUI() {
   if (appIconEl) appIconEl.src = _menuAssetUrl('assets/spire/app_icon.jpg');
   const keyArtEl = document.getElementById('heroKeyArtBg');
   if (keyArtEl) {
-    const bgRel = menuStage === 'endless' ? 'assets/spire/logo_banner.jpg' : 'assets/spire/cut_intro_1.jpg';
+    const bgRel = menuStage === 'endless' ? 'assets/spire/scene_1_vista.jpg' : 'assets/spire/v2/title-clean.png';
     keyArtEl.style.backgroundImage = `url('${_menuAssetUrl(bgRel)}')`;
   }
 
   if (typeof SpireAudio !== 'undefined') SpireAudio.refreshButtons();
 
-  // 剧情模式与无尽模式同步 3×2 对称厄度选项卡
-  _renderDiffButtons('storyDiffTabs', 'storyDiffDesc');
+  if (typeof refreshSpireHome === 'function') refreshSpireHome();
+  // Build only the visible preparation screen. Opening the title/story menu
+  // must not load six hidden portraits and rebuild every endless-mode card.
+  if (menuStage === 'home') return;
+  if (menuStage === 'story') {
+    _renderDiffButtons('storyDiffTabs', 'storyDiffDesc');
+    const zeroObj = CLASSES.find(c => c.id === 'allrounder') || CLASSES[0];
+    _renderHeroSpotlight('storyHeroShowcase', zeroObj, true);
+    return;
+  }
   _renderDiffButtons('diffTabs', 'diffDesc');
-
-  // 剧情模式：严格仅展示唯一主角「零号·白衣」
-  const zeroObj = CLASSES.find(c => c.id === 'allrounder') || CLASSES[0];
-  _renderHeroSpotlight('storyHeroShowcase', zeroObj, true);
 
   // 无尽模式：试炼整备双栏选项卡状态同步（轮回厄度 vs 起始层域）
   const diffTabBtn = document.getElementById('prepTabDiffBtn');
@@ -298,6 +324,9 @@ const keys = {};
 window.addEventListener('keydown', e => {
   const k = (e && typeof e.key === 'string') ? e.key.toLowerCase() : '';
   if (!k) return;
+  if (typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay()) return;
+  const presentation = document.getElementById('presentationModal');
+  if (presentation && !presentation.classList.contains('hidden')) return;
   if (k === 'escape') {
     const cm = document.getElementById('codexModal');
     if (cm && !cm.classList.contains('hidden')) { if (e.preventDefault) e.preventDefault(); closeCodex(); return; }
@@ -381,6 +410,9 @@ if (window.addEventListener) {
 }
 
 if (cv.addEventListener) {
+  const canvasTouches = list => Array.from(list || []).filter(t => !t.target || t.target === cv);
+  const canTouchBattle = () => state === 'wave' && !bossCutscene &&
+    !(typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay());
   cv.addEventListener('mousedown', e => {
     if (bossCutscene && bossCutscene._skipRect) {
       const fadeDur = bossCutscene.fadeDur || 0.85;
@@ -410,14 +442,17 @@ if (cv.addEventListener) {
         bossCutscene.t = fadeDur;
       }
     }
-    if (state !== 'wave') return;
+    if (!canTouchBattle()) { resetJoy(); return; }
     e.preventDefault();
-    if (e.touches.length >= 2) {
-      pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const touches = canvasTouches(e.touches);
+    if (touches.length >= 2) {
+      resetJoy();
+      pinchDist = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
       return;
     }
-    if (!joy.active && e.changedTouches.length > 0) {
-      const t = e.changedTouches[0];
+    const changed = canvasTouches(e.changedTouches);
+    if (!joy.active && changed.length > 0) {
+      const t = changed[0];
       joy.id = t.identifier;
       joy.ox = joy.cx = t.clientX;
       joy.oy = joy.cy = t.clientY;
@@ -427,20 +462,23 @@ if (cv.addEventListener) {
   }, { passive: false });
 
   cv.addEventListener('touchmove', e => {
-    if (state !== 'wave') return;
+    if (!canTouchBattle()) { resetJoy(); return; }
     e.preventDefault();
-    if (e.touches.length >= 2) {
-      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const touches = canvasTouches(e.touches);
+    if (touches.length >= 2) {
+      const d = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
       if (pinchDist > 10) {
         userZoomed = true;
         camZoom = Math.max(0.38, Math.min(1.75, camZoom * (d / pinchDist)));
         if (bootReady) clampCam();
       }
+      joy.id = null; joy.active = false; joy.dx = 0; joy.dy = 0; joy.mag = 0;
       pinchDist = d;
+      return;
     }
     if (joy.active) {
-      for (let i = 0; i < e.touches.length; i++) {
-        const t = e.touches[i];
+      for (let i = 0; i < touches.length; i++) {
+        const t = touches[i];
         if (t.identifier === joy.id) {
           const rx = t.clientX - joy.ox, ry = t.clientY - joy.oy;
           const dist = Math.hypot(rx, ry);
@@ -466,11 +504,12 @@ if (cv.addEventListener) {
   }, { passive: false });
 
   const endTouch = e => {
-    if (e.touches.length < 2) pinchDist = 0;
+    const touches = canvasTouches(e.touches);
+    if (touches.length < 2) pinchDist = 0;
     if (joy.active) {
       let stillDown = false;
-      for (let i = 0; i < e.touches.length; i++) {
-        if (e.touches[i].identifier === joy.id) { stillDown = true; break; }
+      for (let i = 0; i < touches.length; i++) {
+        if (touches[i].identifier === joy.id) { stillDown = true; break; }
       }
       if (!stillDown) { joy.id = null; joy.active = false; joy.dx = 0; joy.dy = 0; joy.mag = 0; }
     }
@@ -616,6 +655,7 @@ function syncSetHp() {
 let waveCratesDropped = 0, waveCheckpoint = null;
 
 function startGame(cls, opts) {
+  if (typeof resetWeaponEvolutionUI === 'function') resetWeaponEvolutionUI();
   const options = opts || {};
   const reqMode = options.mode ? options.mode : ((cls && cls !== 'allrounder') ? 'endless' : 'story');
   const runEndless = reqMode === 'endless' || !!options.endless;
@@ -693,6 +733,7 @@ function replayOpeningCutscene() {
 }
 
 function showStart() {
+  if (typeof resetWeaponEvolutionUI === 'function') resetWeaponEvolutionUI();
   state = 'menu';
   resetJoy();
   if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.resetForNewRun === 'function') {
@@ -713,9 +754,6 @@ function showStart() {
   if (typeof SpireAudio !== 'undefined' && SpireAudio.refreshButtons) SpireAudio.refreshButtons();
   bossCutscene = null;
   if (typeof pendingBossCutscene !== 'undefined') pendingBossCutscene = null;
-  if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.resetForNewRun === 'function') {
-    SpireDirector.resetForNewRun();
-  }
   waveCheckpoint = null;
   document.getElementById('hud').classList.add('hidden');
   const sm = document.getElementById('startMenu');
@@ -840,6 +878,7 @@ function clonePlayerForCheckpoint(p) {
   copy.items = Object.assign({}, p.items || {});
   copy.recentCrateIds = Array.isArray(p.recentCrateIds) ? p.recentCrateIds.slice() : [];
   copy.shownBossPortraits = Object.assign({}, p.shownBossPortraits || {});
+  copy.story = p.story ? JSON.parse(JSON.stringify(p.story)) : null;
   copy._sbCache = null;
   return copy;
 }
@@ -862,9 +901,11 @@ function saveWaveCheckpoint(extraMeta = null) {
     shopOffers: Array.isArray(shopOffers) ? shopOffers.map(o => o ? Object.assign({}, o) : null).filter(Boolean) : [],
     player: clonePlayerForCheckpoint(player)
   }, extraMeta || {});
+  if (!endlessMode && typeof SpireSave !== 'undefined') SpireSave.write(waveCheckpoint);
 }
 
-function retryFailedWave() {
+function retryFailedWave(options) {
+  const isResume = !!(options && options.resume);
   if (!waveCheckpoint || !waveCheckpoint.player) {
     if (player && player.cls) startGame(player.cls, { mode: endlessMode ? 'endless' : 'story' });
     else showStart();
@@ -879,7 +920,7 @@ function retryFailedWave() {
   const nextRetryCount = Math.max(
     (player && player.retryCount) || 0,
     (waveCheckpoint.player && waveCheckpoint.player.retryCount) || 0
-  ) + 1;
+  ) + (isResume ? 0 : 1);
 
   wave = waveCheckpoint.wave;
   endlessMode = !!waveCheckpoint.endlessMode;
@@ -911,6 +952,7 @@ function retryFailedWave() {
   resetJoy();
   last = performance.now();
   document.getElementById('endMenu').classList.add('hidden');
+  document.getElementById('startMenu').classList.add('hidden');
   document.getElementById('pauseMenu').classList.add('hidden');
   document.getElementById('shopMenu').classList.add('hidden');
   document.getElementById('levelMenu').classList.add('hidden');
@@ -919,7 +961,7 @@ function retryFailedWave() {
 
   logInfo('RETRY', `战败回溯重开第 ${wave} 波 (累计重开 ${nextRetryCount} 次) · Lv=${player.lv} · 💎=${player.mats}`);
   beginWave({
-    isRetry: true,
+    isRetry: !isResume,
     sceneId: waveCheckpoint.sceneId,
     waveBossIds: Array.isArray(waveCheckpoint.waveBossIds) ? waveCheckpoint.waveBossIds.slice() : null
   });

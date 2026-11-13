@@ -102,12 +102,25 @@ function toggleMobDrawer() {
 }
 
 // 竞技场尺寸与地面贴图精准缓存同步（消除 bakedSceneKey 与 wantKey 不一致导致的重复重烘焙）
+let arenaOwner = null, runArenaW = 0, runArenaH = 0;
 function syncArenaAndZoom(forceBake = false) {
   syncUIMode();
   const portraitPhone = uiMode === 'mobile-portrait';
   const landscapePhone = uiMode === 'mobile-landscape';
-  const targetW = portraitPhone ? 1180 : (landscapePhone ? 1920 : 2200);
-  const targetH = portraitPhone ? 1960 : (landscapePhone ? 1220 : 1500);
+  let targetW = portraitPhone ? 1180 : (landscapePhone ? 1920 : 2200);
+  let targetH = portraitPhone ? 1960 : (landscapePhone ? 1220 : 1500);
+  // Rotation changes the camera, not an active level's collision geometry.
+  // Rescaling only some entities leaves bullets, portals and dash endpoints
+  // in their old positions. A new player/run can choose a fresh arena size.
+  if (bootReady && player && state !== 'menu') {
+    if (arenaOwner !== player) {
+      arenaOwner = player;
+      runArenaW = targetW; runArenaH = targetH;
+    }
+    targetW = runArenaW; targetH = runArenaH;
+  } else {
+    arenaOwner = null;
+  }
   const mobilePerf = uiMode !== 'desktop';
   const nextBakeScale = typeof computeFloorBakeScale === 'function'
     ? computeFloorBakeScale(targetW, targetH, mobilePerf, dpr || 1)
@@ -163,13 +176,24 @@ function clampCam() {
   }
 }
 
-function resize() {
-  viewW = window.innerWidth || 390;
-  viewH = window.innerHeight || 844;
-  syncUIMode();
+// Only the moving battlefield uses this pixel budget. HTML portraits, CGs,
+// dialogue and HUD text remain at the display's native resolution.
+let battleResolutionScale = 1;
+let battleSampleMs = 0, battleSampleFrames = 0;
+function resetBattleFrameSample() {
+  battleSampleMs = 0;
+  battleSampleFrames = 0;
+}
+
+function syncBattleCanvasResolution() {
+  // 严格按视界布局区分桌面/移动像素预算（触控笔记本仍按桌面超清渲染，杜绝地面与石栏变糊！）
   const mobilePerf = uiMode !== 'desktop';
-  // Retina 超清渲染：桌面端不再因触控屏误判降采样，最高解锁 2.25x DPR；移动端提升至 1.65x
-  dpr = Math.min(window.devicePixelRatio || 1, mobilePerf ? 1.65 : 2.25);
+  const pixelBudget = mobilePerf ? 3600000 : 11200000;
+  const nativeDpr = Math.max(0.5, window.devicePixelRatio || 1);
+  const baseDpr = Math.min(nativeDpr, mobilePerf ? 1.75 : 2.25,
+    Math.sqrt(pixelBudget / Math.max(1, viewW * viewH)));
+  battleResolutionScale = 1;
+  dpr = Math.max(0.75, baseDpr * battleResolutionScale);
   const cw = Math.max(1, Math.round(viewW * dpr));
   const ch = Math.max(1, Math.round(viewH * dpr));
   if (cv.width !== cw || cv.height !== ch) {
@@ -180,14 +204,55 @@ function resize() {
     ctx.imageSmoothingEnabled = true;
     try { ctx.imageSmoothingQuality = 'high'; } catch (_) {}
   }
+}
+
+function recordBattleFrame(frameMs) {
+  if (!Number.isFinite(frameMs) || frameMs <= 0 || frameMs > 250) {
+    resetBattleFrameSample();
+    return;
+  }
+  battleSampleMs += frameMs;
+  battleSampleFrames++;
+  if (battleSampleMs < 2500) return;
+  resetBattleFrameSample();
+  // 保持 battleResolutionScale = 1 恒定超清，绝不动态降采样模糊地面与护栏（帧率由底层零GC/节流保障）
+}
+
+function resize() {
+  const visible = window.visualViewport;
+  const useVisible = visible && visible.width > 0 && visible.height > 0 && !(visible.scale > 1.01);
+  const nextW = Math.round((useVisible ? visible.width : window.innerWidth) || 390);
+  const nextH = Math.round((useVisible ? visible.height : window.innerHeight) || 844);
+  if ((nextW !== viewW || nextH !== viewH) && typeof resetJoy === 'function') resetJoy();
+  viewW = nextW;
+  viewH = nextH;
+  // Older embedded browsers may lack dvh; the visible viewport also follows
+  // WeChat's expanding/collapsing toolbars without placing buttons underneath.
+  if (document.documentElement && document.documentElement.style) {
+    document.documentElement.style.setProperty('--app-height', nextH + 'px');
+  }
+  syncUIMode();
+  syncBattleCanvasResolution();
+  resetBattleFrameSample();
   syncArenaAndZoom();
   if (bootReady) clampCam();
   if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.onResize === 'function') {
     SpireDirector.onResize(viewW, viewH, dpr);
   }
 }
-window.addEventListener('resize', resize);
+let viewportResizeQueued = false;
+function scheduleViewportResize() {
+  if (viewportResizeQueued) return;
+  viewportResizeQueued = true;
+  requestAnimationFrame(() => { viewportResizeQueued = false; resize(); });
+}
+window.addEventListener('resize', scheduleViewportResize, { passive: true });
+if (window.visualViewport && window.visualViewport.addEventListener) {
+  window.visualViewport.addEventListener('resize', scheduleViewportResize, { passive: true });
+}
 window.addEventListener('wheel', e => {
+  if (e.target !== cv || state !== 'wave' || !player || bossCutscene ||
+      (typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay())) return;
   userZoomed = true;
   camZoom = Math.max(0.38, Math.min(1.75, camZoom - e.deltaY * 0.0005));
   if (bootReady) clampCam();

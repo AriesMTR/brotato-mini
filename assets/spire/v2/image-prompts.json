@@ -1,0 +1,21 @@
+{
+  "tool": "built-in image_gen",
+  "purpose": "Clean production backgrounds derived from approved concepts; live text and controls are implemented in code.",
+  "jobs": [
+    {
+      "id": "title-clean",
+      "ref": "/Users/perfxlab/perfxlab/workspace/WeGame/output/design/images/01-title.png",
+      "prompt": "Use case: precise-object-edit. Edit target: this approved Japanese animated-film game title-screen concept. Produce a clean background plate for a real coded game UI. Remove ALL baked-in lettering, title, subtitle, menu options, cyan selection line/diamond, bottom icons and labels. Seamlessly reconstruct the existing rainy mist and stones beneath those UI areas. Keep the original white-cloaked silver-haired girl on the right, her face, outfit, pose, glowing cyan lantern, distant tower, ruined bridge, embedded sword and red cloth, perspective, framing and exact cool misty film atmosphere unchanged. The left half should remain naturally quiet fog and architecture for future live HTML title/menu overlay. Keep wide 16:9 composition. Do not add any letters, glyphs, symbols, logos, buttons, frames, controls, watermarks or people. No UI whatsoever. This is environment art, not a screenshot."
+    },
+    {
+      "id": "wind-pavilion",
+      "ref": "/Users/perfxlab/perfxlab/workspace/WeGame/output/design/revision-v2/images/07-dialogue-tension.png",
+      "prompt": "Use case: precise-object-edit. Edit target: approved rain-pavilion dialogue scene. Produce the clean EMPTY environmental background for a live dialogue engine that will place separate original portrait sprites above it. Remove BOTH people completely (white-cloaked girl left, green-cloaked merchant right), including their arms, hats, worn clothes, held cyan lantern, held cloth; remove all text, the entire textbox, nameplate, top labels, icons, lines and controls. Reconstruct the now-visible stone wind pavilion, foreground stall/table with traveling supplies, rolled dry cloth, kettle, ledger and crates, warm amber oil lantern hanging on the central stone column, broken arches, deep blue nighttime rain and distant bridge lights. Keep the original camera perspective, architecture, painterly cel shading, strong amber/cold-blue contrast, rain atmosphere and wide 16:9 cinematic composition. The left and right foreground must have no people, silhouettes, body parts, faces or duplicated characters. No UI, no text, no border, no logo, no watermark. Maintain dark quiet space at bottom for a real coded textbox."
+    },
+    {
+      "id": "player-defeat-clean",
+      "ref": "/Users/perfxlab/perfxlab/workspace/WeGame/output/design/revision-v2/images/08-player-defeat-final.png",
+      "prompt": "Use case: precise-object-edit. Edit target: the approved PLAYER DEFEAT game screen. Remove ONLY all UI and typography from the right one third: floor title, ornaments and lines, main title, explanatory text, both button boxes and their text, background crest. Fill that area with a natural continuation of the dark rainy bridge, subtle fog, clouds and wet stones consistent with existing scene. Keep the slumped silver-haired white-cloaked girl in foreground, her face/pose/outfit/hands, the fallen cyan lantern with NO red tassel, distant standing red-scarfed swordswoman, scale, camera, cel-shaded anime film style, rain and dramatic cold light exactly as the reference. Keep right side dark and uncluttered for future live HTML defeat controls. Preserve original wide 16:9 framing. No lettering, no symbols, no icons, no UI, no borders, no new people, no new props, no reward mementos."
+    }
+  ]
+}

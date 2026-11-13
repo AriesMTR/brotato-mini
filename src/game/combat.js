@@ -458,18 +458,20 @@ function applyPoison(e, addStacks = 1) {
   if (!e.poisonTick || e.poisonTick <= 0) e.poisonTick = 0.46;
 }
 
-// 首领【隐藏二阶段 · 真红神话觉醒】（血量再提升 50% + 攻击力提升 30% + 纯死战不加冗余时间 + 播放隐藏动画 + 必爆传说神装，同波防双王叠加）
+// 主线固定第二阶段剧情死战，无尽保留 33% 神话觉醒与额外战利品（血量再提升 50% + 攻击力提升 30% + 纯死战不加冗余时间）
 function triggerBossMythicPhase2(e) {
   if (!e || e.mythicPhase2) return false;
-  if (player && player.waveMythicAwakened) {
+  const storyPhase = !!e.storyPhaseBoss && !endlessMode;
+  if (!storyPhase && player && player.waveMythicAwakened) {
     e.canPhase2 = false;
     return false;
   }
   if (player) {
     player.waveMythicAwakened = true;
-    player.mythicAwakenedCount = (player.mythicAwakenedCount || 0) + 1;
+    if (!storyPhase) player.mythicAwakenedCount = (player.mythicAwakenedCount || 0) + 1;
   }
   e.mythicPhase2 = true;
+  if (storyPhase) e.storyStage = 2;
   e.canPhase2 = false;
   e.maxHp = Math.max(450, Math.round(e.maxHp * 1.50));
   e.hp = e.maxHp;
@@ -477,7 +479,9 @@ function triggerBossMythicPhase2(e) {
   e.dmg = Math.round(e.dmg * 1.30);
   e.spd *= 1.10;
   e.exposeT = 0;
-  if (!String(e.bossTitle || '').includes('神话')) {
+  if (storyPhase) {
+    e.bossTitle = String(e.bossTitle || '守誓者').replace(/ · 第一阶段$/, '') + ' · 第二阶段';
+  } else if (!String(e.bossTitle || '').includes('神话')) {
     e.bossTitle = `⚡ ${e.bossTitle || '深渊首领'} · 神话二阶段`;
   }
 
@@ -504,23 +508,29 @@ function triggerBossMythicPhase2(e) {
   }
   const bw = document.getElementById('bossBarWrap');
   if (bw) { bw.classList.remove('hidden'); bw.classList.add('mythic'); }
-  if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.onBossPhase2 === 'function') {
+  if (storyPhase && typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.onBossPhase2 === 'function') {
     SpireDirector.onBossPhase2(wave, e);
   }
-  // 二阶段 33% 概率触发觉醒，且一旦进入二阶段 100% 必出二阶段专属隐藏立绘横幅（完整展示 5 秒后柔化消逝）！
-  const p2Title = (e.bossTitle || '神话首领').replace(/^⚡\s*/, '');
-  const p2Sub = '宿命死战 · 二阶段专属隐藏立绘解封！';
-  const p2Tag = '不加冗余时间 · 血量+50% / 攻击+30% · 死战击败必爆【传说圣遗物匣】与永久弑神赐福！';
-  const p2Dur = (typeof BOSS_CUTSCENE_TOTAL_SEC === 'number') ? BOSS_CUTSCENE_TOTAL_SEC : 5.85;
-  const dirBlocking = (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.isBlockingGameplay === 'function' && SpireDirector.isBlockingGameplay());
-  if (dirBlocking && typeof queueBossCutscene === 'function') {
-    queueBossCutscene('mythic_phase2', e.variant, p2Title, p2Sub, p2Tag, '#ff2a55', '#ffd166', p2Dur);
-  } else if (typeof startBossCutscene === 'function') {
-    startBossCutscene('mythic_phase2', e.variant, p2Title, p2Sub, p2Tag, '#ff2a55', '#ffd166', p2Dur);
+  // 随机觉醒立绘横幅属于无尽模式；主线由剧情导演演出，不叠加横幅或神话掉落承诺。
+  if (endlessMode) {
+    const p2Title = (e.bossTitle || '神话首领').replace(/^⚡\s*/, '');
+    const p2Sub = '宿命死战 · 二阶段专属隐藏立绘解封！';
+    const p2Tag = '不加冗余时间 · 血量+50% / 攻击+30% · 死战击败必爆【传说圣遗物匣】与永久弑神赐福！';
+    const p2Dur = (typeof BOSS_CUTSCENE_TOTAL_SEC === 'number') ? BOSS_CUTSCENE_TOTAL_SEC : 5.85;
+    const dirBlocking = (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.isBlockingGameplay === 'function' && SpireDirector.isBlockingGameplay());
+    if (dirBlocking && typeof queueBossCutscene === 'function') {
+      queueBossCutscene('mythic_phase2', e.variant, p2Title, p2Sub, p2Tag, '#ff2a55', '#ffd166', p2Dur);
+    } else if (typeof startBossCutscene === 'function') {
+      startBossCutscene('mythic_phase2', e.variant, p2Title, p2Sub, p2Tag, '#ff2a55', '#ffd166', p2Dur);
+    }
   }
-  if (player) addText(player.x, player.y - 52, '◆ 隐藏二阶段死战！血量+50% · 攻击+30%！', '#ffd166', 21, 2.8);
-  announce('◆ 逆天异变！首领觉醒【隐藏神话二阶段】（血量+50%·攻击+30%），死战到底击败必掉传说神装！', '#ffd166', 4.5);
-  logInfo('MYTHIC_PHASE2', `首领触发隐藏二阶段死战觉醒 ${e.bossTitle} · HP=${e.maxHp} · DMG=${e.dmg}`);
+  if (storyPhase) {
+    logInfo('STORY_PHASE2', `${e.bossTitle} · HP=${e.maxHp} · DMG=${e.dmg} · 不发放胜利奖励`);
+  } else {
+    if (player) addText(player.x, player.y - 52, '◆ 隐藏二阶段死战！血量+50% · 攻击+30%！', '#ffd166', 21, 2.8);
+    announce('◆ 逆天异变！首领觉醒【隐藏神话二阶段】（血量+50%·攻击+30%），死战到底击败必掉传说神装！', '#ffd166', 4.5);
+    logInfo('MYTHIC_PHASE2', `首领触发隐藏二阶段死战觉醒 ${e.bossTitle} · HP=${e.maxHp} · DMG=${e.dmg}`);
+  }
   return true;
 }
 
@@ -536,6 +546,9 @@ function primeBomber(e) {
 
 function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts = {}) {
   if (!e || e.hp <= 0 || e.primed || !Number.isFinite(rawDmg)) return;
+  if (!player || player.hp <= 0 || state !== 'wave') return;
+  if (typeof isSpireCombatSuspended === 'function' && isSpireCombatSuspended()) return;
+  if (typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay()) return;
   if (!Number.isFinite(e.hp)) { e.hp = 0; return; }
 
   // 铁甲圣甲虫正面举盾减伤 55% + 金属格挡火星（格挡轻提示 0.38s 快隐 + 0.35s 节流防刷屏）
@@ -739,8 +752,7 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
       return;
     }
     if ((e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss') && e.canPhase2 && !e.mythicPhase2) {
-      triggerBossMythicPhase2(e);
-      return;
+      if (triggerBossMythicPhase2(e)) return;
     }
     killEnemyRewards(e);
   }
@@ -777,6 +789,23 @@ function dropCrystals(x, y, totalMat) {
 }
 
 function killEnemyRewards(e) {
+  if (!e || e._rewarded || e._storyDefeatQueued || !player || player.hp <= 0 || state !== 'wave') return;
+  if (typeof isSpireCombatSuspended === 'function' && isSpireCombatSuspended()) return;
+  const isStoryActBoss = !endlessMode && e.type === 'boss' && wave <= MAX_WAVE && wave % 4 === 0;
+  if (isStoryActBoss && typeof resolveSpireBossDefeat === 'function') {
+    // 本帧立即锁定结果；之后的弹丸/反伤不得同时把本层结算为玩家失败。
+    e.hp = 0;
+    e._storyDefeatQueued = true;
+    resolveSpireBossDefeat(e);
+    return;
+  }
+  awardEnemyRewards(e);
+}
+
+// 真正的奖励只由击败流程调用一次。主线首领在告别演出结束后才抵达这里。
+function awardEnemyRewards(e) {
+  if (!e || e._rewarded || !player || player.hp <= 0) return;
+  e._rewarded = true;
   e.hp = 0;
   player.kills++;
   if (player && (player.dashCd || 0) > 0) {
@@ -886,7 +915,7 @@ function killEnemyRewards(e) {
   }
 
   // 若击败的是【隐藏二阶段·真红神话形态】首领，额外爆出必出传说装的【神话秘宝舱】与永久弑神赐福！
-  if (e.mythicPhase2) {
+  if (e.mythicPhase2 && !e.storyPhaseBoss) {
     dropCrystals(e.x, e.y, 36);
     player.dmgMul += 0.15;
     player.critDmg = (player.critDmg || 0) + 0.25;
@@ -939,6 +968,8 @@ function killEnemyRewards(e) {
     }
   }
   if (e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss') {
+    // 主线的清场、对白和结算由 resolveSpireBossDefeat 统一串联。
+    if (!endlessMode && e.type === 'boss' && wave <= MAX_WAVE && wave % 4 === 0) return;
     const otherBoss = enemies.some(o => o !== e && (o.type === 'boss' || o.type === 'special_boss' || o.type === 'mini_boss') && o.hp > 0);
     if (!otherBoss && !spawns.some(s => s.type === 'boss' || s.type === 'special_boss' || s.type === 'mini_boss')) {
       if (e.type === 'boss' || e.type === 'special_boss' || overtime) {
@@ -946,29 +977,7 @@ function killEnemyRewards(e) {
         hazards.length = 0;
       }
       if (player) player.invuln = 0;
-      const isStoryActBoss = (!endlessMode && e.type === 'boss' && wave <= MAX_WAVE && wave % 4 === 0);
-      if (isStoryActBoss) {
-        // 守誓者解脱：净化场上残余杂兵与刷怪点，并将首领秘宝与晶石牵引至提灯人身边
-        spawns.length = 0;
-        for (let oi = 0; oi < enemies.length; oi++) {
-          const oe = enemies[oi];
-          if (oe && oe !== e && oe.hp > 0) {
-            addBurst(oe.x, oe.y, '#72efdd', 5, 95);
-            oe.hp = 0;
-          }
-        }
-        if (player) {
-          for (let di = 0; di < drops.length; di++) {
-            drops[di].x = player.x + (di % 3 - 1) * 6;
-            drops[di].y = player.y;
-          }
-        }
-        overtime = false;
-        waveTime = Math.min(waveTime, 0.28);
-        if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.onBossDefeated === 'function') {
-          SpireDirector.onBossDefeated(wave, e.variant);
-        }
-      } else if (overtime) {
+      if (overtime) {
         overtime = false;
         waveTime = Math.min(waveTime, 0.65);
       } else if (e.type === 'boss') {
@@ -1046,6 +1055,8 @@ function triggerBullNova() {
 // 全面加固受击结算（已彻底取消主角全局无敌帧：每一次未闪避的受击与重叠弹幕均真实结算，防重入锁杜绝递归异常）
 function hurtPlayer(rawDmg, isProjectile = false) {
   if (!player || state !== 'wave' || player.hp <= 0 || inHurtPlayer) return;
+  if (typeof isSpireCombatSuspended === 'function' && isSpireCombatSuspended()) return;
+  if (typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay()) return;
   if (!Number.isFinite(rawDmg) || rawDmg <= 0) return;
   inHurtPlayer = true;
   try {

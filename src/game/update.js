@@ -155,19 +155,7 @@ function update(dt) {
   if (typeof SpireDirector !== 'undefined' && SpireDirector) {
     SpireDirector.update(dt);
     if (SpireDirector.isBlockingGameplay()) {
-      if (state === 'wave' && player) {
-        // 登场剧情播放期间预先将首领实体从传送预警法阵具象化至桥心，对话落幕瞬间即可无缝交锋
-        for (let i = spawns.length - 1; i >= 0; i--) {
-          const sp = spawns[i];
-          if (sp.type === 'boss' || sp.type === 'special_boss' || sp.type === 'mini_boss') {
-            sp.t -= dt;
-            if (sp.t <= 0) {
-              createEnemy(sp.x, sp.y, sp.type, sp.variant);
-              spawns.splice(i, 1);
-            }
-          }
-        }
-      }
+      // 剧情、选项与回看期间连刷怪预警也冻结，镜前作决定时不提前启动战斗。
       return;
     }
     const ts = typeof SpireDirector.getTimeScale === 'function' ? SpireDirector.getTimeScale() : 1;
@@ -175,6 +163,7 @@ function update(dt) {
     dt *= ts;
   }
   if (state !== 'wave' || !player) return;
+  if (typeof isSpireCombatSuspended === 'function' && isSpireCombatSuspended()) return;
   if (typeof isAudioModalOpen === 'function' && isAudioModalOpen()) return;
   if (typeof resetCombatFrameBudgets === 'function') resetCombatFrameBudgets();
   if (shake > 0) shake = Math.max(0, shake - dt * 36);
@@ -507,8 +496,8 @@ function update(dt) {
   spawnAcc -= dt;
   const onBossWave = (wave >= 4 && wave % 4 === 0);
   const hordeBoost = hordeWave ? (wave <= 4 ? 1.14 : 1.20) : 1;
-  // 前期（第 1~6 层）刷怪总量与同屏上限平滑下调 20%，第 7 层起恢复满额压迫感
-  const earlySpawnMul = wave <= 4 ? 0.80 : (wave === 5 ? 0.87 : (wave === 6 ? 0.94 : 1.0));
+  // 前期（第 1~6 层）刷怪总量与同屏上限平滑下调，第 7 层起恢复满额压迫感
+  const earlySpawnMul = wave <= 2 ? 0.72 : (wave <= 4 ? 0.78 : (wave === 5 ? 0.87 : (wave === 6 ? 0.94 : 1.0)));
   const maxActiveEnemies = isTouch
     ? (onBossWave ? 24 : Math.min(64, Math.round((28 + wave * 2.8) * earlySpawnMul)))
     : (onBossWave ? 30 : Math.min(80, Math.round((34 + wave * 3.2) * earlySpawnMul)));
@@ -829,7 +818,7 @@ function update(dt) {
       const rangeBonusDmg = tpl.rangeScale ? Math.max(0, totalRange) * tpl.rangeScale : 0;
       const hpBonusDmg = tpl.hpScale ? Math.max(0, player.maxHp) * tpl.hpScale : 0;
       const armBonusDmg = tpl.armorScale ? Math.max(0, getTotalArmor()) * tpl.armorScale : 0;
-      const base = ((tpl.dmg + aspdBonusDmg + rangeBonusDmg + hpBonusDmg + armBonusDmg) * tierScale + (w.id === 'stick' ? Math.max(0, stickCount - 1) * 4.0 : 0)) * (evo && evo.dmgMul ? evo.dmgMul : 1);
+      const base = ((tpl.dmg + aspdBonusDmg + rangeBonusDmg + hpBonusDmg + armBonusDmg) * tierScale + (w.id === 'stick' ? Math.max(0, stickCount - 1) * 4.8 : 0)) * (evo && evo.dmgMul ? evo.dmgMul : 1);
       const archetypeScale = tpl.set === 'elemental' ? elemMul : (tpl.techScale ? (1 + (techMul - 1) * (typeof tpl.techScale === 'number' ? tpl.techScale : 1)) : 1);
       const finalMul = (effDmg + (tpl.melee ? player.meleeBonus : (player.rangedBonus || 0))) * archetypeScale;
       const critChance = baseCrit + (tpl.critBonus || 0) + (w.tier - 1) * 0.03 + (evo && evo.critAdd ? evo.critAdd : 0);
