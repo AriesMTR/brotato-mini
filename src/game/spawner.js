@@ -481,6 +481,7 @@ function shouldRollRareBossPortrait(variantKey = '', forceCutscene = false) {
 }
 
 function startBossCutscene(mode, variant, title, subtitle, extraTag = '', color = '#ff4d6d', accent = '#ffd166', dur = BOSS_CUTSCENE_TOTAL_SEC, extra = null) {
+  if (!endlessMode) return;
   const fadeDur = (extra && extra.fadeDur) || BOSS_CUTSCENE_FADE_SEC;
   const totalDur = Math.max(fadeDur + 0.5, dur || BOSS_CUTSCENE_TOTAL_SEC);
   bossCutscene = Object.assign({
@@ -501,6 +502,7 @@ function startBossCutscene(mode, variant, title, subtitle, extraTag = '', color 
 }
 
 function queueBossCutscene(mode, variant, title, subtitle, extraTag = '', color = '#ff4d6d', accent = '#ffd166', dur = BOSS_CUTSCENE_TOTAL_SEC, extra = null) {
+  if (!endlessMode) return;
   const fadeDur = (extra && extra.fadeDur) || BOSS_CUTSCENE_FADE_SEC;
   const totalDur = Math.max(fadeDur + 0.5, dur || BOSS_CUTSCENE_TOTAL_SEC);
   pendingBossCutscene = Object.assign({
@@ -585,7 +587,20 @@ function summonSpecialBoss(rel, forceCutscene = false) {
 }
 
 function beginWave(retryMeta = null) {
+  // 旧检查点也可能含尚未择定分支的五阶武器；先完成选择，再建立本层起点。
+  if (typeof resetWeaponEvolutionUI === 'function') resetWeaponEvolutionUI();
+  if (typeof getPendingEvoWeapon === 'function' && getPendingEvoWeapon()) {
+    state = 'evolution';
+    resetJoy();
+    for (const key in keys) keys[key] = false;
+    const currentPlayer = player, currentWave = wave;
+    checkPendingWeaponEvolutions(() => {
+      if (player === currentPlayer && wave === currentWave && state === 'evolution') beginWave(retryMeta);
+    });
+    return;
+  }
   state = 'wave';
+  if (typeof beginSpireFloor === 'function') beginSpireFloor(wave, !!(retryMeta && retryMeta.isRetry));
   inHurtPlayer = false;
   shake = 0;
   resetJoy();
@@ -979,12 +994,13 @@ function createEnemy(x, y, type, variant = '') {
     else baseBossHp = 14800 + Math.max(0, wave - MAX_WAVE) * 3600;
     const bhp = Math.round(baseBossHp * bossHpMul * lateBossScale * midLateHpMul * endlessMul * diff.hpMul * twinScale);
     const bossDmgBase = wave <= 4 ? 7.8 : (wave <= 8 ? 9.6 : (wave <= 12 ? 11.2 : 12.6));
-    const phase2Chance = (isStoryBoss && wave === 16 && bKey === 'solar_seraph')
-      ? 1.0 // 第 16 层终幕日蚀圣女剧情必进二阶段；其余所有首领统一 33% 概率进入二阶段！
-      : mythicRate;
+    // 主线以稳定的两阶段讲清每位守誓者的坚持与败北；无尽保留随机神话觉醒。
+    const phase2Chance = isStoryBoss ? 1 : mythicRate;
     ent = {
       ...base, r: 48, hp: bhp, maxHp: bhp, spd: bDef.spd * sm, dmg: Math.round(bossDmgBase * dm),
-      color: bDef.color, type: 'boss', variant: bKey, bossTitle: `${bDef.icon} ${bDef.name}`,
+      color: bDef.color, type: 'boss', variant: bKey,
+      bossTitle: `${bDef.icon} ${bDef.name}${isStoryBoss ? ' · 第一阶段' : ''}`,
+      storyPhaseBoss: isStoryBoss, storyStage: isStoryBoss ? 1 : 0,
       dashT: 2.5, sumT: 5.8, meteorT: 4.1, skillT: 2.0, sigSkillT: 4.2, terrainCd: 6.2, ringCd: 4.9,
       burstLeft: 0, burstCd: 0, canPhase2: Math.random() < phase2Chance, mythicPhase2: false,
       mat: wave <= 4 ? 26 : (wave <= 8 ? 34 : (wave <= 12 ? 42 : 52))

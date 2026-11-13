@@ -1,0 +1,241 @@
+/* V2: rain, negative space, warm paper type and a readable ink-blue surface. */
+:root { --cinema-paper:#eeeae1; --cinema-muted:#a8bac1; --cinema-teal:#91d1d2; --cinema-ink:#101c27; }
+button:focus-visible, input:focus-visible, a:focus-visible { outline:2px solid #b5e4e3; outline-offset:5px; }
+.start-hub { padding:30px 4vw 26px; background:#0b1420; }
+.start-frame-ornament { display:none; }
+#startMenu .start-bg-art { opacity:1; background-position:center; transform:none; }
+#startMenu[data-stage="home"] .start-bg-art { animation:quiet-arrival 1.4s ease-out both; }
+#startMenu .start-bg-vignette { background:linear-gradient(90deg,rgba(6,15,25,.63),rgba(6,15,25,.21) 45%,rgba(6,15,25,.04) 75%),linear-gradient(0deg,rgba(4,12,22,.67),transparent 30%,transparent 80%,rgba(6,15,25,.28)); }
+#startMenu .menu-stage { max-width:1500px; align-items:stretch; gap:0; }
+#menuHomeView { margin:auto; }
+.home-topbar { min-height:42px; align-items:flex-start; }
+.home-ver-pill { border:0; padding:0; background:none; color:#c1d0d6; font-size:10px; letter-spacing:2px; opacity:.78; }
+.home-topbar .ghost-pill-btn { background:rgba(10,23,34,.28); border-color:rgba(220,237,239,.2); color:#e0e9e7; }
+#menuHomeView .home-centerpiece { align-self:flex-start; align-items:flex-start; justify-content:center; text-align:left; gap:0; width:52%; padding:0; margin:0 0 1vh 4vw; flex:1; }
+#menuHomeView .brand-en-sub { font:10px/1.8 -apple-system,"PingFang SC",sans-serif; letter-spacing:4px; color:#b9cdd2; margin:0 0 18px; }
+#menuHomeView .home-main-title { margin:0; font-family:"Songti SC","Noto Serif SC",serif; font-size:clamp(60px,7.1vw,112px); font-weight:400; letter-spacing:.1em; line-height:1.15; color:#f1eee5; text-shadow:0 3px 24px #0b172856; background:none; -webkit-text-fill-color:currentColor; }
+.home-subtitle { font-family:"Songti SC","Noto Serif SC",serif; font-size:clamp(15px,1.6vw,23px); letter-spacing:.52em; color:#e2e7e5; margin:24px 0 0 4px; }
+.title-menu { display:flex; flex-direction:column; align-items:stretch; gap:10px; width:clamp(250px,27vw,360px); margin:clamp(40px,8vh,95px) 0 0 -22px; }
+.title-link { position:relative; display:flex; gap:15px; align-items:center; text-align:left; padding:14px 16px; color:#e5e8e5; border:0; border-bottom:1px solid transparent; background:transparent; font-family:"Songti SC","Noto Serif SC",serif; font-size:clamp(21px,2vw,28px); letter-spacing:.25em; border-radius:0; cursor:pointer; transition:color .2s,background .2s; }
+.title-link:hover,.title-link:focus-visible { background:linear-gradient(90deg,rgba(141,201,210,.13),transparent); color:white; transform:none; box-shadow:none; }
+.title-link.primary:after { content:""; position:absolute; height:1px; bottom:0; left:48px; right:20px; background:linear-gradient(90deg,#9ed8da,transparent); }
+.title-diamond { color:#a3d8dc; width:16px; opacity:0; font-size:22px; transition:opacity .2s; }
+.title-link.primary .title-diamond,.title-link:hover .title-diamond { opacity:1; }
+.title-link small { display:block; font:11px/1.5 -apple-system,"PingFang SC",sans-serif; letter-spacing:1px; color:#acbec7; margin:8px 0 0; }
+.home-poem { margin:30px 0 0 6px; color:#b8c7cd; font:12px/1.9 "Songti SC",serif; letter-spacing:2px; opacity:.8; }
+#menuHomeView .home-footer { gap:25px; justify-content:flex-start; border:0; padding:14px 0 0; width:100%; }
+.footer-link-btn { color:#d0d9dd; font-size:13px; letter-spacing:2px; min-height:44px; }
+.footer-link-btn:hover { color:white; }
+.home-settings { margin-left:auto; }
+.save-status { position:absolute; bottom:55px; left:0; font-size:12px; color:#e6d6ae; }
+.sub-topbar .ghost-pill-btn,.stage-mode-tab { color:#d7e2e4; border-color:#b9d0d22d; background:#0a192350; }
+.stage-mode-tab.active { color:#e6f7f5; border-color:#8bc5c783; background:#243d484d; }
+#startMenu[data-stage="story"] .start-bg-art { opacity:.65; background-position:70% center; }
+#startMenu[data-stage="story"] .start-bg-vignette { background:linear-gradient(90deg,#0a16264d,transparent 32%,#08141ee0 80%),linear-gradient(0deg,#07121de0,transparent 40%); }
+#menuStoryView .story-stage-body { max-width:1250px; width:100%; min-height:0; flex:1; margin:24px auto 0; grid-template-columns:minmax(0,1.08fr) minmax(360px,.92fr); gap:6vw; }
+#storyHeroShowcase.hero-spotlight-card { display:block; position:relative; background:none; border:0; box-shadow:none; overflow:hidden; border-radius:0; min-height:440px; }
+.prep-zero-portrait { position:absolute; height:104%; max-width:100%; width:auto; left:50%; transform:translateX(-50%); bottom:0; object-fit:contain; object-position:bottom; -webkit-mask-image:linear-gradient(0deg,transparent,black 22%,black 94%,transparent); mask-image:linear-gradient(0deg,transparent,black 22%,black 94%,transparent); }
+.prep-hero-caption { position:absolute; bottom:8%; left:4%; color:#e8eae5; text-shadow:0 2px 18px #08111f; }
+.prep-hero-caption>span { font-size:11px; letter-spacing:5px; color:#b8cbd0; }
+.prep-hero-caption h2 { font:38px/1.5 "Songti SC",serif; letter-spacing:4px; margin:8px 0; }
+.prep-hero-caption h2 span { font-size:18px; font-weight:400; }
+.prep-hero-caption p { font:14px/1.9 "Songti SC",serif; color:#c7d1d7; }
+#menuStoryView .story-depart { align-self:center; display:flex; flex-direction:column; gap:0; background:rgba(11,27,38,.62); border:1px solid #d7e5e218; border-radius:0; padding:34px; box-shadow:none; }
+.prep-overline { color:#9ab5bf; font-size:10px; letter-spacing:3px; line-height:1.8; margin:0 0 10px; }
+.prep-title { color:#eeece4; font:42px/1.25 "Songti SC",serif; letter-spacing:4px; margin:0; padding-bottom:17px; border-bottom:1px solid #c4d7d440; }
+.prep-location { color:#bdcdd1; font:16px/1.7 "Songti SC",serif; letter-spacing:2px; margin:13px 0; }
+.prep-act-dots { display:flex; align-items:center; padding:17px 9px 30px; color:#627982; }
+.prep-act-dots span { flex:0 0 28px; height:28px; border:1px solid #7e9ba033; border-radius:50%; text-align:center; font:12px/27px serif; }
+.prep-act-dots span.active { background:#8bc9ce24; border-color:#a4d4d9; color:#e3ffff; box-shadow:0 0 18px #90d0d83b; }
+.prep-act-dots i { flex:1; height:1px; background:#b6d7db24; }
+#menuStoryView .depart-label { font:19px/1.6 "Songti SC",serif; color:#e0e7e7; letter-spacing:2px; }
+#storyDiffTabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:14px 0 8px; }
+#storyDiffTabs .diff-btn { min-height:58px; padding:8px; border:1px solid #b6d7db22; border-radius:1px; background:#09182066; color:#a8bdc5; box-shadow:none; }
+#storyDiffTabs .diff-btn.active { color:#eff6f2; background:#709fa524; border-color:#a1d3d0aa; box-shadow:inset 0 0 12px #8ebbb710; }
+#storyDiffTabs .diff-btn-top { display:none; }
+#storyDiffTabs .diff-name { font:21px/1.5 "Songti SC",serif; letter-spacing:4px; }
+#storyDiffDesc { color:#aabfc9; border:0; background:none; padding:12px 0 0; min-height:65px; font-size:12px; line-height:1.8; }
+#storyDiffDesc .desc-title { display:none; }
+.text-action { padding:6px 0; border:0; background:none; color:#a9c5ce; font-size:12px; cursor:pointer; }
+.prep-controls { margin:25px 0 23px; text-align:center; font:14px/1.9 "Songti SC",serif; color:#b6cad2; letter-spacing:2px; }
+.prep-controls span { margin:0 7px; color:#6a8690; }
+#startStoryBtn { width:100%; min-height:60px; padding:13px 24px; background:linear-gradient(120deg,#648f963a,#93c8bd13); border:1px solid #9bcecc; border-radius:1px; box-shadow:none; color:#ecf1e9; font:25px/1.3 "Songti SC",serif; letter-spacing:5px; }
+#startStoryBtn span { float:right; color:#9dbfbd; }
+#startStoryBtn:hover { background:#88bfb332; transform:none; }
+.prep-save-note { color:#829aa5; font-size:11px; line-height:1.8; text-align:center; margin:15px 0 0; }
+#startMenu[data-stage="endless"] .start-bg-art { opacity:.24; }
+#startMenu[data-stage="endless"] .menu-stage { max-width:1180px; gap:20px; }
+.presentation-modal { z-index:160; background:#07111deb; padding:28px; overflow:hidden; }
+.presentation-panel { width:min(840px,100%); max-height:90vh; max-height:90dvh; display:flex; flex-direction:column; background:#111f2b; border:1px solid #a6bfc534; box-shadow:0 25px 80px #0005; }
+.presentation-head { flex-shrink:0; display:flex; justify-content:space-between; align-items:center; gap:20px; padding:28px 32px 22px; border-bottom:1px solid #c0d4d220; }
+.presentation-head h2 { margin:0; color:#ecebe3; font:30px/1.4 "Songti SC",serif; letter-spacing:2px; }
+.presentation-body { overflow:auto; padding:15px 32px 30px; overscroll-behavior:contain; }
+.quiet-button,.cinema-button { color:#c8dadf; border:1px solid #a7c3c833; background:#28414b30; padding:10px 16px; min-height:44px; font-size:14px; cursor:pointer; border-radius:2px; }
+.quiet-button:hover { background:#314d5d70; }
+.cinema-button { color:#eaf4ef; border-color:#a3d4d0aa; background:#4f7e7f40; }
+.modal-explanation { color:#bbcbd0; font-size:16px; line-height:1.9; margin:18px 0 30px; }
+.modal-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:12px; }
+.setting-row { display:flex; align-items:center; justify-content:space-between; gap:24px; padding:22px 0; border-bottom:1px solid #bcd2d217; color:#e1e8e5; cursor:pointer; }
+.setting-row strong { display:block; font-size:16px; font-weight:500; }
+.setting-row small { display:block; color:#97afb9; font-size:12px; line-height:1.8; margin-top:6px; }
+.setting-row input { width:23px; height:23px; accent-color:#9bcacb; flex-shrink:0; }
+.settings-links { display:flex; gap:10px; flex-wrap:wrap; margin:25px 0; }
+.settings-footnote { color:#809ca8; font-size:12px; line-height:1.9; }
+.gallery-note { color:#acbec7; font-size:13px; line-height:1.8; padding:6px 0 20px; border-bottom:1px solid #bcd2d217; }
+.gallery-section { margin:28px 0 12px; color:#8eb6c0; font-size:12px; font-weight:500; letter-spacing:2px; }
+.gallery-event { display:flex; justify-content:space-between; align-items:center; gap:20px; width:100%; min-height:54px; color:#dce6e4; padding:12px 14px; background:#172c3733; border:0; border-bottom:1px solid #a4bfc518; cursor:pointer; text-align:left; font-size:15px; }
+.gallery-event:hover { background:#304e5f6b; }
+.gallery-play { font-size:11px; color:#8eafb8; flex-shrink:0; }
+#endMenu { background-image:linear-gradient(90deg,#06111a14,#06111a9c),var(--ending-art,none); background-size:cover; background-position:center; }
+#endMenu[data-result="defeat"] { align-items:flex-end; padding:5vw; }
+#endMenu[data-result="defeat"] .modal-plaque { width:min(480px,47%); background:linear-gradient(120deg,#0d1827db,#0d1827a6); border:1px solid #b9d6da24; padding:40px 30px; box-shadow:none; }
+#endMenu[data-result="defeat"] .modal-plaque h1 { font:clamp(28px,3.5vw,48px)/1.5 "Songti SC",serif; letter-spacing:4px; color:#efebdf; }
+#endMenu .end-actions { display:flex; flex-direction:column; gap:12px; }
+#endMenu .end-actions .btn { min-height:47px; }
+#endMenu[data-result="defeat"] #abandonRestartBtn { order:4; background:transparent; border-color:transparent; color:#a8b8c0; font-size:12px; }
+#endMenu[data-result="defeat"] .end-actions>.btn-sec:not(#endMainMenuBtn) { display:none; }
+.reduce-motion *, .reduce-motion *:before,.reduce-motion *:after { animation:none!important; transition:none!important; scroll-behavior:auto!important; }
+@keyframes quiet-arrival { from { opacity:.35; } to { opacity:1; } }
+@media (max-width:900px) {
+  #menuStoryView .story-stage-body { gap:20px; grid-template-columns:minmax(220px,.8fr) minmax(330px,1.2fr); }
+  #menuStoryView .story-depart { padding:24px; }
+  #startMenu .menu-stage { width:100%; }
+  .prep-controls { letter-spacing:0; font-size:13px; }
+}
+@media (max-width:640px) {
+  body.m-ui #startMenu.start-hub { padding:calc(15px + env(safe-area-inset-top,0px)) 22px calc(15px + env(safe-area-inset-bottom,0px)); }
+  #startMenu .start-bg-art { background-position:63% center; }
+  #startMenu .start-bg-vignette { background:linear-gradient(0deg,#06111ef2,rgba(6,17,30,.18) 76%,#0b15274d); }
+  #menuHomeView .home-topbar { min-height:44px; align-items:center; }
+  #menuHomeView .home-ver-pill { font-size:8px; line-height:1.9; max-width:190px; letter-spacing:1.4px; }
+  #menuHomeView .home-topbar .ghost-pill-btn { font-size:10px; padding:7px 10px; }
+  #menuHomeView .home-centerpiece { width:100%; justify-content:flex-end; align-items:flex-start; margin:0; padding:20px 8px 20px; }
+  #menuHomeView .brand-en-sub { font-size:8px; letter-spacing:2.5px; margin-bottom:12px; }
+  #menuHomeView .home-main-title { font-size:clamp(46px,12.5vw,76px); letter-spacing:.09em; }
+  .home-subtitle { font-size:14px; margin:18px 0 0 4px; letter-spacing:.4em; }
+  .title-menu { margin:30px 0 0 -15px; width:min(320px,95%); gap:6px; }
+  .title-link { font-size:23px; padding:12px 12px; min-height:54px; }
+  .title-link small { font-size:10px; }
+  .home-poem { display:none; }
+  #menuHomeView .home-footer { gap:12px; padding-top:12px; align-items:center; flex-wrap:wrap; }
+  #menuHomeView .footer-link-btn { font-size:11px; letter-spacing:1px; }
+  #menuHomeView .home-settings { margin-left:auto; }
+  .save-status { font-size:10px; bottom:48px; }
+  #menuStoryView .sub-topbar { flex-wrap:wrap; gap:8px; }
+  #menuStoryView .sub-topbar>.gold { display:none; }
+  #menuStoryView .stage-mode-tabs { margin-left:auto; }
+  #menuStoryView .story-stage-body { display:flex; flex-direction:column; gap:0; margin:0; overflow:visible; }
+  #storyHeroShowcase.hero-spotlight-card { flex-shrink:0; height:28vh; min-height:165px; max-height:230px; overflow:hidden; }
+  .prep-zero-portrait { height:190%; left:57%; bottom:-72%; }
+  .prep-hero-caption { bottom:14%; left:2%; }
+  .prep-hero-caption>span { font-size:10px; }
+  .prep-hero-caption h2 { font-size:30px; }
+  .prep-hero-caption h2 span { font-size:14px; }
+  .prep-hero-caption p { display:none; }
+  #menuStoryView .story-depart { width:100%; align-self:stretch; padding:20px; }
+  .prep-overline { font-size:9px; }
+  .prep-title { font-size:29px; padding-bottom:10px; }
+  .prep-location { font-size:13px; margin:10px 0; }
+  .prep-act-dots { padding:8px 4px 20px; }
+  #menuStoryView .depart-label { font-size:16px; }
+  #storyDiffTabs .diff-btn { min-height:48px; }
+  #storyDiffTabs .diff-name { font-size:18px; }
+  #storyDiffDesc { min-height:0; font-size:11px; }
+  .prep-controls { margin:16px 0; font-size:12px; }
+  #startStoryBtn { min-height:52px; font-size:21px; }
+  .prep-save-note { font-size:10px; margin-top:10px; }
+  #startMenu[data-stage="story"] .menu-stage { overflow:auto; padding-bottom:12px; }
+  .presentation-modal { padding:12px; }
+  .presentation-panel { max-height:94vh; max-height:94dvh; }
+  .presentation-head { padding:20px; gap:8px; }
+  .presentation-head h2 { font-size:24px; }
+  .presentation-body { padding:10px 20px 22px; }
+  .gallery-event { font-size:14px; }
+  .setting-row { gap:14px; }
+  #endMenu[data-result="defeat"] { justify-content:flex-end; align-items:center; padding:18px; }
+  #endMenu[data-result="defeat"] .modal-plaque { width:100%; padding:22px; max-height:66vh; overflow:auto; }
+  #endMenu[data-result="defeat"] .modal-plaque h1 { font-size:31px; }
+}
+@media (max-height:560px) and (min-width:641px) {
+  #startMenu.start-hub { padding:12px 4vw; }
+  #menuHomeView .home-main-title { font-size:59px; }
+  #menuHomeView .brand-en-sub { margin-bottom:8px; font-size:8px; }
+  .home-subtitle { margin-top:12px; font-size:14px; }
+  .title-menu { margin-top:22px; gap:2px; }
+  .title-link { font-size:20px; padding:9px 14px; min-height:43px; }
+  .home-poem { display:none; }
+  #menuHomeView .home-footer { padding:0; }
+  #menuStoryView { overflow:auto; }
+  #menuStoryView .story-stage-body { margin-top:10px; }
+  #menuStoryView .story-depart { padding:18px; }
+  #storyHeroShowcase.hero-spotlight-card { min-height:365px; }
+  .prep-title { font-size:28px; }
+  .prep-act-dots { padding:10px 0; }
+  .prep-controls { margin:12px 0; }
+}
+@media (prefers-reduced-motion:reduce) { #startMenu .start-bg-art { animation:none!important; } }
+
+/* Mobile shell: reserve the actual safe content box, including short landscape. */
+body.m-ui #startMenu.start-hub {
+  padding-left: calc(16px + env(safe-area-inset-left,0px));
+  padding-right: calc(16px + env(safe-area-inset-right,0px));
+  padding-top: calc(10px + env(safe-area-inset-top,0px));
+  padding-bottom: calc(10px + env(safe-area-inset-bottom,0px));
+}
+body.m-ui #menuHomeView .home-topbar,
+body.m-ui #menuHomeView .home-footer { flex-shrink:0; }
+body.m-ui #menuHomeView .home-centerpiece { flex-shrink:0; }
+body.m-ui .presentation-modal {
+  padding:calc(10px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) calc(12px + env(safe-area-inset-left,0px));
+}
+body.m-ui .presentation-panel { min-height:0; max-height:100%; }
+body.m-ui .presentation-body { min-height:0; flex:1 1 auto; overflow-x:hidden; overflow-y:auto; }
+body.m-ui .presentation-head { padding:14px 16px; gap:10px; }
+body.m-ui .presentation-head>div { min-width:0; }
+body.m-ui .presentation-head h2 { font-size:23px; }
+body.m-ui #presentationClose { flex-shrink:0; min-width:44px; }
+body.m-ui .presentation-body { padding:8px 16px 20px; }
+body.m-ui .setting-row { padding:16px 0; gap:16px; }
+body.m-ui .setting-row>span { min-width:0; }
+body.m-ui .settings-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+body.m-ui .settings-links .quiet-button { padding:10px 7px; }
+body.m-ui .gallery-event { padding:12px 5px; gap:12px; line-height:1.6; }
+body.m-ui .gallery-event>span:first-child { min-width:0; overflow-wrap:anywhere; }
+body.m-ui .gallery-play { white-space:nowrap; }
+body.m-ui .modal-actions { display:grid; grid-template-columns:1fr; }
+body.m-ui #moreDifficultyBtn { min-height:44px; }
+body.m-ui #endMenu[data-result="defeat"] {
+  padding:calc(10px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) calc(16px + env(safe-area-inset-left,0px));
+}
+body.m-ui #endMenu[data-result="defeat"] .modal-plaque { max-height:100%; }
+body.m-landscape #menuHomeView .home-ver-pill { display:none; }
+body.m-landscape #menuHomeView .home-topbar { min-height:44px; justify-content:flex-end; }
+body.m-landscape #menuHomeView .home-centerpiece {
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(190px,.85fr);
+  grid-template-rows:auto auto auto; gap:4px 16px; width:100%; margin:0; padding:8px 0;
+  align-content:center; align-items:center;
+}
+body.m-landscape #menuHomeView .brand-en-sub { grid-column:1; grid-row:1; margin:0; font-size:8px; letter-spacing:1.4px; }
+body.m-landscape #menuHomeView .home-main-title { grid-column:1; grid-row:2; font-size:clamp(32px,6.6vw,58px); padding:0; }
+body.m-landscape #menuHomeView .home-subtitle { grid-column:1; grid-row:3; margin:6px 0 0; font-size:12px; letter-spacing:.25em; }
+body.m-landscape #menuHomeView .title-menu { grid-column:2; grid-row:1 / 4; width:100%; margin:0; gap:2px; }
+body.m-landscape #menuHomeView .title-link { font-size:19px; padding:8px 6px; min-height:44px; gap:8px; }
+body.m-landscape #menuHomeView .title-link small { font-size:10px; letter-spacing:0; margin-top:3px; }
+body.m-landscape #menuHomeView .home-poem { display:none; }
+body.m-landscape #menuHomeView .home-footer { gap:14px; padding-top:4px; flex-wrap:wrap; }
+body.m-landscape #menuHomeView .footer-link-btn { font-size:11px; letter-spacing:1px; }
+body.m-landscape #menuStoryView .story-stage-body { display:grid; grid-template-columns:minmax(130px,.65fr) minmax(250px,1fr); gap:12px; margin:8px 0 0; }
+body.m-landscape #storyHeroShowcase.hero-spotlight-card { min-height:300px; height:100%; max-height:none; }
+body.m-landscape .prep-zero-portrait { height:100%; bottom:0; left:50%; }
+body.m-landscape #menuStoryView .story-depart { padding:16px; }
+body.m-landscape .prep-hero-caption { left:4%; }
+body.m-landscape .prep-hero-caption h2 { font-size:24px; }
+body.m-landscape .prep-hero-caption p { display:none; }
+@media (max-width:360px) {
+  body.m-portrait #menuHomeView .home-main-title { font-size:41px; }
+  body.m-portrait #menuHomeView .home-centerpiece { padding-left:2px; padding-right:2px; }
+  body.m-portrait #menuHomeView .title-link { font-size:21px; }
+  body.m-portrait #menuStoryView .story-depart { padding:16px; }
+  body.m-portrait #menuHomeView .home-footer { gap:8px; }
+  body.m-ui .presentation-head h2 { font-size:21px; }
+}
