@@ -2762,4 +2762,7 @@ function loop(now) {
     }
   }
 }
+if (typeof SpireBootGate !== 'undefined' && SpireBootGate && typeof SpireBootGate.runFullCheck === 'function') {
+  SpireBootGate.runFullCheck('renderer_tail');
+}
 requestAnimationFrame(loop);

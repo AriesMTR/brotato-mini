@@ -1656,3 +1656,6 @@ function createEnemy(x, y, type, variant = '') {
   addBurst(x, y, ent.elite ? '#ffd166' : ent.color, isBossLike ? 16 : (ent.elite ? 8 : 5), isBossLike ? 150 : 85);
   return ent;
 }
+if (typeof SpireBootGate !== 'undefined' && SpireBootGate) {
+  SpireBootGate.setStep(52, '波次与地形引擎就绪 · 正在装载渲染管线…');
+}

@@ -137,6 +137,10 @@ function _renderHeroSpotlight(containerId, clsObj, isStoryLocked) {
 }
 
 function openMenuStage(stage) {
+  if ((stage === 'story' || stage === 'endless') && typeof bootIntegrityPassed !== 'undefined' && !bootIntegrityPassed) {
+    if (typeof SpireBootGate !== 'undefined' && SpireBootGate) SpireBootGate.runFullCheck('user_guard');
+    return;
+  }
   menuStage = (stage === 'story' || stage === 'endless') ? stage : 'home';
   const sm = document.getElementById('startMenu');
   if (sm && sm.setAttribute) sm.setAttribute('data-stage', menuStage);
@@ -544,6 +548,9 @@ function setHudWidth(id, val) {
   if (el) el.style.width = val;
 }
 bootReady = true;
+if (typeof SpireBootGate !== 'undefined' && SpireBootGate) {
+  SpireBootGate.setStep(38, '主殿交互就绪 · 正在装载刷怪与战斗结算模块…');
+}
 resize();
 cam.x = WORLD.w / 2; cam.y = WORLD.h / 2;
 clampCam();
@@ -655,6 +662,10 @@ function syncSetHp() {
 let waveCratesDropped = 0, waveCheckpoint = null;
 
 function startGame(cls, opts) {
+  if (typeof bootIntegrityPassed !== 'undefined' && !bootIntegrityPassed) {
+    if (typeof SpireBootGate !== 'undefined' && SpireBootGate) SpireBootGate.runFullCheck('user_guard');
+    return;
+  }
   if (typeof resetWeaponEvolutionUI === 'function') resetWeaponEvolutionUI();
   const options = opts || {};
   const reqMode = options.mode ? options.mode : ((cls && cls !== 'allrounder') ? 'endless' : 'story');

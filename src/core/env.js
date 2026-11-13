@@ -1,4 +1,4 @@
-// 核心画布环境、DPR 像素比与全局品质常量（v2.1.3 全剧情电影演出融合版 · 首领击破后续刷小怪保满晶石收益 · 敌方流光弹道与非圆圈差异化技能特效重绘 · 召唤阵扩容 & 多形态地形块升级 · 前5层温和减压、全怪整体血量回调-20%及10层后陡峭升维）
+// 核心画布环境、DPR 像素比与全局品质常量（v2.1.4 网页端全链路资源完整性校验门禁版 · 首领击破后续刷小怪保满晶石收益 · 敌方流光弹道与非圆圈差异化技能特效重绘 · 召唤阵扩容 & 多形态地形块升级 · 前5层温和减压、全怪整体血量回调-20%及10层后陡峭升维）
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
     const rad = Math.min(typeof r === 'number' ? r : 4, Math.abs(w) * 0.5, Math.abs(h) * 0.5);
@@ -15,13 +15,23 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: fal
 let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.06, userZoomed = false;
 let isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let bootReady = false;
-const APP_VERSION = 'v2.1.3';
-const APP_BUILD_DATE = '2026-11-13';
+let bootIntegrityPassed = false;
+const APP_VERSION = 'v2.1.4';
+const APP_BUILD_DATE = '2026-11-14';
 
 // 游戏内置版本更新日志数据（供开局主界面「纪元志」弹窗展示）
 const CHANGELOG_HISTORY = [
   {
-    ver: 'v2.1.3', date: '2026-11-13', tag: '当前版本 · 首领续刷保收益 · 弹幕与远程异形特效重绘 · 巨型召唤阵与细长/斜向真地形块 · 全怪血量-20%回调、前5层减压及10层后高压',
+    ver: 'v2.1.4', date: '2026-11-14', tag: '当前版本 · 网页端全链路资源完整性校验门禁 · 防半加载黑屏/报错 · 异常缓存一键重拉',
+    title: '🛡️ 网页端全链路资源完整性自检与首屏门禁（SpireBootGate）：彻底根治弱网半加载提前刷出主界面导致的运行 Bug',
+    items: [
+      '🛡️ 首屏 0ms 防误触门禁幕布：网页端打开瞬间由零依赖内联门禁层接管视口，在全部 20 个 JS 模块、4 张样式表与首屏核心原画（标题背景、主角精灵表、零/青羽立绘、首幕地面贴图）全部校验通过前严格锁定开局入口，彻底杜绝「脚本/贴图还没下完就刷出初始界面点击报错」的问题！',
+      '🔍 20 大模块契约 + HTML/JS 跨版本缓存一致性逐项核验：逐一校验环境、日志、生态、贴图总管、视口、声景、32把兵装库、魔物设定、圣典、十六层剧本、演出导演、菜单、存档、刷怪器、战斗结算、帧循环、行商、精灵烘焙与渲染器共 20 项模块符号及 HTML/JS 版本号，缺一不可！',
+      '🔄 弱网自动重试与一键清缓存重拉：首屏关键贴图下载抖动时自动附加防缓存参数静默重试 2 次；若遇断网或 CDN 残缺缓存导致脚本/样式缺失，精准列出缺失模块并提供「清理残缺缓存并重拉」一键自愈恢复！'
+    ]
+  },
+  {
+    ver: 'v2.1.3', date: '2026-11-13', tag: '首领续刷保收益 · 弹幕与远程异形特效重绘 · 巨型召唤阵与细长/斜向真地形块 · 全怪血量-20%回调、前5层减压及10层后高压',
     title: '🔥 全怪整体血量下调20%与前5层舒适减压 + 第10层后硬核升维 + 巨型Boss召唤阵与细长/斜向多形态地形块 + 远程怪异形特效大重做 + 首领续刷保收益 & T4/T5概率斩弹',
     items: [
       '🔮 奇遇召唤 Boss 法阵翻倍扩容 + 全域随机细长/斜向多形态真地形块（对怪减益减半、主针对玩家）：召唤圣物法阵半径扩至 88（面积扩大 4 倍）；彻底重做战场地形生成引擎——每波在全图九宫侧翼与边角随机铺设 4~7 块【斜向细长裂脉、蜿蜒S/折角沟壑、斜切多边形岩台块、月牙弧带与折弯裂谷】，不再扎堆中心或呈单调圆滩；同时将地形对怪物的伤害与减速严格减半，强化熔岩灼足减速与泥沼深陷腐蚀对玩家走位的压迫感！',
@@ -265,3 +275,290 @@ const MAX_WEAPON_TIER = 5;
 const TIER_COLORS = ['', '#e2deec', '#4cc9f0', '#c77dff', '#ffd166', '#ff3b6b'];
 const TIER_GLOW   = ['', 'rgba(255,255,255,0)', 'rgba(76,201,240,0.45)', 'rgba(199,125,255,0.55)', 'rgba(255,209,102,0.68)', 'rgba(255,59,107,0.84)'];
 const TIER_NAMES  = ['', '普通', '精良', '史诗', '传说', '神话'];
+
+// ============================================================================
+// 🛡️ 网页端全链路资源完整性自检与启动门禁系统 (SpireBootGate)
+// 防止弱网/丢包/跨版本残缺缓存导致「内容没下载全但初始界面已刷出」引发运行 Bug
+// ============================================================================
+const SpireBootGate = (function () {
+  const failedNetTags = [];
+  let finished = false;
+  let codeAllVerified = false;
+  let checkingImages = false;
+
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('error', function (ev) {
+      const t = ev && ev.target;
+      if (t && t !== window && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+        const rawUrl = String(t.src || t.href || t.tagName);
+        const shortName = rawUrl.split('/').slice(-2).join('/') || rawUrl;
+        if (failedNetTags.indexOf(shortName) === -1) failedNetTags.push(shortName);
+      }
+    }, true);
+  }
+
+  function forceReloadClean() {
+    const go = function () {
+      try {
+        const base = (typeof location !== 'undefined' && location.pathname) ? location.pathname : './';
+        const hash = (typeof location !== 'undefined' && location.hash) ? location.hash : '';
+        location.replace(base + '?_reload=' + Date.now() + hash);
+      } catch (_) {}
+    };
+    try {
+      const tasks = [];
+      if (typeof navigator !== 'undefined' && navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        tasks.push(navigator.serviceWorker.getRegistrations().then(rs => Promise.all(rs.map(r => r.unregister()))));
+      }
+      if (typeof window !== 'undefined' && window.caches && window.caches.keys) {
+        tasks.push(window.caches.keys().then(ks => Promise.all(ks.map(k => window.caches.delete(k)))));
+      }
+      if (tasks.length) {
+        Promise.all(tasks).then(go, go);
+        return;
+      }
+    } catch (_) {}
+    go();
+  }
+
+  if (typeof window !== 'undefined') {
+    window.__spireForceReload = forceReloadClean;
+    window.__spireAllowBypass = function () {
+      if (!codeAllVerified) return false;
+      unlockGate('manual_image_bypass');
+      return true;
+    };
+  }
+
+  function setStep(pct, stepTxt) {
+    if (finished) return;
+    const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+    const fillEl = document.getElementById('bootGateFill');
+    const pctEl = document.getElementById('bootGatePct');
+    const stepEl = document.getElementById('bootGateStep');
+    if (fillEl) fillEl.style.width = clamped + '%';
+    if (pctEl) pctEl.textContent = clamped + '%';
+    if (stepEl && stepTxt) stepEl.textContent = stepTxt;
+  }
+
+  function showFailure(failures, allowImageBypass) {
+    bootIntegrityPassed = false;
+    const gate = document.getElementById('bootGate');
+    if (gate) {
+      gate.classList.remove('hidden');
+      gate.hidden = false;
+      gate.style.display = 'flex';
+    }
+    const errBox = document.getElementById('bootGateErrBox');
+    const errList = document.getElementById('bootGateErrList');
+    const bypassBtn = document.getElementById('bootGateBypassBtn');
+    const slowWrap = document.getElementById('bootGateSlowWrap');
+    if (slowWrap) slowWrap.style.display = 'none';
+    if (errList) {
+      errList.innerHTML = failures.map(msg => `<div>• ${String(msg).replace(/</g, '&lt;')}</div>`).join('');
+    }
+    if (bypassBtn) {
+      bypassBtn.style.display = allowImageBypass ? 'inline-block' : 'none';
+    }
+    if (errBox) errBox.style.display = 'block';
+    setStep(allowImageBypass ? 88 : 42, allowImageBypass ? '核心代码已就绪，部分首屏贴图下载超时' : '资源完整性校验未通过 · 已拦截残缺启动');
+    if (typeof logWarn === 'function') {
+      logWarn('BOOT_GATE', `完整性拦截 (${failures.length}项): ${failures.join(' | ')}`);
+    }
+  }
+
+  function unlockGate(reason) {
+    finished = true;
+    bootIntegrityPassed = true;
+    setStep(100, '全量模块与首屏资源校验通过');
+    const gate = document.getElementById('bootGate');
+    if (gate) {
+      gate.classList.add('hidden');
+      gate.hidden = true;
+      gate.style.display = 'none';
+    }
+    if (typeof refreshSpireHome === 'function') refreshSpireHome();
+    if (typeof logInfo === 'function') {
+      logInfo('BOOT_OK', `全链路资源完整性校验通过 (${reason}) · ver=${APP_VERSION}`);
+    }
+  }
+
+  function verifyModules() {
+    const failures = [];
+    const gate = document.getElementById('bootGate');
+    const htmlVer = gate && gate.getAttribute ? gate.getAttribute('data-html-version') : null;
+    if (htmlVer && htmlVer !== APP_VERSION) {
+      failures.push(`HTML 入口版本 (${htmlVer}) 与脚本版本 (${APP_VERSION}) 不一致（旧缓存残留）`);
+    }
+    for (let i = 0; i < failedNetTags.length; i++) {
+      failures.push(`网络加载失败: ${failedNetTags[i]}`);
+    }
+
+    const checks = [
+      ['01/env', () => typeof APP_VERSION === 'string' && Array.isArray(CHANGELOG_HISTORY)],
+      ['02/logger', () => typeof logInfo === 'function' && typeof logError === 'function'],
+      ['03/scenes', () => typeof SCENES !== 'undefined' && Array.isArray(SCENES) && SCENES.length >= 4],
+      ['04/boss_portraits', () => typeof SpireAssets === 'object' && SpireAssets !== null && typeof BOSS_PORTRAIT_DATA === 'object'],
+      ['05/textures', () => typeof buildFloorTexture === 'function'],
+      ['06/viewport', () => typeof resize === 'function' && typeof clampCam === 'function'],
+      ['07/audio', () => typeof SpireAudio === 'object' && typeof beep === 'function'],
+      ['08/arsenal', () => typeof WEAPONS === 'object' && WEAPONS !== null && Object.keys(WEAPONS).length === 32 && Array.isArray(ITEMS) && ITEMS.length >= 20 && Array.isArray(CLASSES) && CLASSES.length >= 6],
+      ['09/monsters', () => typeof BOSS_DEFS === 'object' && BOSS_DEFS !== null && Object.keys(BOSS_DEFS).length >= 6],
+      ['10/codex', () => typeof openCodex === 'function'],
+      ['11/story-v2', () => typeof SpireStoryV2 === 'object' && SpireStoryV2 !== null && !!SpireStoryV2.opening],
+      ['12/director', () => typeof SpireDirector === 'object' && SpireDirector !== null && typeof SpireDirector.render === 'function'],
+      ['13/menus', () => typeof startGame === 'function' && typeof showStart === 'function' && typeof initMenuUI === 'function'],
+      ['14/presentation', () => typeof SpireSave === 'object' && typeof continueSpireStory === 'function'],
+      ['15/spawner', () => typeof beginWave === 'function' && typeof createEnemy === 'function' && typeof spawnArenaTerrains === 'function'],
+      ['16/combat', () => typeof hurtEnemy === 'function' && typeof hurtPlayer === 'function'],
+      ['17/update', () => typeof update === 'function' && typeof triggerSoulDash === 'function'],
+      ['18/shop', () => typeof openShop === 'function' && typeof finishWave === 'function'],
+      ['19/sprites', () => typeof getBakedWeaponSprite === 'function'],
+      ['20/renderer', () => typeof draw === 'function' && typeof loop === 'function']
+    ];
+
+    for (let i = 0; i < checks.length; i++) {
+      let ok = false;
+      try { ok = !!checks[i][1](); } catch (_) { ok = false; }
+      if (!ok) failures.push(`模块未就绪或下载残缺: ${checks[i][0]}`);
+    }
+
+    const codeOk = failures.length === 0;
+    let cssPending = false;
+    if (typeof document !== 'undefined' && document.styleSheets && typeof document.styleSheets.length === 'number' && document.querySelectorAll) {
+      const links = document.querySelectorAll('link[rel="stylesheet"]');
+      for (let i = 0; i < links.length; i++) {
+        const lnk = links[i];
+        if (!lnk.sheet) {
+          if (document.readyState !== 'complete') {
+            cssPending = true;
+          } else {
+            const href = (lnk.getAttribute && lnk.getAttribute('href')) || lnk.href || ('stylesheet#' + (i + 1));
+            failures.push(`样式表未下载完整: ${href.split('?')[0]}`);
+          }
+        }
+      }
+    }
+
+    return { ok: failures.length === 0 && !cssPending, codeOk, cssPending, failures };
+  }
+
+  function verifyCriticalAssets() {
+    if (finished || checkingImages) return;
+    const isInlineBundle = typeof window !== 'undefined' && window.__SPIRE_INLINE_ASSETS__ && typeof window.__SPIRE_INLINE_ASSETS__ === 'object';
+    if (isInlineBundle || typeof Image === 'undefined') {
+      unlockGate('inline_or_headless');
+      return;
+    }
+
+    checkingImages = true;
+    const criticalList = [
+      ['主殿背景原画', 'assets/spire/v2/title-clean.png'],
+      ['主角立绘档案', 'assets/spire/port_zero.jpg'],
+      ['风语行商立绘', 'assets/spire/port_qingyu.jpg'],
+      ['主角战斗精灵表', 'assets/spire/hero_zero_sheet.png'],
+      ['首幕地面石板贴图', 'assets/spire/arena_1_foundry.jpg']
+    ];
+    const total = criticalList.length;
+    let doneCount = 0;
+    let pending = total;
+    const imgFailures = [];
+    const startedAt = Date.now();
+
+    const finishOne = function (label, ok, relPath) {
+      if (finished) return;
+      doneCount++;
+      pending--;
+      if (!ok) imgFailures.push(`${label} (${relPath}) 下载或解码失败`);
+      const pct = 66 + Math.round((doneCount / total) * 34);
+      setStep(pct, `正在核验首屏核心原画 (${doneCount}/${total})…`);
+      if (pending <= 0) {
+        checkingImages = false;
+        if (imgFailures.length === 0) {
+          unlockGate('web_full_verified');
+        } else {
+          showFailure(imgFailures, true);
+        }
+      }
+    };
+
+    for (let i = 0; i < total; i++) {
+      const label = criticalList[i][0];
+      const rel = criticalList[i][1];
+      const baseResolved = (typeof SpireAssets !== 'undefined' && SpireAssets && typeof SpireAssets.resolve === 'function')
+        ? SpireAssets.resolve(rel)
+        : rel;
+
+      const tryLoad = function (attempt) {
+        let settled = false;
+        const img = new Image();
+        img.onload = function () {
+          if (settled) return;
+          settled = true;
+          const validDim = (img.naturalWidth || img.width || 0) > 0 && (img.naturalHeight || img.height || 0) > 0;
+          if (validDim) finishOne(label, true, rel);
+          else if (attempt < 2 && !/^data:/i.test(baseResolved)) tryLoad(attempt + 1);
+          else finishOne(label, false, rel);
+        };
+        img.onerror = function () {
+          if (settled) return;
+          settled = true;
+          if (attempt < 2 && !/^data:/i.test(baseResolved)) {
+            tryLoad(attempt + 1);
+          } else {
+            finishOne(label, false, rel);
+          }
+        };
+        if (attempt === 0 || /^data:/i.test(baseResolved)) {
+          img.src = baseResolved + (/^data:|\?/.test(baseResolved) ? '' : ('?v=' + APP_VERSION));
+        } else {
+          const clean = baseResolved.split('?')[0];
+          img.src = clean + '?_retry=' + attempt + '&_t=' + Date.now();
+        }
+      };
+
+      tryLoad(0);
+    }
+
+    if (!finished && pending > 0 && typeof setTimeout === 'function') {
+      setTimeout(function () {
+        if (!finished && pending > 0 && (Date.now() - startedAt) >= 10000) {
+          checkingImages = false;
+          showFailure(['首屏核心原画响应超时（当前网络较慢或连接受阻）'], true);
+        }
+      }, 11000);
+    }
+  }
+
+  function runFullCheck(source) {
+    if (finished) return true;
+    const res = verifyModules();
+    if (!res.codeOk) {
+      if (source === 'window_load' || source === 'renderer_tail' || source === 'user_guard') {
+        showFailure(res.failures, false);
+      }
+      return false;
+    }
+    if (res.cssPending) {
+      setStep(60, '核心脚本已就绪 · 正在等待样式表完成加载…');
+      return false;
+    }
+    if (!res.ok) {
+      showFailure(res.failures, false);
+      return false;
+    }
+    codeAllVerified = true;
+    setStep(66, '20/20 核心模块校验通过 · 正在核验首屏原画…');
+    verifyCriticalAssets();
+    return bootIntegrityPassed;
+  }
+
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('load', function () {
+      if (!finished) runFullCheck('window_load');
+    });
+  }
+
+  setStep(14, '基础环境就绪 · 正在加载数据与战斗模块…');
+  return { setStep, verifyModules, runFullCheck, forceReloadClean };
+})();

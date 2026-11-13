@@ -2472,3 +2472,20 @@ h2 {
   body:not(.m-ui) .hud-right small { display: none; }
   body:not(.m-ui) .shop-bottom { flex-direction: column; align-items: stretch; }
 }
+
+/* 首屏全量资源完整性门禁（防止网页端脚本/贴图未下载全时提前露出主菜单触发异常） */
+.boot-gate.hidden {
+  display: none !important;
+  pointer-events: none !important;
+}
+.boot-slow-wrap {
+  opacity: 0;
+  pointer-events: none;
+  animation: bootSlowReveal 0.4s ease 6.5s forwards;
+}
+@keyframes bootSlowReveal {
+  to {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
