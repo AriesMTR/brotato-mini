@@ -96,19 +96,13 @@ function buildFloorTexture() {
     }
   }
 
-  // 极淡哥特星轨地砖暗纹与中心日蚀罗盘环
-  const cx = ox + WORLD.w / 2, cy = oy + WORLD.h / 2;
+  // 极淡哥特星轨地砖暗纹（移除场地中央易被误判为攻击射程圈的固定圆环）
   g.strokeStyle = sc.gridCol;
   g.lineWidth = 1.3;
   g.beginPath();
   for (let x = ox; x <= ox + WORLD.w; x += 120) { g.moveTo(x, oy); g.lineTo(x, oy + WORLD.h); }
   for (let y = oy; y <= oy + WORLD.h; y += 120) { g.moveTo(ox, y); g.lineTo(ox + WORLD.w, y); }
   g.stroke();
-
-  g.strokeStyle = 'rgba(229, 184, 105, 0.12)';
-  g.lineWidth = 2.0;
-  g.beginPath(); g.arc(cx, cy, 136, 0, Math.PI * 2); g.stroke();
-  g.beginPath(); g.arc(cx, cy, 28, 0, Math.PI * 2); g.stroke();
 
   // 哥特暗金双线结界边框 + 四角菱星铭纹（取代原版粗糙工业铁板铆钉）
   g.strokeStyle = 'rgba(4, 6, 12, 0.68)';

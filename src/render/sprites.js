@@ -224,7 +224,7 @@ function drawTreeSprite(tr) {
     // 首帧贴图未就绪时的哥特封魂晶碑极简兜底
     ctx.save();
     ctx.translate(tr.x, tr.y);
-    ctx.fillStyle = flash ? '#ffffff' : '#1e293b';
+    ctx.fillStyle = flash ? '#475569' : '#1e293b';
     ctx.strokeStyle = '#f6d379';
     ctx.lineWidth = 2.2;
     ctx.beginPath();
@@ -380,7 +380,7 @@ function drawEnemySprite(e) {
   const r = Math.max(6, e.r || 15);
   const isBoss = e.type === 'boss' || e.type === 'special_boss';
   const isMini = e.type === 'mini_boss';
-  const flash = e.hitFlash > 0 || (e.primed && ((now * 0.025) | 0) % 2 === 1);
+  const flash = e.hitFlash > 0 || (e.primed && ((now * 0.014) | 0) % 2 === 1);
 
   // 1. 地面接触阴影与首领/精英/神话二阶段清晰气场底环
   ctx.fillStyle = 'rgba(0,0,0,0.44)';
@@ -467,7 +467,7 @@ function drawEnemySprite(e) {
       const dw = spr.w * sc, dh = spr.h * sc;
       ctx.drawImage(spr.canvas, -dw * 0.5, -dh * 0.56, dw, dh);
     } else {
-      ctx.fillStyle = flash ? '#ffffff' : (e.color || '#be123c');
+      ctx.fillStyle = flash ? '#f8d7da' : (e.color || '#be123c');
       ctx.strokeStyle = '#090d16';
       ctx.lineWidth = 2.4;
       ctx.beginPath(); ctx.arc(0, 0, r * 0.9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -553,33 +553,16 @@ function drawPotatoHero() {
   const it = p.items || {};
   const now = _syncNow();
 
-  // 1. 索敌射程圈与青焰拾取磁环
-  const dispR = Math.max(55, p._displayRange || 140);
-  ctx.save();
-  ctx.strokeStyle = 'rgba(246, 211, 121, 0.12)';
-  ctx.lineWidth = 1.3;
-  ctx.setLineDash([9, 9]);
-  ctx.beginPath(); ctx.arc(p.x, p.y, dispR, 0, Math.PI * 2); ctx.stroke();
-  ctx.restore();
-
-  ctx.strokeStyle = it.magnet ? 'rgba(114, 239, 221, 0.14)' : 'rgba(229, 184, 105, 0.08)';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(16, p.magnet || 100), 0, Math.PI * 2); ctx.stroke();
-
-  // 2. 地面阴影 + 高辨识度角色受击判定心核环（密集弹幕中一眼看清精确走位判定点！）
+  // 1. 地面接触阴影与脚底轻量站位底椭圆（移除易干扰视线的攻击射程圈与磁吸大圆环）
   ctx.fillStyle = 'rgba(0,0,0,0.48)';
   ctx.beginPath(); ctx.ellipse(p.x, p.y + 22, 20, 7.5, 0, 0, Math.PI * 2); ctx.fill();
 
-  ctx.strokeStyle = it.berserk ? 'rgba(251, 113, 133, 0.56)' : 'rgba(114, 239, 221, 0.48)';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath(); ctx.ellipse(p.x, p.y + 21, 22, 8.2, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = it.berserk ? 'rgba(251, 113, 133, 0.50)' : 'rgba(114, 239, 221, 0.42)';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.ellipse(p.x, p.y + 21, 21, 7.8, 0, 0, Math.PI * 2); ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(246, 211, 121, 0.34)';
-  ctx.lineWidth = 1.3;
-  ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(10, (p.r || 15) - 2), 0, Math.PI * 2); ctx.stroke();
-
-  // 3. 4 帧动作精灵表状态机与柔顺插值绘制
-  const hurtFlash = p.invuln > 0 && (((p.invuln * 22) | 0) % 2 === 0);
+  // 2. 4 帧动作精灵表状态机与柔顺插值绘制（仅真实扣血受击时柔和微闪，瞬步/过场无敌态不闪白）
+  const hurtFlash = (p.hurtFlashT || 0) > 0 && (((p.hurtFlashT * 16) | 0) % 2 === 0);
   const inAtkPose = (p._atkPoseT || 0) > 0;
   const desiredFace = (inAtkPose && p._atkAimX !== undefined && Math.abs(p._atkAimX) > 0.16)
     ? (p._atkAimX < 0 ? -1 : 1)
@@ -647,7 +630,7 @@ function drawPotatoHero() {
       const dw = spr.w * sc, dh = spr.h * sc;
       ctx.drawImage(spr.canvas, -dw * 0.5, -dh, dw, dh);
     } else {
-      ctx.fillStyle = hurtFlash ? '#ffffff' : '#f1efe7';
+      ctx.fillStyle = hurtFlash ? '#fff7ed' : '#f1efe7';
       ctx.strokeStyle = '#090d16';
       ctx.lineWidth = 2.4;
       ctx.beginPath();

@@ -235,6 +235,7 @@ function update(dt) {
     const tr = trees[i];
     if (tr.hp <= 0) { trees.splice(i, 1); continue; }
     if (tr.hitFlash > 0) tr.hitFlash -= dt;
+    if (tr._flashCd > 0) tr._flashCd -= dt;
     tr.sway += dt * 2.4;
   }
 
@@ -375,7 +376,7 @@ function update(dt) {
     player.teslaCd -= dt;
     if (player.teslaCd <= 0) {
       player.teslaCd = Math.max(0.45, 1.7 / (1 + (player.teslaCount - 1) * 0.55));
-      const maxTD = Math.max(150, 300 + Math.round(totalRange * 0.5));
+      const maxTD = Math.max(120, 240 + Math.round(totalRange * 0.5));
       let near = null, nearDSq = maxTD * maxTD;
       for (let i = 0; i < enemies.length; i++) {
         const e = enemies[i];
@@ -397,23 +398,23 @@ function update(dt) {
   const onBossWave = (wave >= 4 && wave % 4 === 0);
   const hordeBoost = hordeWave ? (wave <= 4 ? 1.14 : 1.20) : 1;
   const maxActiveEnemies = isTouch
-    ? (onBossWave ? 22 : Math.min(60, Math.round(20 + wave * 3.0)))
-    : (onBossWave ? 28 : Math.min(76, Math.round(24 + wave * 3.6)));
+    ? (onBossWave ? 24 : Math.min(64, Math.round(28 + wave * 2.8)))
+    : (onBossWave ? 30 : Math.min(80, Math.round(34 + wave * 3.2)));
   if (!overtime && spawnAcc <= 0 && waveTime > 1.5 && (enemies.length + spawns.length) < maxActiveEnemies) {
-    const baseCount = onBossWave ? 1.8 : (1.15 + Math.min(wave, 6) * 0.22 + Math.max(0, Math.min(16, wave) - 6) * 0.25);
+    const baseCount = onBossWave ? 2.0 : (2.45 + Math.min(wave, 6) * 0.28 + Math.max(0, Math.min(16, wave) - 6) * 0.24);
     const rawCnt = Math.max(1, Math.round(baseCount * diff.spawnMul * hordeBoost));
     const room = Math.max(1, maxActiveEnemies - (enemies.length + spawns.length));
     const count = Math.min(rawCnt, room);
     const early = selectedDiff >= 3 ? 1 : 0;
     for (let i = 0; i < count; i++) {
       const ang = Math.random() * Math.PI * 2;
-      const dist = 255 + Math.random() * 340;
+      const dist = 245 + Math.random() * 330;
       const x = Math.max(60, Math.min(WORLD.w - 60, player.x + Math.cos(ang) * dist));
       const y = Math.max(60, Math.min(WORLD.h - 60, player.y + Math.sin(ang) * dist));
       const type = pickWaveEnemyType(wave + early);
       spawnWarning(x, y, type);
     }
-    spawnAcc = Math.max(onBossWave ? 0.62 : 0.58, (1.50 - Math.min(wave, 10) * 0.082) / Math.pow(diff.spawnMul * hordeBoost, 0.45));
+    spawnAcc = Math.max(onBossWave ? 0.58 : 0.48, (1.08 - Math.min(wave, 10) * 0.048) / Math.pow(diff.spawnMul * hordeBoost, 0.48));
   }
 
   // 地面红圈/外环环形/元素预警轰炸倒计时引爆
@@ -517,6 +518,7 @@ function update(dt) {
   clampCam();
 
   if (player.invuln > 0) player.invuln -= dt;
+  if (player.hurtFlashT > 0) player.hurtFlashT -= dt;
   if (player.regen > 0 && player.hp > 0 && player.hp < player.maxHp) {
     player.regenAcc += player.regen * dt;
     if (player.regenAcc >= 1) {
@@ -602,8 +604,8 @@ function update(dt) {
     const orbitA = (idx / Math.max(1, nW)) * Math.PI * 2 + nowOrbitBase;
     const baseWx = player.x + Math.cos(orbitA) * orbitR;
     const baseWy = player.y + Math.sin(orbitA) * (orbitR * 0.9);
-    const rangeAdd = tpl.melee ? Math.round(totalRange * 0.78 + (player.meleeSweepBonus || 0) * 22) : totalRange;
-    const maxR = Math.max(tpl.melee ? 92 : 68, tpl.range + rangeAdd + (w.tier - 1) * (tpl.melee ? 20 : 16));
+    const rangeAdd = tpl.melee ? Math.round(totalRange * 0.78 + (player.meleeSweepBonus || 0) * 18) : totalRange;
+    const maxR = Math.max(tpl.melee ? 74 : 54, tpl.range + rangeAdd + (w.tier - 1) * (tpl.melee ? 16 : 13));
     if (maxR > maxEquipRange) maxEquipRange = maxR;
 
     let best = null, bestD = maxR, bestIsTree = false;
@@ -646,7 +648,7 @@ function update(dt) {
       const finalMul = (effDmg + (tpl.melee ? player.meleeBonus : 0)) * archetypeScale;
       const critChance = baseCrit + (tpl.critBonus || 0) + (w.tier - 1) * 0.03;
       const critMult = getEffectiveCritMult(tpl.critMult || 1.95);
-      w.cd = tpl.cd / Math.max(0.3, effAspd * (1 + (w.tier - 1) * 0.08));
+      w.cd = tpl.cd / Math.max(0.18, effAspd * (1 + (w.tier - 1) * 0.08));
       player._atkPoseT = Math.max(player._atkPoseT || 0, tpl.melee ? 0.21 : 0.14);
       player._atkAimX = Math.cos(w.angle);
       player._atkAngle = w.angle;
@@ -884,10 +886,10 @@ function update(dt) {
     w.wx = baseWx + Math.cos(w.angle) * offset;
     w.wy = baseWy + Math.sin(w.angle) * offset;
   }
-  player._displayRange = maxEquipRange > 0 ? maxEquipRange : Math.max(85, 130 + totalRange);
+  player._displayRange = maxEquipRange > 0 ? maxEquipRange : Math.max(68, 104 + totalRange);
 
-  // 自动机枪炮台与浮游激光塔索敌开火（享受工程套装、工程专精、超算芯片与攻击范围加成）
-  const turretMaxR = Math.max(185, 395 + Math.round(totalRange * 0.5));
+  // 自动机枪炮台与浮游激光塔索敌开火（享受工程套装、工程专精、超算芯片与攻击范围加成，射程同步 -20%、攻速同步 -30%）
+  const turretMaxR = Math.max(148, 316 + Math.round(totalRange * 0.5));
   for (let ti = 0; ti < turrets.length; ti++) {
     const t = turrets[ti];
     t.cd -= dt;
@@ -907,7 +909,7 @@ function update(dt) {
         const cMul = isCrit ? getEffectiveCritMult(1.85) : 1;
         const overclockMul = (player.turretOverclockT || 0) > 0 ? 1.75 : 1;
         if (t.kind === 'laser') {
-          t.cd = Math.max(0.14, 0.68 / (Math.sqrt(effAspd) * techMul * overclockMul)) / (1 + (t.tier - 1) * 0.14);
+          t.cd = Math.max(0.18, 0.81 / (Math.sqrt(effAspd) * techMul * overclockMul)) / (1 + (t.tier - 1) * 0.14);
           t.recoil = 1;
           const ldmg = (14.5 + wave * 1.75) * (1 + (t.tier - 1) * 0.45) * effDmg * techMul * cMul;
           const ex = t.x + Math.cos(t.angle) * turretMaxR, ey = t.y + Math.sin(t.angle) * turretMaxR;
@@ -928,7 +930,7 @@ function update(dt) {
             }
           }
         } else if (bullets.length < (isTouch ? 180 : 260)) {
-          t.cd = Math.max(0.09, 0.39 / (Math.sqrt(effAspd) * techMul * overclockMul)) / (1 + (t.tier - 1) * 0.15);
+          t.cd = Math.max(0.12, 0.465 / (Math.sqrt(effAspd) * techMul * overclockMul)) / (1 + (t.tier - 1) * 0.15);
           t.recoil = 1;
           const tdmg = (9.5 + wave * 1.15) * (1 + (t.tier - 1) * 0.5) * effDmg * techMul * cMul;
           const bLife = turretMaxR / 690;
@@ -1065,6 +1067,7 @@ function update(dt) {
     const e = enemies[i];
     if (!e || e.hp <= 0) continue;
     if (e.hitFlash > 0) e.hitFlash -= dt;
+    if (e._flashCd > 0) e._flashCd -= dt;
     if (e._blkTxtCd > 0) e._blkTxtCd -= dt;
     if (e._reactCd > 0) e._reactCd -= dt;
 

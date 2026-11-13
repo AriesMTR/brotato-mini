@@ -356,7 +356,10 @@ function hurtTree(tr, rawDmg) {
   if (!tr || tr.hp <= 0) return;
   const dmg = Math.max(1, Math.round(rawDmg));
   tr.hp -= dmg;
-  tr.hitFlash = 0.09;
+  if (!(tr._flashCd > 0)) {
+    tr.hitFlash = 0.042;
+    tr._flashCd = 0.095;
+  }
   addText(tr.x, tr.y - 26, dmg, '#a3e635', 14);
   addSparks(tr.x, tr.y - 8, Math.random() * 6.28, '#5ef29b', 2);
   if (tr.hp <= 0) {
@@ -578,8 +581,8 @@ function beginWave(retryMeta = null) {
   }
   if (typeof SpireAudio !== 'undefined') SpireAudio.syncScene(curScene.id);
   syncArenaAndZoom(true);
-  // 16 层平滑回合时长：第 1 层 20s 起步，逐层递增至 58s，第 4/8/12 层首领战 90s，第 16 层终局决战 95s
-  waveTime = isBossWave ? (wave === MAX_WAVE ? 95 : 90) : Math.min(58, 18 + Math.round(wave * 2.6));
+  // 16 层平滑回合时长：第 1 层 27s 起步，逐层递增至 60s，第 4/8/12 层首领战 95s，第 16 层终局决战 110s
+  waveTime = isBossWave ? (wave === MAX_WAVE ? 110 : 95) : Math.min(60, 25 + Math.round(wave * 2.3));
   waveMaxTime = waveTime;
   lastUrgentSec = -1;
   spawnAcc = 0.25;
@@ -618,14 +621,26 @@ function beginWave(retryMeta = null) {
   for (let i = 0; i < initTrees; i++) spawnTree();
 
   // 第 3 波起按轮次逐步解锁【场景专属怪物】与【场景专属环境异象】（概率触发，非每波必出）
-  if (wave >= 3) {
-    sceneMobEnabled = Math.random() < Math.min(0.72, 0.30 + (wave - 2) * 0.07);
-    activeSceneEvent = (!isBossWave && Math.random() < Math.min(0.65, 0.25 + (wave - 2) * 0.06)) ? curScene.eventId : null;
+  if (wave >= 2) {
+    sceneMobEnabled = hordeWave || Math.random() < Math.min(0.88, 0.52 + (wave - 1) * 0.05);
+    activeSceneEvent = (wave >= 3 && !isBossWave && Math.random() < Math.min(0.65, 0.25 + (wave - 2) * 0.06)) ? curScene.eventId : null;
     sceneEventT = activeSceneEvent ? 4.2 : 999;
   } else {
     sceneMobEnabled = false;
     activeSceneEvent = null;
     sceneEventT = 999;
+  }
+
+  // 非首领层开场立即刷出合围前锋群（重点加密第 1 层与前中期开局怪潮压迫感，告别开场冷场）
+  if (!isBossWave) {
+    const openCnt = Math.max(4, Math.round((wave === 1 ? 6 : 4) * diff.spawnMul));
+    for (let oi = 0; oi < openCnt; oi++) {
+      const oa = (oi / openCnt) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
+      const od = 265 + Math.random() * 125;
+      const ox = Math.max(60, Math.min(WORLD.w - 60, player.x + Math.cos(oa) * od));
+      const oy = Math.max(60, Math.min(WORLD.h - 60, player.y + Math.sin(oa) * od));
+      spawnWarning(ox, oy, pickWaveEnemyType(wave));
+    }
   }
 
   // 1~16 层主线剧情攀登期间禁用随机奇遇首领祭坛（确保首领 100% 仅在第 4/8/12/16 层固定登场，无尽模式开放奇遇祭坛）
@@ -776,7 +791,7 @@ function pickWaveEnemyType(wv) {
   const maxRanged = Math.min(10, 2 + Math.floor(wave * 0.7));
   const allowRanged = countActiveRangedEnemies() < maxRanged;
 
-  const exclProb = (curScene.exclMob && RANGED_ENEMY_TYPES.has(curScene.exclMob)) ? 0.055 : 0.11;
+  const exclProb = (curScene.exclMob && RANGED_ENEMY_TYPES.has(curScene.exclMob)) ? 0.10 : 0.16;
   if (sceneMobEnabled && curScene.exclMob && Math.random() < exclProb) {
     if (!RANGED_ENEMY_TYPES.has(curScene.exclMob) || allowRanged) {
       return curScene.exclMob;
@@ -784,32 +799,37 @@ function pickWaveEnemyType(wv) {
   }
 
   const table = [
-    ['chaser', 54]
+    ['chaser', 28]
   ];
-  if (wv >= 2 || (wave === 1 && waveTime < 10)) table.push(['swarmer', wave === 1 ? 12 : 14]);
-  if (wv >= 2) table.push(['stalker', 11]);
-  if (wv >= 3) {
-    table.push(['charger', 8]);
-    table.push(['bomber', 5]);
+  if (wv >= 2 || wave === 1) table.push(['swarmer', wave === 1 ? 16 : 14]);
+  if (wv >= 2 || wave === 1) table.push(['stalker', wave === 1 ? 9 : 13]);
+  if (wv >= 2) {
+    table.push(['shielder', wv === 2 ? 5 : 8]);
   }
-  if (wv >= 4) {
-    table.push(['splitter', 7]);
-    table.push(['shielder', 6]);
+  if (wv >= 3) {
+    table.push(['charger', 9.5]);
+    table.push(['bomber', 7.5]);
+    table.push(['splitter', 7.5]);
   }
   if (wv >= 5) {
-    table.push(['brute', 6]);
-    table.push(['summoner', 3.5]);
+    table.push(['brute', 7.5]);
+    table.push(['summoner', 5.0]);
   }
   if (wv >= 6) {
-    table.push(['healer', 3.5]);
-    table.push(['juggernaut', 3]);
+    table.push(['healer', 4.8]);
+    table.push(['juggernaut', 4.0]);
   }
 
   if (allowRanged) {
-    if (wv >= 2) table.push(['shooter', 5.5]);
-    if (wv >= 3) table.push(['sniper_bug', 3.0]);
-    if (wv >= 4) table.push(['mortar', 3.0]);
-    if (wv >= 5) table.push(['spinner', 2.8]);
+    if (wv >= 2) table.push(['shooter', 6.0]);
+    if (wv >= 3) table.push(['sniper_bug', 4.2]);
+    if (wv >= 4) {
+      table.push(['mortar', 4.2]);
+      table.push(['spinner', 4.0]);
+    }
+    if (hordeWave || (endlessMode && wv >= 7)) {
+      table.push(['spore_mother', 3.2]);
+    }
   }
 
   let totalW = 0;
@@ -840,11 +860,14 @@ function spawnHazard(x, y, r, dmg, delay = 1.22, extra = {}) {
 // 全异星怪物、4 大新增特异兵种、5 大场景专属怪、随机精英统领、4 大主宰 Boss 与 3 大奇遇首领生成
 // （全面拉开不同怪物在体型 r、血量 hp、移速 spd 与伤害 dmg 上的生态差异，增强首领压迫感并兼顾近战博弈）
 function createEnemy(x, y, type, variant = '') {
-  const endlessMul = wave > MAX_WAVE ? Math.pow(1.22, wave - MAX_WAVE) : 1;
+  const hpBaseMul = typeof MONSTER_HP_BASE_MUL === 'number' ? MONSTER_HP_BASE_MUL : 1.50;
+  const hpLinearSlope = typeof MONSTER_HP_LINEAR_SLOPE === 'number' ? MONSTER_HP_LINEAR_SLOPE : 0.72;
+  const bossHpMul = typeof BOSS_HP_MUL === 'number' ? BOSS_HP_MUL : 4.00;
+  const endlessMul = wave > MAX_WAVE ? Math.pow(1.16, wave - MAX_WAVE) : 1;
   const wIdx = Math.max(0, wave - 1);
-  // 适配 1~16 层四幕成长曲线：前期顺畅破敌，中后期第 8/12/16 层稳步递进，不膨胀卡关
+  // 常规魔物血量整体提升 50%，并随波数严格线性增长（第 1 波 1.50x 起，每波恒定线性递增 +1.08x）
   const clampedStoryIdx = Math.min(15, wIdx);
-  const s = (1 + clampedStoryIdx * 0.165 + Math.pow(Math.max(0, clampedStoryIdx - 2), 1.66) * 0.115) * endlessMul * diff.hpMul;
+  const s = hpBaseMul * (1 + wIdx * hpLinearSlope) * endlessMul * diff.hpMul;
   const dm = (1 + clampedStoryIdx * 0.105 + Math.max(0, Math.min(16, wave) - 7) * 0.048) * (wave > MAX_WAVE ? Math.pow(1.10, wave - MAX_WAVE) : 1) * diff.dmgMul;
   const sm = (1 + Math.min(0.18, wIdx * 0.012)) * diff.spdMul;
   const base = {
@@ -874,14 +897,14 @@ function createEnemy(x, y, type, variant = '') {
     const bDef = bossDefs[bKey] || FALLBACK_BOSS_DEFS.butcher;
     const isStoryBoss = (!endlessMode && wave <= MAX_WAVE);
     const twinScale = (!isStoryBoss && (diff.doubleBoss || (endlessMode && wave >= 20))) ? 0.68 : 1;
-    // 四幕固定首领精调血量梯度：第4层烬羽(1150) -> 第8层星使(3400) -> 第12层伽蓝(7600) -> 第16层日蚀圣女(12600 + 必进二阶段真我觉醒)
+    // 四幕固定首领血量整体提高 300%（4.0x）：第4层烬羽(4600) -> 第8层星使(13600) -> 第12层伽蓝(30400) -> 第16层日蚀圣女(50400 + 必进二阶段真我觉醒)
     let baseBossHp = 13600;
     if (wave <= 4) baseBossHp = 1150;
     else if (wave <= 8) baseBossHp = 3400;
     else if (wave <= 12) baseBossHp = 7600;
     else if (wave <= 16) baseBossHp = 12600;
     else baseBossHp = 14800 + Math.max(0, wave - MAX_WAVE) * 3600;
-    const bhp = Math.round(baseBossHp * endlessMul * diff.hpMul * twinScale);
+    const bhp = Math.round(baseBossHp * bossHpMul * endlessMul * diff.hpMul * twinScale);
     const bossDmgBase = wave <= 4 ? 7.8 : (wave <= 8 ? 9.6 : (wave <= 12 ? 11.2 : 12.6));
     const phase2Chance = (wave === 16 && bKey === 'solar_seraph')
       ? 1.0 // 第 16 层日蚀圣女 100% 触发二阶段【真我破茧】演出！
@@ -897,7 +920,7 @@ function createEnemy(x, y, type, variant = '') {
     const mKey = (variant && miniBossDefs[variant]) ? variant : getFixedMiniBossForWave(wave, false);
     const mDef = miniBossDefs[mKey] || FALLBACK_MINI_BOSS_DEFS.vanguard;
     const twinMiniScale = (diff.dualElite && wave >= 10) ? 0.70 : 1;
-    const mhp = Math.round((460 + wave * 95 + Math.pow(Math.max(0, Math.min(16, wave) - 3), 2.05) * 32) * endlessMul * diff.hpMul * twinMiniScale);
+    const mhp = Math.round((460 + wave * 95 + Math.pow(Math.max(0, Math.min(16, wave) - 3), 2.05) * 32) * bossHpMul * endlessMul * diff.hpMul * twinMiniScale);
     ent = {
       ...base, r: 36, hp: mhp, maxHp: mhp, spd: mDef.spd * sm, dmg: Math.round(8.4 * dm),
       color: mDef.color, type: 'mini_boss', variant: mKey, bossTitle: `${mDef.icon} ${mDef.name}`,
@@ -905,7 +928,7 @@ function createEnemy(x, y, type, variant = '') {
     };
   } else if (type === 'special_boss') {
     const relDef = specialRelics.find(r => r.bossId === variant) || specialRelics[0];
-    const shp = Math.round((960 + wave * 240 + Math.pow(wave, 1.92) * 14) * endlessMul * diff.hpMul);
+    const shp = Math.round((960 + wave * 240 + Math.pow(wave, 1.92) * 14) * bossHpMul * endlessMul * diff.hpMul);
     const sSpd = relDef.bossId === 'crimson_lord' ? 98 : (relDef.bossId === 'golden_golem' ? 74 : 86);
     ent = {
       ...base, r: 43, hp: shp, maxHp: shp, spd: sSpd * sm, dmg: Math.round(9.0 * dm),

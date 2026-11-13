@@ -189,7 +189,10 @@ function triggerExplosion(x, y, radius, enemyDmg, hurtPlayerToo = false, playerD
 }
 
 function getTotalArmor() { return (player ? player.armor : 0) + getSetBonuses().armor + getRockCount(); }
-function getTotalRangeBonus() { return (player ? player.rangeBonus : 0) + getSetBonuses().range; }
+function getTotalRangeBonus() {
+  const scale = typeof PLAYER_RANGE_SCALE === 'number' ? PLAYER_RANGE_SCALE : 0.80;
+  return Math.round(((player ? player.rangeBonus : 0) + getSetBonuses().range) * scale);
+}
 function getArmorMitigation() {
   const a = getTotalArmor();
   return a >= 0 ? Math.min(0.70, a / (a + 18)) : Math.max(-0.6, a * 0.06);
@@ -203,11 +206,12 @@ function getEffectiveDmgMul() {
   return Math.max(0.25, player.dmgMul - penalty + rangeConvert + hpConvert + armorConvert);
 }
 function getEffectiveAtkSpd() {
-  if (!player) return 1;
+  const scale = typeof PLAYER_ASPD_SCALE === 'number' ? PLAYER_ASPD_SCALE : 0.70;
+  if (!player) return scale;
   const missingBonus = player.cls === 'vampire' ? (1 - Math.max(0, player.hp) / Math.max(1, player.maxHp)) * 0.9 : 0;
   const sporeBonus = player.inSpore ? 0.14 : 0;
   const dashBonus = (player.dashHasteT || 0) > 0 ? 0.20 : 0;
-  return Math.max(0.3, player.atkSpd + getSetBonuses().aspd + missingBonus + sporeBonus + dashBonus);
+  return Math.max(0.18, (player.atkSpd + getSetBonuses().aspd + missingBonus + sporeBonus + dashBonus) * scale);
 }
 function getEffectiveCrit() { return (player ? player.crit : 0) + getSetBonuses().crit; }
 function getEffectiveCritMult(baseMult = 1.95) { return baseMult + (player ? (player.critDmg || 0) : 0); }
@@ -526,7 +530,10 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
 
   const dmg = Math.max(1, Math.round(rawDmg));
   e.hp -= dmg;
-  if (!opts.isDot) e.hitFlash = 0.09;
+  if (!opts.isDot && !(e._flashCd > 0)) {
+    e.hitFlash = 0.042;
+    e._flashCd = 0.095;
+  }
 
   if (knockA !== null && e.type !== 'boss' && e.type !== 'mini_boss' && e.type !== 'special_boss') {
     const baseKb = e.type === 'juggernaut' ? 1.2 : ((e.type === 'brute' || e.type === 'shielder') ? 3 : 10);
@@ -909,6 +916,7 @@ function hurtPlayer(rawDmg) {
 
     player.hp -= dmg;
     player.invuln = 0.42 * invScale;
+    player.hurtFlashT = 0.22;
     shake = 4.5;
     beep(115, 0.15, 'sawtooth', 0.08);
     addBurst(player.x, player.y, '#ff4d6d', 10, 175);
