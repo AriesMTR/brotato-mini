@@ -471,8 +471,9 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running", preferences 
   assert.strictEqual(vm.runInContext("MAX_WAVE", s), 16, "MAX_WAVE must be strictly 16 floors");
   assert.strictEqual(vm.runInContext("menuStage", s), "home", "Game must boot onto clean Main Title Screen (menuStage === 'home')");
 
-  // Verify v1.4.0: 32 weapons x 2 evolutions = 64 unique evolutions, T4+T4 -> T5 merge + 2-choice evolution modal,
-  // HD baked sprites across all 32 weapons, mid-late 2.0x HP & DMG wave curve, and desktop Retina floorBakeScale >= 2.0
+  // Verify v2.1.2: 32 weapons x 2 evolutions = 64 unique evolutions, T4+T4 -> T5 merge + 2-choice evolution modal,
+  // HD baked sprites across all 32 weapons, softened W1-W5 early difficulty with preserved 2.0x late cap,
+  // boosted melee base damage, MONSTER_SPD_MUL = 0.80, RANGED_ENEMY_COUNT_MUL = 0.80, stick range >= 130, and Retina floorBakeScale >= 1.60
   const v140Audit = vm.runInContext(`(() => {
     const wIds = Object.keys(WEAPONS);
     if (wIds.length !== 32) return { ok: false, reason: 'Expected 32 weapons, got ' + wIds.length };
@@ -488,8 +489,15 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running", preferences 
       }
     }
     if (evoIds.size !== 64) return { ok: false, reason: 'Expected 64 unique evolutions, got ' + evoIds.size };
-    if (getMidLateWaveHpMul(1) !== 1 || Math.abs(getMidLateWaveHpMul(16) - 2.0) > 1e-6) return { ok: false, reason: 'Bad midLateHpMul curve' };
-    if (getMidLateWaveDmgMul(1) !== 1 || Math.abs(getMidLateWaveDmgMul(16) - 2.0) > 1e-6) return { ok: false, reason: 'Bad midLateDmgMul curve' };
+    if (!(getMidLateWaveHpMul(1) < 0.80 && getMidLateWaveHpMul(4) < 1.0 && getMidLateWaveHpMul(8) > 1.3 && Math.abs(getMidLateWaveHpMul(16) - 2.0) <= 1e-6)) {
+      return { ok: false, reason: 'Bad midLateHpMul curve' };
+    }
+    if (!(getMidLateWaveDmgMul(1) < 0.80 && getMidLateWaveDmgMul(4) < 1.0 && getMidLateWaveDmgMul(8) > 1.3 && Math.abs(getMidLateWaveDmgMul(16) - 2.0) <= 1e-6)) {
+      return { ok: false, reason: 'Bad midLateDmgMul curve' };
+    }
+    if (MONSTER_SPD_MUL !== 0.80 || RANGED_ENEMY_COUNT_MUL !== 0.80 || WEAPONS.stick.range < 130 || WEAPONS.stick.dmg < 18 || WEAPONS.katana.dmg < 30) {
+      return { ok: false, reason: 'Bad v2.1.2 balance constants' };
+    }
 
     // Test T4 + T4 -> T5 merge & 2-choice evolution modal
     startGame('allrounder', { mode: 'endless' });
@@ -606,14 +614,14 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running", preferences 
 runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
 
 // ============================================================================
-// Suite 3: Bounded battlefield pixels, frame pacing, sprite motion and render costs
+// Suite 3: Crisp Retina battlefield pixels, frame pacing, sprite motion and render costs
 // ============================================================================
 {
   for (const sample of [
-    { mobile: false, width: 1440, height: 900, native: 2, budget: 2400000, maxDpr: 1.5 },
-    { mobile: false, width: 2560, height: 1440, native: 2, budget: 2400000, maxDpr: 1.5 },
-    { mobile: true, width: 390, height: 844, native: 3, budget: 1400000, maxDpr: 1.25 },
-    { mobile: true, width: 1024, height: 1366, native: 3, budget: 1400000, maxDpr: 1.25 }
+    { mobile: false, width: 1440, height: 900, native: 2, budget: 11200000, maxDpr: 2.25 },
+    { mobile: false, width: 2560, height: 1440, native: 2, budget: 11200000, maxDpr: 2.25 },
+    { mobile: true, width: 390, height: 844, native: 3, budget: 3600000, maxDpr: 1.75 },
+    { mobile: true, width: 1024, height: 1366, native: 3, budget: 3600000, maxDpr: 1.75 }
   ]) {
     const { sandbox: s } = createEnv(sample.mobile, sample.width, sample.height, sample.native);
     const canvas = vm.runInContext('({ width: cv.width, height: cv.height, dpr, smoothing: ctx.imageSmoothingQuality })', s);
@@ -622,7 +630,7 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     assert(canvas.width * canvas.height <= sample.budget + integerRoundingAllowance,
       `Battlefield pixel budget exceeded at ${sample.width}x${sample.height}@${sample.native}`);
     assert(canvas.dpr <= sample.maxDpr, `Battlefield DPR must stay bounded on ${sample.mobile ? 'touch' : 'desktop'} screens`);
-    assert.strictEqual(canvas.smoothing, 'low', 'Moving battlefield must use low-cost bilinear resampling');
+    assert.strictEqual(canvas.smoothing, 'high', 'Battlefield must preserve crisp high-quality resampling without blur');
   }
   const { sandbox: s } = createEnv(false, 1440, 900, 2);
   const adaptation = vm.runInContext(`(() => {
@@ -645,12 +653,11 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     const before = snapshot(), initialPixels = cv.width * cv.height;
     resetBattleFrameSample();
     for (let i = 0; i < 80; i++) recordBattleFrame(32);
-    const degradesRasterOnly = battleResolutionScale < initialScale && cv.width * cv.height < initialPixels && before === snapshot();
-    const newScale = battleResolutionScale;
+    const preservesSharpness = battleResolutionScale === 1 && cv.width * cv.height === initialPixels && before === snapshot();
     resize();
-    const resizeKeepsLow = ctx.imageSmoothingQuality === 'low' && battleResolutionScale === newScale && before === snapshot();
+    const resizeKeepsCrisp = ctx.imageSmoothingQuality === 'high' && battleResolutionScale === 1 && before === snapshot();
     for (let i = 0; i < 400; i++) recordBattleFrame(32);
-    const boundedMinimum = battleResolutionScale >= .65;
+    const boundedMinimum = battleResolutionScale === 1 && dpr >= 1.7;
 
     resetBattleFrameSample(); for (let i = 0; i < 10; i++) recordBattleFrame(32);
     document.hidden = true; _advanceClock(100); loop(performance.now());
@@ -661,10 +668,10 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     SpireDirector.replayEvent('opening.awakening'); _advanceClock(100); loop(performance.now());
     const narrativeClearsSample = battleSampleFrames === 0 && battleSampleMs === 0;
     SpireDirector.closeReplay();
-    return { normalUnchanged, oneSpikeUnchanged, loadingStallUnchanged, degradesRasterOnly,
-      resizeKeepsLow, boundedMinimum, hiddenClearsSample, narrativeClearsSample };
+    return { normalUnchanged, oneSpikeUnchanged, loadingStallUnchanged, preservesSharpness,
+      resizeKeepsCrisp, boundedMinimum, hiddenClearsSample, narrativeClearsSample };
   })()`, s);
-  for (const [key, value] of Object.entries(adaptation)) assert.strictEqual(value, true, 'Adaptive resolution invariant: ' + key);
+  for (const [key, value] of Object.entries(adaptation)) assert.strictEqual(value, true, 'Crisp Retina resolution invariant: ' + key);
 }
 
 {
@@ -731,7 +738,7 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
 
 {
   const { sandbox: s, stats, gameDraws } = createEnv(false, 1440, 900, 2);
-  assert(vm.runInContext("dpr <= 1.5 && dpr > 0", s), "Desktop battlefield must respect its pixel-budget DPR while HTML text remains independent");
+  assert(vm.runInContext("dpr >= 1.7 && dpr <= 2.25", s), "Desktop Retina battlefield must preserve crisp native DPR without blur");
 
   s.__battleDrawCount = () => gameDraws.length;
   const renderBudget = vm.runInContext(`(() => {
@@ -852,13 +859,16 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     for (const stepDt of [0.10, 2.40, 2.80]) { _advanceClock(stepDt * 1000); update(stepDt); draw(); }
     bossCutscene = null;
 
-    // Trigger Phase 2 in Endless Mode -> must 100% guarantee immediate mythic_phase2 portrait banner!
+    // Trigger Phase 2 in Endless Mode -> must 100% guarantee immediate mythic_phase2 portrait banner + +50% HP + +30% DMG + ZERO extra time inflation!
     endlessMode = true;
     player.waveMythicAwakened = false;
+    const preP2WaveTime = waveTime;
     const p2Boss = createEnemy(player.x + 150, player.y, 'boss', 'frost_queen');
+    const p1Hp = p2Boss.maxHp, p1Dmg = p2Boss.dmg;
     p2Boss.canPhase2 = true;
     hurtEnemy(p2Boss, p2Boss.maxHp + 99999, true);
-    const p2Guaranteed = !!(bossCutscene && bossCutscene.mode === 'mythic_phase2' && bossCutscene.variant === 'frost_queen' && bossCutscene.maxT >= 5.8);
+    const p2StatsOk = (p2Boss.maxHp === Math.max(450, Math.round(p1Hp * 1.50)) && p2Boss.hp === p2Boss.maxHp && p2Boss.dmg === Math.round(p1Dmg * 1.30) && waveTime === preP2WaveTime);
+    const p2Guaranteed = !!(p2StatsOk && bossCutscene && bossCutscene.mode === 'mythic_phase2' && bossCutscene.variant === 'frost_queen' && bossCutscene.maxT >= 5.8);
     for (const stepDt of [0.12, 2.50, 2.75]) { _advanceClock(stepDt * 1000); update(stepDt); draw(); }
     bossCutscene = null;
 

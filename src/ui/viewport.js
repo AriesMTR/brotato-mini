@@ -186,12 +186,14 @@ function resetBattleFrameSample() {
 }
 
 function syncBattleCanvasResolution() {
-  const mobilePerf = uiMode !== 'desktop' || isTouch;
-  const pixelBudget = mobilePerf ? 1400000 : 2400000;
+  // 严格按视界布局区分桌面/移动像素预算（触控笔记本仍按桌面超清渲染，杜绝地面与石栏变糊！）
+  const mobilePerf = uiMode !== 'desktop';
+  const pixelBudget = mobilePerf ? 3600000 : 11200000;
   const nativeDpr = Math.max(0.5, window.devicePixelRatio || 1);
-  const baseDpr = Math.min(nativeDpr, mobilePerf ? 1.25 : 1.5,
+  const baseDpr = Math.min(nativeDpr, mobilePerf ? 1.75 : 2.25,
     Math.sqrt(pixelBudget / Math.max(1, viewW * viewH)));
-  dpr = Math.max(0.5, baseDpr * battleResolutionScale);
+  battleResolutionScale = 1;
+  dpr = Math.max(0.75, baseDpr * battleResolutionScale);
   const cw = Math.max(1, Math.round(viewW * dpr));
   const ch = Math.max(1, Math.round(viewH * dpr));
   if (cv.width !== cw || cv.height !== ch) {
@@ -200,9 +202,7 @@ function syncBattleCanvasResolution() {
   }
   if (ctx) {
     ctx.imageSmoothingEnabled = true;
-    // Bilinear sampling for real-time movement; static sprite baking keeps
-    // high-quality resampling once, instead of repeating it for every monster.
-    try { ctx.imageSmoothingQuality = 'low'; } catch (_) {}
+    try { ctx.imageSmoothingQuality = 'high'; } catch (_) {}
   }
 }
 
@@ -214,16 +214,8 @@ function recordBattleFrame(frameMs) {
   battleSampleMs += frameMs;
   battleSampleFrames++;
   if (battleSampleMs < 2500) return;
-  const averageMs = battleSampleMs / battleSampleFrames;
   resetBattleFrameSample();
-  // Sustained missed frames lower only render resolution. Never alter enemy
-  // counts, simulation speed, attack timing or camera/world coordinates.
-  // Do not immediately raise it again and cause visible quality oscillation.
-  if (averageMs > 22 && battleResolutionScale > 0.65) {
-    battleResolutionScale = Math.max(0.65, battleResolutionScale * 0.85);
-    syncBattleCanvasResolution();
-    if (typeof logInfo === 'function') logInfo('PERF', `战场分辨率自适应 dpr=${dpr.toFixed(2)} pixels=${cv.width}x${cv.height}`);
-  }
+  // 保持 battleResolutionScale = 1 恒定超清，绝不动态降采样模糊地面与护栏（帧率由底层零GC/节流保障）
 }
 
 function resize() {

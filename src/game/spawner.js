@@ -556,18 +556,17 @@ function summonSpecialBoss(rel, forceCutscene = false) {
   if (!rel || !rel.def) return;
   const def = rel.def;
   beep(185, 0.26, 'sawtooth', 0.085);
-  if (rings.length < 40) rings.push({ x: rel.x, y: rel.y, r: 165, color: def.bossColor, t: 0.42, maxT: 0.42, fill: true });
+  if (rings.length < 36) rings.push({ x: rel.x, y: rel.y, r: 165, color: def.bossColor, t: 0.42, maxT: 0.42, fill: false });
   if (lightnings.length < 35) {
     lightnings.push({ pts: [{ x: rel.x, y: Math.max(20, rel.y - 280) }, { x: rel.x - 18, y: rel.y - 130 }, { x: rel.x + 14, y: rel.y - 55 }, { x: rel.x, y: rel.y }], color: def.color, t: 0.32, maxT: 0.32 });
   }
-  waveTime = Math.min(95, waveTime + 25);
-  waveMaxTime = Math.max(waveMaxTime, waveTime);
+  // 首领纯死战机制：不再额外增加冗余倒计时，若常规时间耗尽未分胜负自动转入死战，击败即刻通关领赏！
   spawnWarning(rel.x, rel.y, 'special_boss', def.bossId);
   const bw = document.getElementById('bossBarWrap');
   if (bw) { bw.classList.remove('hidden', 'mythic'); }
   if (player) {
     player.invuln = 0;
-    addText(player.x, player.y - 54, `${def.bossIcon} 特殊首领【${def.bossName}】降临！`, '#ffd166', 20, 2.6);
+    addText(player.x, player.y - 54, `◆ 特殊首领【${def.bossName}】降临！`, '#ffd166', 20, 2.6);
   }
   const showRarePortrait = shouldRollRareBossPortrait(def.bossId, forceCutscene);
   if (showRarePortrait) {
@@ -576,14 +575,14 @@ function summonSpecialBoss(rel, forceCutscene = false) {
       def.bossId,
       def.bossName,
       `🏮 记忆祭坛共鸣 · ${def.icon}${def.name}唤醒`,
-      '⏱️ 轮回延长 +25s · 贴近风眼可躲外环斩 · 击败必掉守誓遗物匣！',
+      '⚔️ 宿命死战到底（不加冗余时间） · 贴近风眼躲外环斩 · 击败必掉守誓遗物匣！',
       def.bossColor,
       def.color,
       BOSS_CUTSCENE_TOTAL_SEC
     );
   }
-  announce(`${def.bossIcon} 特殊首领【${def.bossName}】已唤醒！本波时间延长 +25s`, '#ffd166', 4.0);
-  logInfo('SPECIAL_BOSS', `召唤特殊首领 ${def.bossName}(${def.bossId}) · 立绘特写=${showRarePortrait} · 延长回合至 ${Math.ceil(waveTime)}s`);
+  announce(`${def.bossIcon} 特殊首领【${def.bossName}】已唤醒！宿命死战开启，击败必掉首领秘宝箱`, '#ffd166', 4.0);
+  logInfo('SPECIAL_BOSS', `召唤特殊首领 ${def.bossName}(${def.bossId}) · 立绘特写=${showRarePortrait} · 纯死战模式`);
 }
 
 function beginWave(retryMeta = null) {
@@ -670,10 +669,10 @@ function beginWave(retryMeta = null) {
   const initTrees = 1 + Math.min(2, player.bonusTrees || 0);
   for (let i = 0; i < initTrees; i++) spawnTree();
 
-  // 第 3 波起按轮次逐步解锁【场景专属怪物】与【场景专属环境异象】（概率触发，非每波必出）
+  // 第 2 层起解锁【场景专属怪物】，第 5 层起概率触发【场景专属环境异象】（前 3 层降低复合压力，中后期异象概率补偿）
   if (wave >= 2) {
     sceneMobEnabled = hordeWave || Math.random() < Math.min(0.88, 0.52 + (wave - 1) * 0.05);
-    activeSceneEvent = (wave >= 3 && !isBossWave && Math.random() < Math.min(0.65, 0.25 + (wave - 2) * 0.06)) ? curScene.eventId : null;
+    activeSceneEvent = (wave >= 5 && !isBossWave && Math.random() < Math.min(0.68, 0.30 + (wave - 4) * 0.065)) ? curScene.eventId : null;
     sceneEventT = activeSceneEvent ? 4.2 : 999;
   } else {
     sceneMobEnabled = false;
@@ -681,13 +680,13 @@ function beginWave(retryMeta = null) {
     sceneEventT = 999;
   }
 
-  // 非首领层开场立即刷出合围前锋群（前期 1~6 层下调 20% 怪潮密度，让开局节奏更张弛有度）
+  // 非首领层开场立即刷出合围前锋群（前 4 层开场合围数量与距离适度放宽，降低前期开荒贴脸压迫）
   if (!isBossWave) {
-    const earlyOpenMul = wave <= 4 ? 0.80 : (wave === 5 ? 0.87 : (wave === 6 ? 0.94 : 1.0));
-    const openCnt = Math.max(3, Math.round((wave === 1 ? 6 : 4) * earlyOpenMul * diff.spawnMul));
+    const earlyOpenMul = wave <= 2 ? 0.68 : (wave <= 4 ? 0.76 : (wave === 5 ? 0.86 : (wave === 6 ? 0.94 : 1.0)));
+    const openCnt = Math.max(2, Math.round((wave === 1 ? 5 : 4) * earlyOpenMul * diff.spawnMul));
     for (let oi = 0; oi < openCnt; oi++) {
       const oa = (oi / openCnt) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
-      const od = 265 + Math.random() * 125;
+      const od = (wave <= 4 ? 320 : 265) + Math.random() * 125;
       const ox = Math.max(60, Math.min(WORLD.w - 60, player.x + Math.cos(oa) * od));
       const oy = Math.max(60, Math.min(WORLD.h - 60, player.y + Math.sin(oa) * od));
       spawnWarning(ox, oy, pickWaveEnemyType(wave));
@@ -846,7 +845,7 @@ function spawnWarning(x, y, type, variant = '') {
   spawns.push({ x: sx, y: sy, type, variant, t: 0.90, maxT: 0.90 });
 }
 
-const RANGED_ENEMY_TYPES = new Set(['shooter', 'sniper_bug', 'mortar', 'spinner', 'rad_scorpion', 'frost_wisp', 'spore_mother']);
+const RANGED_ENEMY_TYPES = new Set(['shooter', 'sniper_bug', 'mortar', 'spinner', 'rad_scorpion', 'frost_wisp', 'spore_mother', 'summoner']);
 
 function countActiveRangedEnemies() {
   let c = 0;
@@ -859,68 +858,78 @@ function countActiveRangedEnemies() {
   return c;
 }
 
-// 生态多样化权重刷怪表（从第 1 层起全面开放 Z 字折线潜猎、弹性分裂泥、喷毒虫、三叉戟蝎、蛮牛冲锋与潜沙突刺等丰富机制怪，告别呆板直走）
+// 生态多样化权重刷怪表（怪物总量保持 100% 不变；远程怪刷新占比与同屏上限精准降低 20%，空出份额 1:1 转为同波近战怪）
 function pickWaveEnemyType(wv) {
-  const maxRanged = Math.min(12, 3 + Math.floor(wave * 0.85));
+  const rangedCountMul = typeof RANGED_ENEMY_COUNT_MUL === 'number' ? RANGED_ENEMY_COUNT_MUL : 0.80;
+  const maxRanged = Math.max(2, Math.round(Math.min(12, 3 + Math.floor(wave * 0.85)) * rangedCountMul));
   const allowRanged = countActiveRangedEnemies() < maxRanged;
 
-  const exclProb = (curScene.exclMob && RANGED_ENEMY_TYPES.has(curScene.exclMob)) ? 0.14 : 0.20;
+  const isExclRanged = !!(curScene.exclMob && RANGED_ENEMY_TYPES.has(curScene.exclMob));
+  const exclProb = isExclRanged ? (0.14 * rangedCountMul) : 0.20;
   if (sceneMobEnabled && curScene.exclMob && Math.random() < exclProb) {
-    if (!RANGED_ENEMY_TYPES.has(curScene.exclMob) || allowRanged) {
+    if (!isExclRanged || allowRanged) {
       return curScene.exclMob;
     }
   }
 
-  const table = [
-    ['chaser', 13],
+  const meleeTable = [
+    ['chaser', 12.5],
     ['stalker', 10.5],
-    ['swarmer', 8.0],
-    ['splitter', 6.8]
+    ['swarmer', 7.2],
+    ['splitter', 7.2]
   ];
   if (wv >= 2) {
-    table.push(['charger', 9.2]);
-    table.push(['shielder', 6.0]);
+    meleeTable.push(['charger', 11.8]);
+    meleeTable.push(['shielder', 7.8]);
   }
   if (wv >= 3) {
-    table.push(['sand_worm', 6.8]);
-    table.push(['bomber', 6.5]);
+    meleeTable.push(['sand_worm', 9.0]);
+    meleeTable.push(['bomber', 6.4]);
   }
   if (wv >= 4) {
-    table.push(['magma_imp', 5.2]);
-  }
-  if (wv >= 5) {
-    table.push(['brute', 6.8]);
-    table.push(['summoner', 4.8]);
+    meleeTable.push(['brute', wv === 4 ? 4.2 : 8.6]);
+    meleeTable.push(['magma_imp', 5.2]);
   }
   if (wv >= 6) {
-    table.push(['healer', 4.5]);
-    table.push(['juggernaut', 3.8]);
+    meleeTable.push(['juggernaut', 6.2]);
+    meleeTable.push(['healer', 4.6]);
   }
 
-  if (allowRanged) {
-    table.push(['shooter', wv === 1 ? 5.5 : 6.4]);
-    if (wv >= 2) {
-      table.push(['rad_scorpion', 6.2]);
-    }
-    if (wv >= 3) {
-      table.push(['frost_wisp', 5.0]);
-      table.push(['sniper_bug', 4.6]);
-    }
-    if (wv >= 4) {
-      table.push(['spinner', 4.6]);
-      table.push(['mortar', 4.4]);
-    }
-    if (wv >= 5 || hordeWave || (endlessMode && wv >= 7)) {
-      table.push(['spore_mother', 3.8]);
-    }
+  const rangedTable = [
+    ['shooter', wv === 1 ? 5.5 : 7.0]
+  ];
+  if (wv >= 2) {
+    rangedTable.push(['rad_scorpion', 6.8]);
+  }
+  if (wv >= 3) {
+    rangedTable.push(['frost_wisp', 5.6]);
+    rangedTable.push(['sniper_bug', 5.2]);
+  }
+  if (wv >= 4) {
+    rangedTable.push(['spinner', 5.2]);
+    rangedTable.push(['mortar', 5.0]);
+  }
+  if (wv >= 5) {
+    rangedTable.push(['summoner', 5.3]);
+  }
+  if (wv >= 5 || hordeWave || (endlessMode && wv >= 7)) {
+    rangedTable.push(['spore_mother', 4.3]);
   }
 
-  let totalW = 0;
-  for (let i = 0; i < table.length; i++) totalW += table[i][1];
-  let r = Math.random() * totalW;
-  for (let i = 0; i < table.length; i++) {
-    r -= table[i][1];
-    if (r <= 0) return table[i][0];
+  let meleeW = 0;
+  for (let i = 0; i < meleeTable.length; i++) meleeW += meleeTable[i][1];
+  let rangedW = 0;
+  for (let i = 0; i < rangedTable.length; i++) rangedW += rangedTable[i][1];
+
+  const baseRangedShare = (meleeW + rangedW) > 0 ? (rangedW / (meleeW + rangedW)) : 0;
+  const pickRanged = allowRanged && rangedW > 0 && Math.random() < (baseRangedShare * rangedCountMul);
+  const chosenTable = pickRanged ? rangedTable : meleeTable;
+  const chosenTotalW = pickRanged ? rangedW : meleeW;
+
+  let r = Math.random() * chosenTotalW;
+  for (let i = 0; i < chosenTable.length; i++) {
+    r -= chosenTable[i][1];
+    if (r <= 0) return chosenTable[i][0];
   }
   return 'chaser';
 }
@@ -946,8 +955,9 @@ function createEnemy(x, y, type, variant = '') {
   const hpBaseMul = typeof MONSTER_HP_BASE_MUL === 'number' ? MONSTER_HP_BASE_MUL : 1.50;
   const hpLinearSlope = typeof MONSTER_HP_LINEAR_SLOPE === 'number' ? MONSTER_HP_LINEAR_SLOPE : 0.72;
   const bossHpMul = typeof BOSS_HP_MUL === 'number' ? BOSS_HP_MUL : 4.00;
-  const lateBossMaxMul = typeof LATE_BOSS_HP_MUL === 'number' ? LATE_BOSS_HP_MUL : 3.00;
-  const lateBossScale = wave <= 4 ? 1.00 : (wave <= 6 ? 1.35 : (wave <= 8 ? 1.85 : (wave <= 10 ? 2.45 : lateBossMaxMul)));
+  const lateBossMaxMul = typeof LATE_BOSS_HP_MUL === 'number' ? LATE_BOSS_HP_MUL : 12.00;
+  // 后期首领血量再提升 +300%（由旧版 3.0x 跃升至 12.0x！第 4 层维持开荒友好，第 6~16 层逐幕陡峭攀升至满额 12.0x）
+  const lateBossScale = wave <= 4 ? 1.00 : (wave <= 6 ? 1.90 : (wave <= 8 ? 3.80 : (wave <= 10 ? 7.20 : (wave <= 12 ? 10.50 : lateBossMaxMul))));
   const monsterDmgMul = typeof MONSTER_DMG_MUL === 'number' ? MONSTER_DMG_MUL : 1.20;
   const midLateHpMul = typeof getMidLateWaveHpMul === 'function' ? getMidLateWaveHpMul(wave) : 1.0;
   const midLateDmgMul = typeof getMidLateWaveDmgMul === 'function' ? getMidLateWaveDmgMul(wave) : 1.0;
@@ -957,7 +967,8 @@ function createEnemy(x, y, type, variant = '') {
   const clampedStoryIdx = Math.min(15, wIdx);
   const s = hpBaseMul * (1 + wIdx * hpLinearSlope) * midLateHpMul * endlessMul * diff.hpMul;
   const dm = (1 + clampedStoryIdx * 0.105 + Math.max(0, Math.min(16, wave) - 7) * 0.048) * midLateDmgMul * (wave > MAX_WAVE ? Math.pow(1.10, wave - MAX_WAVE) : 1) * diff.dmgMul * monsterDmgMul;
-  const sm = (1 + Math.min(0.18, wIdx * 0.012)) * diff.spdMul;
+  const monsterSpdMul = typeof MONSTER_SPD_MUL === 'number' ? MONSTER_SPD_MUL : 0.80;
+  const sm = (1 + Math.min(0.18, wIdx * 0.012)) * diff.spdMul * monsterSpdMul;
   const base = {
     x, y, hitFlash: 0, phase: Math.random() * 6.28, vx: 0, vy: 0, faceA: 0,
     burnT: 0, burnTick: 0, burnDmg: 0, chillT: 0, freezeT: 0, sunderT: 0, _touchCd: 0,
@@ -987,13 +998,13 @@ function createEnemy(x, y, type, variant = '') {
     const twinScale = (!isStoryBoss && (diff.doubleBoss || (endlessMode && wave >= 20))) ? 0.68 : 1;
     // 四幕固定首领血量提高 300%，且中后期首领血量再额外提升最高 +200%（第 12~16 层及无尽轮回达 3.0x 终局强度）
     let baseBossHp = 13600;
-    if (wave <= 4) baseBossHp = 1150;
+    if (wave <= 4) baseBossHp = 880;
     else if (wave <= 8) baseBossHp = 3400;
     else if (wave <= 12) baseBossHp = 7600;
     else if (wave <= 16) baseBossHp = 12600;
     else baseBossHp = 14800 + Math.max(0, wave - MAX_WAVE) * 3600;
     const bhp = Math.round(baseBossHp * bossHpMul * lateBossScale * midLateHpMul * endlessMul * diff.hpMul * twinScale);
-    const bossDmgBase = wave <= 4 ? 7.8 : (wave <= 8 ? 9.6 : (wave <= 12 ? 11.2 : 12.6));
+    const bossDmgBase = wave <= 4 ? 6.8 : (wave <= 8 ? 9.6 : (wave <= 12 ? 11.2 : 12.6));
     // 主线以稳定的两阶段讲清每位守誓者的坚持与败北；无尽保留随机神话觉醒。
     const phase2Chance = isStoryBoss ? 1 : mythicRate;
     ent = {
@@ -1028,51 +1039,52 @@ function createEnemy(x, y, type, variant = '') {
       mat: relDef.bossId === 'golden_golem' ? 48 : (relDef.bossId === 'crimson_lord' ? 30 : 26)
     };
   } else if (type === 'stalker') {
-    ent = { ...base, r: 13, hp: 11.0 * s, maxHp: 11.0 * s, spd: 136 * sm, dmg: Math.round(4.8 * dm), color: '#06d6a0', type, slashCd: 0.7, stepCd: 2.0 + Math.random(), zigT: 0.35 + Math.random() * 0.25, zigDir: Math.random() < 0.5 ? 1 : -1, mat: 2 };
+    ent = { ...base, r: 14, hp: 20.0 * s, maxHp: 20.0 * s, spd: 138 * sm, dmg: Math.round(5.0 * dm), color: '#06d6a0', type, slashCd: 0.7, stepCd: 2.0 + Math.random(), zigT: 0.35 + Math.random() * 0.25, zigDir: Math.random() < 0.5 ? 1 : -1, mat: 2 };
   } else if (type === 'sniper_bug') {
-    ent = { ...base, r: 15, hp: 11.5 * s, maxHp: 11.5 * s, spd: 54 * sm, dmg: Math.round(6.8 * dm), color: '#ef233c', type, shotT: 2.1 + Math.random() * 0.8, aimA: undefined, mat: 3 };
+    ent = { ...base, r: 15, hp: 13.0 * s, maxHp: 13.0 * s, spd: 54 * sm, dmg: Math.round(6.8 * dm), color: '#ef233c', type, shotT: 2.1 + Math.random() * 0.8, aimA: undefined, aimMaxT: 0.72, recoilT: 0, mat: 3 };
   } else if (type === 'spinner') {
-    ent = { ...base, r: 19, hp: 26 * s, maxHp: 26 * s, spd: 74 * sm, dmg: Math.round(5.0 * dm), color: '#f59e0b', type, shotT: 2.1 + Math.random() * 0.8, orbitDir: Math.random() < 0.5 ? 1 : -1, mat: 3 };
+    ent = { ...base, r: 19, hp: 28 * s, maxHp: 28 * s, spd: 74 * sm, dmg: Math.round(5.0 * dm), color: '#f59e0b', type, shotT: 2.1 + Math.random() * 0.8, orbitDir: Math.random() < 0.5 ? 1 : -1, mat: 3 };
   } else if (type === 'juggernaut') {
-    ent = { ...base, r: 36, hp: 135 * s, maxHp: 135 * s, spd: 40 * sm, dmg: Math.round(10.5 * dm), color: '#475569', type, slamCd: 3.2, mat: 7 };
+    ent = { ...base, r: 38, hp: 310 * s, maxHp: 310 * s, spd: 45 * sm, dmg: Math.round(11.2 * dm), color: '#475569', type, slamCd: 3.0, mat: 7 };
   } else if (type === 'rad_scorpion') {
-    ent = { ...base, r: 21, hp: 34 * s, maxHp: 34 * s, spd: 70 * sm, dmg: Math.round(5.5 * dm), color: '#a3e635', type, shotT: 2.0 + Math.random() * 0.8, mat: 3 };
+    ent = { ...base, r: 21, hp: 36 * s, maxHp: 36 * s, spd: 70 * sm, dmg: Math.round(5.5 * dm), color: '#a3e635', type, shotT: 2.0 + Math.random() * 0.8, mat: 3 };
   } else if (type === 'sand_worm') {
-    ent = { ...base, r: 17, hp: 22 * s, maxHp: 22 * s, spd: 102 * sm, dmg: Math.round(5.4 * dm), color: '#f4a261', type, dashT: 1.9 + Math.random() * 0.8, mat: 3 };
+    ent = { ...base, r: 18, hp: 48 * s, maxHp: 48 * s, spd: 108 * sm, dmg: Math.round(5.8 * dm), color: '#f4a261', type, dashT: 1.65 + Math.random() * 0.7, mat: 3 };
   } else if (type === 'frost_wisp') {
-    ent = { ...base, r: 15, hp: 16 * s, maxHp: 16 * s, spd: 82 * sm, dmg: Math.round(4.6 * dm), color: '#48cae4', type, shotT: 1.8 + Math.random() * 0.8, mat: 3 };
+    ent = { ...base, r: 15, hp: 17 * s, maxHp: 17 * s, spd: 82 * sm, dmg: Math.round(4.6 * dm), color: '#48cae4', type, shotT: 1.8 + Math.random() * 0.8, orbitDir: Math.random() < 0.5 ? 1 : -1, mat: 3 };
   } else if (type === 'magma_imp') {
-    ent = { ...base, r: 14, hp: 14 * s, maxHp: 14 * s, spd: 118 * sm, dmg: Math.round(5.6 * dm), color: '#fb5607', type, mat: 3 };
+    ent = { ...base, r: 14, hp: 20 * s, maxHp: 20 * s, spd: 118 * sm, dmg: Math.round(5.8 * dm), color: '#fb5607', type, mat: 3 };
   } else if (type === 'spore_mother') {
-    ent = { ...base, r: 26, hp: 52 * s, maxHp: 52 * s, spd: 48 * sm, dmg: Math.round(5.8 * dm), color: '#c77dff', type, shotT: 2.4 + Math.random() * 0.9, mat: 4 };
+    ent = { ...base, r: 26, hp: 56 * s, maxHp: 56 * s, spd: 48 * sm, dmg: Math.round(5.8 * dm), color: '#c77dff', type, shotT: 2.4 + Math.random() * 0.9, mat: 4 };
   } else if (type === 'charger') {
-    ent = { ...base, r: 22, hp: 32 * s, maxHp: 32 * s, spd: 78 * sm, dmg: Math.round(6.2 * dm), color: '#f77f00', type, dashT: 2.0 + Math.random() * 0.9, mat: 3 };
+    ent = { ...base, r: 23, hp: 68 * s, maxHp: 68 * s, spd: 84 * sm, dmg: Math.round(6.8 * dm), color: '#f77f00', type, dashT: 1.75 + Math.random() * 0.75, mat: 3 };
   } else if (type === 'shooter') {
-    ent = { ...base, r: 16, hp: 12.5 * s, maxHp: 12.5 * s, spd: 62 * sm, dmg: Math.round(4.2 * dm), color: '#00b4d8', type, shotT: 1.6 + Math.random() * 0.9, mat: 2 };
+    ent = { ...base, r: 16, hp: 13.5 * s, maxHp: 13.5 * s, spd: 62 * sm, dmg: Math.round(4.2 * dm), color: '#00b4d8', type, shotT: 1.6 + Math.random() * 0.9, mat: 2 };
   } else if (type === 'mortar') {
-    ent = { ...base, r: 20, hp: 22 * s, maxHp: 22 * s, spd: 52 * sm, dmg: Math.round(7.8 * dm), color: '#ff9f1c', type, shotT: 2.0 + Math.random() * 1.0, mat: 3 };
+    ent = { ...base, r: 20, hp: 24 * s, maxHp: 24 * s, spd: 52 * sm, dmg: Math.round(7.8 * dm), color: '#ff9f1c', type, shotT: 2.0 + Math.random() * 1.0, mat: 3 };
   } else if (type === 'bomber') {
-    ent = { ...base, r: 15, hp: 12 * s, maxHp: 12 * s, spd: 112 * sm, dmg: Math.round(8.8 * dm), color: '#ff4d6d', type, primed: false, fuseT: 1.25, maxFuseT: 1.25, blastR: 86, mat: 2 };
+    ent = { ...base, r: 15, hp: 18 * s, maxHp: 18 * s, spd: 114 * sm, dmg: Math.round(8.8 * dm), color: '#ff4d6d', type, primed: false, fuseT: 1.25, maxFuseT: 1.25, blastR: 86, mat: 2 };
   } else if (type === 'splitter') {
-    ent = { ...base, r: 24, hp: 32 * s, maxHp: 32 * s, spd: 68 * sm, dmg: Math.round(4.4 * dm), color: '#52b788', type, hopT: 0.8 + Math.random() * 0.6, spitT: 2.1 + Math.random() * 0.9, mat: 3 };
+    ent = { ...base, r: 25, hp: 54 * s, maxHp: 54 * s, spd: 70 * sm, dmg: Math.round(4.8 * dm), color: '#52b788', type, hopT: 0.8 + Math.random() * 0.6, spitT: 2.1 + Math.random() * 0.9, mat: 3 };
   } else if (type === 'mini_slime') {
-    ent = { ...base, r: 10, hp: 5.5 * s, maxHp: 5.5 * s, spd: 138 * sm, dmg: Math.max(2, Math.round(2.4 * dm)), color: '#74c69d', type, mat: Math.random() < 0.35 ? 1 : 0 };
+    ent = { ...base, r: 10, hp: 9.0 * s, maxHp: 9.0 * s, spd: 140 * sm, dmg: Math.max(2, Math.round(2.6 * dm)), color: '#74c69d', type, mat: Math.random() < 0.35 ? 1 : 0 };
   } else if (type === 'shielder') {
-    ent = { ...base, r: 23, hp: 46 * s, maxHp: 46 * s, spd: 58 * sm, dmg: Math.round(5.5 * dm), color: '#5c677d', type, mat: 4 };
+    ent = { ...base, r: 24, hp: 96 * s, maxHp: 96 * s, spd: 62 * sm, dmg: Math.round(6.0 * dm), color: '#5c677d', type, mat: 4 };
   } else if (type === 'summoner') {
-    ent = { ...base, r: 18, hp: 20 * s, maxHp: 20 * s, spd: 54 * sm, dmg: Math.round(3.5 * dm), color: '#7209b7', type, sumT: 3.1 + Math.random(), boltT: 2.4, mat: 4 };
+    ent = { ...base, r: 18, hp: 22 * s, maxHp: 22 * s, spd: 54 * sm, dmg: Math.round(3.5 * dm), color: '#7209b7', type, sumT: 3.1 + Math.random(), boltT: 2.4, mat: 4 };
   } else if (type === 'healer') {
-    ent = { ...base, r: 17, hp: 22 * s, maxHp: 22 * s, spd: 62 * sm, dmg: Math.round(3.0 * dm), color: '#2ec4b6', type, healT: 2.5, mat: 4 };
+    ent = { ...base, r: 17, hp: 28 * s, maxHp: 28 * s, spd: 62 * sm, dmg: Math.round(3.0 * dm), color: '#2ec4b6', type, healT: 2.5, mat: 4 };
   } else if (type === 'brute') {
-    ent = { ...base, r: 32, hp: 96 * s, maxHp: 96 * s, spd: 50 * sm, dmg: Math.round(8.5 * dm), color: '#9d4edd', type, slamCd: 2.6, slamWindup: 0, mat: 5 };
+    ent = { ...base, r: 33, hp: 195 * s, maxHp: 195 * s, spd: 56 * sm, dmg: Math.round(9.2 * dm), color: '#9d4edd', type, slamCd: 2.4, slamWindup: 0, bargeCd: 1.9 + Math.random() * 0.7, bargeT: 0, mat: 5 };
   } else {
-    ent = { ...base, r: 15, hp: 15.5 * s, maxHp: 15.5 * s, spd: (86 + wave * 2.0) * sm, dmg: Math.max(2, Math.round(3.4 * dm)), color: '#d65db1', type: 'chaser', lungeCd: 1.8 + Math.random(), lungeT: 0, mat: Math.random() < 0.65 ? 1 : 2 };
+    ent = { ...base, r: 15, hp: 25.0 * s, maxHp: 25.0 * s, spd: (88 + wave * 2.0) * sm, dmg: Math.max(2, Math.round(3.8 * dm)), color: '#d65db1', type: 'chaser', lungeCd: 1.65 + Math.random() * 0.8, lungeT: 0, mat: Math.random() < 0.65 ? 1 : 2 };
   }
 
-  // 第 3 波起按难度刷出【狂化精英词缀怪】（金色描边光环，高血高速，亡语慢速毒刺环，双倍赏金）
+  // 第 3 波起按难度刷出【狂化精英词缀怪】（第 3 波精英率减半以降开荒压力，第 5 波起微补，总压力守恒）
   const isBossLike = type === 'boss' || type === 'mini_boss' || type === 'special_boss';
   const canElite = wave >= 3 && !isBossLike && type !== 'mini_slime' && type !== 'bomber' && (type !== 'juggernaut' || wave >= 8);
-  const eChance = (diff.eliteRate || 0.05) + Math.min(0.10, (wave - 3) * 0.01);
+  const rawEChance = (diff.eliteRate || 0.05) + Math.min(0.10, (wave - 3) * 0.01);
+  const eChance = wave === 3 ? rawEChance * 0.5 : (rawEChance + (wave >= 5 ? 0.005 : 0));
   if (canElite && Math.random() < eChance) {
     ent.elite = true;
     ent.r = Math.round(ent.r * 1.20);

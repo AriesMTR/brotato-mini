@@ -698,7 +698,7 @@ function startGame(cls, opts) {
     player.spdMul += 0.08; player.dodge += 0.06; player.atkSpd += 0.20; player.crit += 0.12; player.rangeBonus += 65;
     player.weapons.push(makeWeapon('smg', 1), makeWeapon('icicle', 1));
   } else if (cls === 'brawler') {
-    player.maxHp += 8; player.hp += 8; player.armor += 1; player.regen += 1.1; player.meleeBonus = 0.12; player.rangeBonus -= 10;
+    player.maxHp += 8; player.hp += 8; player.armor += 1; player.regen += 1.1; player.meleeBonus = 0.16; player.rangeBonus -= 10;
     player.weapons.push(makeWeapon('katana', 1), makeWeapon('stick', 1));
   } else if (cls === 'engineer') {
     player.armor += 2; player.regen += 1.8; player.techBonus = 0.15; player.bonusTurrets = 2;
