@@ -20,7 +20,10 @@ const MIME_BY_EXT = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
-  '.svg': 'image/svg+xml'
+  '.svg': 'image/svg+xml',
+  '.wav': 'audio/wav',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg'
 };
 
 function toDataUri(absPath) {
@@ -41,14 +44,15 @@ if (fs.existsSync(path.join(ROOT, 'assets/icon.png'))) {
 if (fs.existsSync(path.join(ROOT, 'assets/icon.svg'))) {
   inlineAssets['assets/icon.svg'] = toDataUri(path.join(ROOT, 'assets/icon.svg'));
 }
-const spireDir = path.join(ROOT, 'assets/spire');
-if (fs.existsSync(spireDir)) {
-  for (const name of fs.readdirSync(spireDir).sort()) {
-    const abs = path.join(spireDir, name);
+for (const subDir of ['assets/spire', 'assets/audio']) {
+  const absDir = path.join(ROOT, subDir);
+  if (!fs.existsSync(absDir)) continue;
+  for (const name of fs.readdirSync(absDir).sort()) {
+    const abs = path.join(absDir, name);
     if (!fs.statSync(abs).isFile()) continue;
     const ext = path.extname(name).toLowerCase();
     if (!MIME_BY_EXT[ext]) continue;
-    inlineAssets[`assets/spire/${name}`] = toDataUri(abs);
+    inlineAssets[`${subDir}/${name}`] = toDataUri(abs);
   }
 }
 

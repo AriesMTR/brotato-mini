@@ -325,8 +325,11 @@ window.addEventListener('keydown', e => {
       }
     }
   }
-  if ((k === ' ' || k === 'enter') && bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
-    bossCutscene.t = Math.min(bossCutscene.t, 0.08);
+  if (k === 'enter' && bossCutscene) {
+    const fadeDur = bossCutscene.fadeDur || 0.85;
+    if ((bossCutscene.maxT - bossCutscene.t) > 0.60 && bossCutscene.t > fadeDur) {
+      bossCutscene.t = fadeDur;
+    }
     return;
   }
   if (k === 'escape' || k === 'p') {
@@ -373,9 +376,15 @@ if (window.addEventListener) {
 }
 
 if (cv.addEventListener) {
-  cv.addEventListener('mousedown', () => {
-    if (bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
-      bossCutscene.t = Math.min(bossCutscene.t, 0.08);
+  cv.addEventListener('mousedown', e => {
+    if (bossCutscene && bossCutscene._skipRect) {
+      const fadeDur = bossCutscene.fadeDur || 0.85;
+      const r = bossCutscene._skipRect;
+      const cx = e && typeof e.clientX === 'number' ? e.clientX : -1;
+      const cy = e && typeof e.clientY === 'number' ? e.clientY : -1;
+      if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h && bossCutscene.t > fadeDur) {
+        bossCutscene.t = fadeDur;
+      }
     }
   });
   cv.addEventListener('contextmenu', e => {
@@ -388,8 +397,13 @@ if (cv.addEventListener) {
   });
   cv.addEventListener('touchstart', e => {
     isTouch = true;
-    if (bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
-      bossCutscene.t = Math.min(bossCutscene.t, 0.08);
+    if (bossCutscene && bossCutscene._skipRect && e.changedTouches && e.changedTouches.length > 0) {
+      const fadeDur = bossCutscene.fadeDur || 0.85;
+      const r = bossCutscene._skipRect;
+      const t0 = e.changedTouches[0];
+      if (t0.clientX >= r.x && t0.clientX <= r.x + r.w && t0.clientY >= r.y && t0.clientY <= r.y + r.h && bossCutscene.t > fadeDur) {
+        bossCutscene.t = fadeDur;
+      }
     }
     if (state !== 'wave') return;
     e.preventDefault();
@@ -684,6 +698,10 @@ function showStart() {
   const clm = document.getElementById('changelogModal');
   if (clm) clm.classList.add('hidden');
   bossCutscene = null;
+  if (typeof pendingBossCutscene !== 'undefined') pendingBossCutscene = null;
+  if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.resetForNewRun === 'function') {
+    SpireDirector.resetForNewRun();
+  }
   waveCheckpoint = null;
   document.getElementById('hud').classList.add('hidden');
   const sm = document.getElementById('startMenu');

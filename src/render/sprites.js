@@ -475,33 +475,35 @@ function drawEnemySprite(e) {
     ctx.restore();
   }
 
-  // 3. 四象元素异常状态高辨识度清爽叠层
-  ctx.save();
-  ctx.translate(e.x, e.y);
-  if (e.freezeT > 0 && !flash) {
-    ctx.fillStyle = 'rgba(114, 239, 221, 0.34)';
-    ctx.strokeStyle = '#e0fbfc';
-    ctx.lineWidth = 2.0;
-    ctx.beginPath();
-    for (let k = 0; k < 6; k++) {
-      const ia = (k * Math.PI) / 3 - Math.PI / 6;
-      const ir = r * 1.12;
-      k === 0 ? ctx.moveTo(Math.cos(ia) * ir, Math.sin(ia) * ir) : ctx.lineTo(Math.cos(ia) * ir, Math.sin(ia) * ir);
+  // 3. 四象元素异常状态高辨识度清爽叠层（仅在存在元素异常时开启画布状态栈，节省高频 save/restore）
+  if (((e.freezeT > 0 || e.chillT > 0) && !flash) || e.burnT > 0) {
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    if (e.freezeT > 0 && !flash) {
+      ctx.fillStyle = 'rgba(114, 239, 221, 0.34)';
+      ctx.strokeStyle = '#e0fbfc';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const ia = (k * Math.PI) / 3 - Math.PI / 6;
+        const ir = r * 1.12;
+        k === 0 ? ctx.moveTo(Math.cos(ia) * ir, Math.sin(ia) * ir) : ctx.lineTo(Math.cos(ia) * ir, Math.sin(ia) * ir);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (e.chillT > 0 && !flash) {
+      ctx.fillStyle = 'rgba(114, 239, 221, 0.20)';
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.88, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (e.chillT > 0 && !flash) {
-    ctx.fillStyle = 'rgba(114, 239, 221, 0.20)';
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.88, 0, Math.PI * 2); ctx.fill();
-  }
 
-  if (e.burnT > 0) {
-    const flk = Math.sin(now * 0.026 + e.phase) * 2.5;
-    ctx.fillStyle = '#fb923c';
-    ctx.beginPath();
-    ctx.moveTo(-5, -r * 0.7); ctx.quadraticCurveTo(0, -r - 13 + flk, 5, -r * 0.7);
-    ctx.fill();
+    if (e.burnT > 0) {
+      const flk = Math.sin(now * 0.026 + e.phase) * 2.5;
+      ctx.fillStyle = '#fb923c';
+      ctx.beginPath();
+      ctx.moveTo(-5, -r * 0.7); ctx.quadraticCurveTo(0, -r - 13 + flk, 5, -r * 0.7);
+      ctx.fill();
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   if (e.type === 'shielder') {
     ctx.strokeStyle = '#72efdd'; ctx.lineWidth = 5.5; ctx.lineCap = 'round';
@@ -692,48 +694,147 @@ function drawPotatoHero() {
   }
 }
 
-// 👑 守誓主宰全屏登场 & 剧场字幕栏角色半身原画徽章（暗金哥特圆章裁剪）
+// 👑 首领登场 & 神话二阶段觉醒破框半身立绘系统（440×516 透明抠图 + 双旋星盘法阵 + 二阶六翼神辉，0 radialGradient / 0 shadowBlur）
 function drawBossPortrait(variant, cx, cy, scale, isMythic) {
   const now = _syncNow();
   const s = scale || 1;
   ctx.save();
   ctx.translate(cx, cy);
   ctx.scale(s, s);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
 
-  const ringCol = isMythic ? '#fde68a' : '#e5b869';
+  const RING_COLORS = {
+    butcher: '#ff4d6d',
+    frost_queen: '#72efdd',
+    mech_colossus: '#ff9f1c',
+    void_weaver: '#c77dff',
+    plague_empress: '#52b788',
+    solar_seraph: '#ffd166',
+    crimson_lord: '#fb7185',
+    golden_golem: '#ffd166',
+    abyss_devourer: '#c77dff',
+    vanguard: '#f72585',
+    pyro_lord: '#fb5607',
+    shadow_stalker: '#06d6a0',
+    venom_matriarch: '#80ed99',
+    glacial_valkyrie: '#48cae4',
+    iron_warden: '#eab308',
+    storm_siren: '#38bdf8'
+  };
+  const ringCol = isMythic ? '#ffd166' : (RING_COLORS[variant] || '#ff4d6d');
+  const subCol = isMythic ? '#ff3b6b' : '#f6d379';
+
+  // 神话二阶段专属：背后六翼炽金神辉羽刃 + 圣芒背环
   if (isMythic) {
-    ctx.fillStyle = 'rgba(225, 29, 72, 0.24)';
-    ctx.strokeStyle = '#fde68a';
+    const wingPulse = Math.sin(now * 0.0042) * 3.5;
+    ctx.fillStyle = 'rgba(255, 42, 85, 0.28)';
+    ctx.strokeStyle = '#ffd166';
     ctx.lineWidth = 2.2;
     for (const dir of [-1, 1]) {
       for (let w = 0; w < 3; w++) {
         ctx.beginPath();
-        ctx.moveTo(0, 4 - w * 10);
-        ctx.lineTo(dir * (108 - w * 12), -58 + w * 26);
-        ctx.lineTo(dir * (78 - w * 10), -18 + w * 28);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.moveTo(dir * 10, 2 - w * 12);
+        ctx.lineTo(dir * (132 - w * 14), -74 + w * 30 + wingPulse * (w === 0 ? -1 : 0.5));
+        ctx.lineTo(dir * (96 - w * 11), -24 + w * 32);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
       }
     }
+    ctx.strokeStyle = 'rgba(255, 209, 102, 0.55)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, -10, 96, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
-  ctx.fillStyle = '#0b101d';
+  // 背后曜黑星芒法阵圆盘（角色头冠、长发与裙摆自然上下破框突出）
+  ctx.fillStyle = isMythic ? 'rgba(34, 7, 19, 0.90)' : 'rgba(11, 14, 28, 0.88)';
   ctx.strokeStyle = ringCol;
-  ctx.lineWidth = 3.5;
-  ctx.beginPath(); ctx.arc(0, 0, 68, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.lineWidth = 3.0;
+  ctx.beginPath();
+  ctx.arc(0, -8, 82, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
 
+  // 外环顺时针断续星轨 + 内环逆时针符文刻线
+  ctx.save();
+  ctx.translate(0, -8);
+  ctx.rotate(now * 0.0009);
+  ctx.strokeStyle = subCol;
+  ctx.lineWidth = 1.6;
+  ctx.setLineDash([18, 9, 4, 9]);
+  ctx.beginPath();
+  ctx.arc(0, 0, 90, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.rotate(-now * 0.0021);
+  ctx.strokeStyle = isMythic ? 'rgba(255, 209, 102, 0.52)' : 'rgba(255, 255, 255, 0.34)';
+  ctx.lineWidth = 1.4;
+  ctx.setLineDash([10, 8]);
+  ctx.beginPath();
+  ctx.arc(0, 0, 70, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // 左右悬浮四角星芒点缀
+  ctx.fillStyle = isMythic ? '#ffd166' : ringCol;
+  for (const dir of [-1, 1]) {
+    const sx = dir * 94, sy = -42 + Math.sin(now * 0.003 + dir) * 3.5;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - 7);
+    ctx.lineTo(sx + 2.4, sy - 2.4);
+    ctx.lineTo(sx + 7, sy);
+    ctx.lineTo(sx + 2.4, sy + 2.4);
+    ctx.lineTo(sx, sy + 7);
+    ctx.lineTo(sx - 2.4, sy + 2.4);
+    ctx.lineTo(sx - 7, sy);
+    ctx.lineTo(sx - 2.4, sy - 2.4);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 绘制高清半身破框立绘（440×516 黄金半身比例：一阶段专属夏装 / 二阶段专属隐藏泳装换装）
   const animeImg = typeof getBossAnimePortrait === 'function' ? getBossAnimePortrait(variant, !!isMythic) : null;
   if (animeImg) {
-    ctx.save();
-    ctx.beginPath(); ctx.arc(0, 0, 64, 0, Math.PI * 2); ctx.clip();
-    const iw = animeImg.naturalWidth || 420, ih = animeImg.naturalHeight || 420;
-    const sc = 136 / Math.min(iw, ih);
-    const dw = iw * sc, dh = ih * sc;
-    ctx.drawImage(animeImg, -dw * 0.5, -dh * 0.46, dw, dh);
-    ctx.restore();
+    const iw = animeImg.width || animeImg.naturalWidth || 440;
+    const ih = animeImg.height || animeImg.naturalHeight || 516;
+    const isTallFallback = ih > iw * 1.3;
+    const breath = Math.sin(now * 0.0024) * 2.2;
+    const sway = Math.cos(now * 0.0015) * 1.0;
+    ctx.imageSmoothingEnabled = true;
+    if ('imageSmoothingQuality' in ctx) ctx.imageSmoothingQuality = 'high';
+    if (isTallFallback) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, -8, 78, 0, Math.PI * 2);
+      ctx.clip();
+      const sc = 166 / Math.min(iw, ih);
+      const dw = iw * sc, dh = ih * sc;
+      ctx.drawImage(animeImg, -dw * 0.5, -dh * 0.44, dw, dh);
+      ctx.restore();
+    } else {
+      const dw = 192, dh = 225;
+      ctx.drawImage(animeImg, -dw * 0.5 + sway, -dh * 0.52 + breath, dw, dh);
+    }
+
+    // 底部双层鎏金棱钻托座铭纹（优雅承接半身立绘柔化下缘）
+    ctx.strokeStyle = ringCol;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-58, 96);
+    ctx.lineTo(0, 104);
+    ctx.lineTo(58, 96);
+    ctx.stroke();
+    ctx.fillStyle = subCol;
+    ctx.beginPath();
+    ctx.moveTo(0, 99);
+    ctx.lineTo(5.5, 104);
+    ctx.lineTo(0, 109);
+    ctx.lineTo(-5.5, 104);
+    ctx.closePath();
+    ctx.fill();
   }
 
-  ctx.strokeStyle = isMythic ? '#fb7185' : '#72efdd';
-  ctx.lineWidth = 1.6;
-  ctx.beginPath(); ctx.arc(0, 0, 74, now * 0.001, now * 0.001 + Math.PI * 1.4); ctx.stroke();
   ctx.restore();
 }

@@ -781,6 +781,13 @@ function nextWave() { wave++; beginWave(); }
 function endGame(win) {
   state = 'end';
   resetJoy();
+  if (!win) {
+    bossCutscene = null;
+    if (typeof pendingBossCutscene !== 'undefined') pendingBossCutscene = null;
+    if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.abortActive === 'function') {
+      SpireDirector.abortActive();
+    }
+  }
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('pauseMenu').classList.add('hidden');
   const cm = document.getElementById('crateMenu');

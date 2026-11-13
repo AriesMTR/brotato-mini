@@ -630,13 +630,18 @@ const SpireDirector = (function () {
     step.rightEnterT = 0;
   }
 
-  function resetForNewRun() {
+  function abortActive() {
     _queue.length = 0;
     _cur = null;
     _fadeOut = null;
     _hitstopT = 0;
     _hitstopCd = 0;
     _slowmoT = 0;
+    _syncVisibility();
+  }
+
+  function resetForNewRun() {
+    abortActive();
     _seenIntro = false;
     _seenActCurtain = Object.create(null);
     _seenFloorDlg = Object.create(null);
@@ -689,7 +694,16 @@ const SpireDirector = (function () {
   function onWaveStart(waveNum, sceneObj, bossVariant, isRetry) {
     const w = Math.floor(Number(waveNum) || 1);
     const isEnd = (typeof endlessMode !== 'undefined' && endlessMode) || w > 16;
-    if (isEnd || isRetry) return;
+    if (isRetry) {
+      abortActive();
+      const prefix = `${w}_`;
+      for (const k in _seenBossP2) {
+        if (k.indexOf(prefix) === 0) delete _seenBossP2[k];
+      }
+      delete _seenBossDefeat[w];
+      return;
+    }
+    if (isEnd) return;
 
     // 1. 第 1 层新开局：首先播放宽银幕三镜开场动画！
     if (w === 1 && !_seenIntro) {
@@ -1717,6 +1731,7 @@ const SpireDirector = (function () {
   return {
     CHAR_CAST,
     onResize,
+    abortActive,
     resetForNewRun,
     triggerHitstop,
     toggleAutoPlay,

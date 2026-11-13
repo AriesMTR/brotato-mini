@@ -4,6 +4,24 @@
 
 ---
 
+## [v1.3.8] - 2026-11-13
+### 👑 16 首领「黑曜镌金」破框立绘横幅回归（满 5 秒展示消逝 / 一阶&二阶双 33%）+ 热路径性能优化 + 离线音景与回溯稳定修复
+- **首领登场与二阶段觉醒破框立绘横幅重塑回归（`assets/spire/bp_*`、`src/data/boss_portraits.js`、`src/render/sprites.js`、`src/render/renderer.js`、`src/game/spawner.js`、`src/game/combat.js`）**：
+  - **16 位首领 × 双形态共 32 套 `440×516` 高清透明抠图立绘恢复**：通过轻量化双通道（RGB JPG + Alpha PNG 离屏一次性合成缓存）完整恢复 6 位终局主宰、7 位先锋统领与 3 位记忆祭坛首领的一阶段夏装立绘与二阶段神话换装立绘。
+  - **「黑曜镌金」高级破框横幅重设计**：左侧半身立绘向上/向下突破斜切暗金画匣边框，衬以逆旋双环星盘法阵与二阶段六翼神辉；右侧排版首领称号徽章、真名主标题、时装副标、机制提示胶囊与底部 5 秒倒计时流光进度条，**完整展示满 `5.0s` 后经 `0.85s` 平滑上浮渐隐**（全程 `0` 运行时径向渐变、`0` `shadowBlur`）。
+  - **双阶段 `33%` 触发机制与剧场无冲突衔接**：一阶段首领登场 `33%` 概率展示一阶段立绘（每种首领单局独立上限 1 次）；首领初死 `33%` 概率触发神话二阶段觉醒（第 16 层日蚀圣女剧情终战保持 100% 必进二阶段），且一旦进入二阶段 **100% 必弹二阶段专属立绘横幅**；若当前正播放 `SpireDirector` 宽银幕 AVG 对话则自动挂起队列，待对话结束后无缝弹出。
+- **战斗碰撞与 Canvas 渲染热路径性能优化（`src/render/sprites.js`、`src/render/renderer.js`、`src/game/update.js`、`src/game/combat.js`）**：
+  - 消除 `drawEnemySprite` 在怪物无冰冻/寒冷/灼烧异常时每帧百怪冗余的 `ctx.save() / translate() / restore()` 调用。
+  - 在子弹碰撞前预计算存活怪物的全局 AABB 包络盒实现 `O(1)` 粗筛，并在武器索敌、子弹命中与跳弹搜索中加入轴向差值剪枝（`|dx| >= hitR`）。
+  - 受击火花生成时预存单位向量 `(ux, uy)` 免除渲染帧逐颗 `Math.hypot` 开方，并为光束与连锁闪电补充视口包围盒裁剪。
+- **单文件离线版音频全量内联与潜在 Bug 修复（`scripts/build-singlefile.mjs`、`src/core/audio.js`、`src/game/director.js`、`src/game/spawner.js`、`src/ui/menus.js`、`src/ui/shop.js`）**：
+  - 修复离线单文件版未内联 `assets/audio/*.wav` 及 `AudioBank` 未读取内联字典导致离线环境音频 `ERR_FILE_NOT_FOUND` 的问题；修复 `SpireAudio.tick` 合成器节点未 `disconnect()` 的内存泄漏。
+  - 修复第三幕「倒悬钟楼」场景 ID 误写为 `'clockwork'`（应为 `'wasteland'`）导致上升发条金尘粒子不生效的 Bug。
+  - 修复战败结算、重开本层（`retryFailedWave`）及返回主殿时 `SpireDirector` 慢动作/微顿帧与二阶段演出标记残留的问题。
+  - 将无尽深渊（17 层+）主首领轮转池补齐为全部 6 位终极首领（纳入 `mech_colossus` 与 `plague_empress`），并清理 `monsters.js` 与 `viewport.js` 末尾残留的废弃补丁与重复监听器。
+
+---
+
 ## [v1.3.7] - 2026-11-13
 ### 🎨 全 37 种战斗单位 1:1 专属高清透明贴图 + 硬核数值重构（怪血 +50% 线性成长 / 首领血量 +300% / 射程 -20% / 攻速 -30%）+ 受击微光与战场纯净修复
 - **全 37 种怪物 / 先锋统领 / 终局主宰 / 记忆祭坛首领 1:1 专属高清透明精灵全量实装（0 贴图复用）**：

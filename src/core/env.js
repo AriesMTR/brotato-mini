@@ -1,4 +1,4 @@
-// 核心画布环境、DPR 像素比与全局品质常量（v1.3.7 全37种单位专属超清贴图与受击微光纯净版）
+// 核心画布环境、DPR 像素比与全局品质常量（v1.3.8 首领破框立绘横幅回归 · 性能优化与全链路稳定加固版）
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
     const rad = Math.min(typeof r === 'number' ? r : 4, Math.abs(w) * 0.5, Math.abs(h) * 0.5);
@@ -15,13 +15,23 @@ const cv = document.getElementById('cv'), ctx = cv.getContext('2d', { alpha: fal
 let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.06, userZoomed = false;
 let isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let bootReady = false;
-const APP_VERSION = 'v1.3.7';
+const APP_VERSION = 'v1.3.8';
 const APP_BUILD_DATE = '2026-11-13';
 
 // 游戏内置版本更新日志数据（供开局主界面「纪元志」弹窗展示）
 const CHANGELOG_HISTORY = [
   {
-    ver: 'v1.3.7', date: '2026-11-13', tag: '当前版本 · 全37种单位专属超清贴图 · 硬核难度重构 · 受击微光与战场纯净优化',
+    ver: 'v1.3.8', date: '2026-11-13', tag: '当前版本 · 首领破框立绘横幅回归 · 战斗渲染性能优化 · 离线音景与回溯修复',
+    title: '👑 16 首领黑曜镌金破框立绘横幅回归（满 5 秒展示消逝 / 一阶&二阶双 33%）+ 热路径性能优化与潜在 Bug 清零',
+    items: [
+      '👑 首领登场与二阶段破框立绘横幅重塑回归：完整恢复 16 位首领（6 位终局主宰 + 7 位先锋统领 + 3 位祭坛首领）共 32 套 440×516 高清半身立绘（一阶夏装 & 二阶神话换装）；升级「黑曜镌金」斜切画匣、双旋星盘法阵、立绘左置破框与底部流光计时进度条，满 5.0 秒展示后 0.85 秒丝滑上浮消逝；一阶段 33% 概率触发，二阶段 33% 概率觉醒且觉醒必弹二阶段专属立绘（自动衔接宽银幕 AVG 剧场不重叠）。',
+      '🚀 战斗碰撞与渲染热路径深度提速：消除每帧百怪无元素异常时的冗余 ctx.save/translate/restore 状态栈切换；新增存活怪物全局 AABB 包络盒 O(1) 预筛与轴向差值剪枝，大幅压降密集弹幕 × 怪群碰撞开销；预存受击火花单位向量免除逐帧 hypot 开方，并为光束与连锁电弧补充视口裁剪。',
+      '🔊 单文件离线版音频全量内联与 WebAudio 防泄漏：打包脚本新增内联全部 7 首环境音景与过场 .wav 音频，修复离线版移出目录后音频报 ERR_FILE_NOT_FOUND 的问题；修复 SpireAudio.tick 合成器节点未 disconnect 的内存泄漏。',
+      '🛠️ 逻辑与演出细节修复：修复第三幕「倒悬钟楼」发条金尘粒子因场景 ID 误判未渲染的问题；修复战败重开本层或返回主殿时剧场慢动作/二阶段状态残留；将无尽深渊 17 层+ 主首领轮转池补齐为完整 6 位终极 Boss，并清理残留废弃补丁代码。'
+    ]
+  },
+  {
+    ver: 'v1.3.7', date: '2026-11-13', tag: '全37种单位专属超清贴图 · 硬核难度重构 · 受击微光与战场纯净优化',
     title: '🎨 全 37 种战斗单位 1:1 专属超清贴图实装 + 硬核数值重构（首层加密 / 射程-20% / 攻速-30% / 怪血+50%线性成长 / 首领血量+300%）+ 受击微光与场地净化',
     items: [
       '👾 全 37 种怪物/统领/首领专属超清贴图（新增 28 张 256~300px Retina 哥特 Q 版透明 PNG，0 贴图复用）：从蚀忆灯蛾、裂纹骨盾卫、窥视单眼狙偶、旋刃发条陀螺、腐钟迫击炮手、黑曜巨神卫，到 7 位先锋统领、旧塔机甲神兵与 3 位记忆祭坛首领全部配备 1:1 专属贴图，武器外观与攻击机制严密呼应；烬塔圣典怪物图鉴扩容至 37 项全收录。',

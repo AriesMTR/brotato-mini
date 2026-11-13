@@ -865,8 +865,10 @@ function draw() {
       ctx.restore();
     }
 
-    // 激光束与狙击枪高能贯穿轨迹（外层电浆辉光 + 白炽内芯 + 命中光斑）
-    for (const bm of beams) {
+    // 激光束与狙击枪高能贯穿轨迹（外层电浆辉光 + 白炽内芯 + 命中光斑 + 视口包围盒裁剪）
+    for (let i = 0; i < beams.length; i++) {
+      const bm = beams[i];
+      if ((bm.x1 < vL && bm.x2 < vL) || (bm.x1 > vR && bm.x2 > vR) || (bm.y1 < vT && bm.y2 < vT) || (bm.y1 > vB && bm.y2 > vB)) continue;
       const alpha = Math.max(0.04, bm.t / Math.max(0.01, bm.maxT));
       ctx.save();
       ctx.lineCap = 'round';
@@ -876,22 +878,29 @@ function draw() {
       ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
       ctx.globalAlpha = alpha;
       ctx.lineWidth = (bm.thin ? 4 : 9) * alpha;
-      ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.stroke();
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = (bm.thin ? 1.8 : 3.5) * alpha;
-      ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.stroke();
       ctx.restore();
     }
 
-    // 连锁电弧（双层青紫电芒 + 白芯折线）
-    for (const lt of lightnings) {
+    // 连锁电弧（双层青紫电芒 + 白芯折线 + 视口裁剪）
+    for (let i = 0; i < lightnings.length; i++) {
+      const lt = lightnings[i];
+      const pts = lt.pts;
+      if (!pts || !pts.length) continue;
+      const p0 = pts[0], pN = pts[pts.length - 1];
+      if ((p0.x < vL && pN.x < vL) || (p0.x > vR && pN.x > vR) || (p0.y < vT && pN.y < vT) || (p0.y > vB && pN.y > vB)) continue;
       const alpha = Math.max(0.04, lt.t / Math.max(0.01, lt.maxT));
       ctx.save();
       ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       ctx.globalAlpha = alpha * 0.42;
       ctx.strokeStyle = lt.color; ctx.lineWidth = 8 * alpha;
       ctx.beginPath();
-      lt.pts.forEach((pt, idx) => idx === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+      for (let idx = 0; idx < pts.length; idx++) {
+        idx === 0 ? ctx.moveTo(pts[idx].x, pts[idx].y) : ctx.lineTo(pts[idx].x, pts[idx].y);
+      }
       ctx.stroke();
       ctx.globalAlpha = alpha;
       ctx.lineWidth = 3.5 * alpha;
@@ -1081,8 +1090,14 @@ function draw() {
       const sp = sparks[i];
       if (sp.x < vL || sp.x > vR || sp.y < vT || sp.y > vB) continue;
       const life = Math.max(0, sp.t / sp.maxT);
-      const spd = Math.hypot(sp.vx, sp.vy) || 1;
-      const dx = (sp.vx / spd) * sp.len * life, dy = (sp.vy / spd) * sp.len * life;
+      let ux = sp.ux, uy = sp.uy;
+      if (ux === undefined) {
+        const spd = Math.hypot(sp.vx, sp.vy) || 1;
+        ux = sp.vx / spd; uy = sp.vy / spd;
+        sp.ux = ux; sp.uy = uy;
+      }
+      const reach = sp.len * life;
+      const dx = ux * reach, dy = uy * reach;
       ctx.globalAlpha = life;
       ctx.strokeStyle = sp.color; ctx.lineWidth = 2.6;
       ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(sp.x - dx, sp.y - dy); ctx.stroke();
@@ -1165,7 +1180,7 @@ function draw() {
         const my = ((i * 113 + wt * 68) % viewH);
         ctx.beginPath(); ctx.arc(mx, my, 1.6 + (i % 3) * 0.6, 0, Math.PI * 2); ctx.fill();
       }
-    } else if (scId === 'clockwork') {
+    } else if (scId === 'wasteland') {
       ctx.fillStyle = 'rgba(253, 230, 138, 0.28)';
       for (let i = 0; i < moteCnt; i++) {
         const mx = ((i * 149 + Math.cos(wt + i) * 20) % viewW + viewW) % viewW;
@@ -1299,231 +1314,318 @@ function draw() {
     ctx.restore();
   }
 
-  // 《烬塔残响》四幕暗黑作画剧场演出 & 首领真身显圣时停特写（0 实时渐变，0 滤镜，零盖章标签）
-  if (state === 'wave' && typeof bossCutscene !== 'undefined' && bossCutscene && bossCutscene.t > 0) {
+  // 👑 首领登场（一阶段 33% 概率）/ 神话二阶段觉醒（二阶段 33% 概率觉醒且 100% 必出立绘）全屏斜向破框立绘横幅
+  // 完整展示 5.0 秒后进入 0.85 秒丝滑上浮消逝动画（0 radialGradient / 0 shadowBlur）
+  if (state === 'wave' &&
+      typeof bossCutscene !== 'undefined' && bossCutscene && bossCutscene.t > 0 &&
+      !(typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.isBlockingGameplay === 'function' && SpireDirector.isBlockingGameplay())) {
     const bc = bossCutscene;
-    const maxT = Math.max(0.25, bc.maxT || 3.8);
-    const elapsed = maxT - bc.t;
-    const enterP = Math.min(1, elapsed / 0.22);
-    const exitP = Math.min(1, Math.max(0, bc.t / 0.25));
+    const fadeDur = Math.max(0.35, bc.fadeDur || 0.85);
+    const maxT = Math.max(fadeDur + 0.5, bc.maxT || 5.85);
+    const showDur = Math.max(0.5, maxT - fadeDur);
+    const elapsed = Math.max(0, maxT - bc.t);
+    const rawEnter = Math.min(1, elapsed / 0.30);
+    const enterP = 1 - Math.pow(1 - rawEnter, 3);
+    const rawExit = Math.min(1, Math.max(0, bc.t / fadeDur));
+    const exitP = rawExit * rawExit * (3 - 2 * rawExit);
     const alpha = enterP * exitP;
+    const dissolveLift = (1 - exitP) * 20;
     const isMythic = bc.mode === 'mythic_phase2';
-    const mainCol = bc.color || '#e11d48';
-    const accCol = bc.accent || '#f6d379';
+    const mainCol = isMythic ? '#ff2a55' : (bc.color || '#e11d48');
+    const accCol = isMythic ? '#ffd166' : (bc.accent || '#f6d379');
     const portraitPortrait = viewW < 620;
-    const storyPack = (typeof getSpireCutscenePack === 'function') ? getSpireCutscenePack(bc.variant) : null;
-    const prog = Math.max(0, Math.min(0.999, elapsed / maxT));
-    const beatIdx = storyPack && storyPack.lines ? Math.min(storyPack.lines.length - 1, Math.floor(prog * storyPack.lines.length)) : 0;
-    const activeFrame = (storyPack && storyPack.imgs) ? (storyPack.imgs[beatIdx] || storyPack.imgs[0]) : null;
-
-    ctx.save();
-    // 1. 全屏暗黑剧场遮罩与刀光瞬闪
-    ctx.globalAlpha = 0.86 * alpha;
-    ctx.fillStyle = isMythic ? '#12050b' : '#060913';
-    ctx.fillRect(0, 0, viewW, viewH);
-    if (elapsed < 0.09) {
-      ctx.globalAlpha = (1 - elapsed / 0.09) * 0.38;
-      ctx.fillStyle = isMythic ? '#f6d379' : '#ffffff';
-      ctx.fillRect(0, 0, viewW, viewH);
-    }
-
-    // 2. 宽银幕电影院黑边封幅与鎏金细线
-    const barH = Math.round(Math.min(56, viewH * 0.085) * enterP);
-    ctx.globalAlpha = 0.96 * exitP;
-    ctx.fillStyle = '#04060c';
-    ctx.fillRect(0, 0, viewW, barH);
-    ctx.fillRect(0, viewH - barH, viewW, barH);
-    ctx.fillStyle = accCol;
-    ctx.fillRect(0, barH - 1.5, viewW, 1.5);
-    ctx.fillRect(0, viewH - barH, viewW, 1.5);
-
-    const cy = viewH * 0.5;
     const isShortLand = !portraitPortrait && viewH < 500;
-    if (activeFrame && !portraitPortrait) {
-      // 3A. 16:9 暗黑热血作画过场三镜动态剧场（适配桌面端与手机横屏紧凑比例）
-      const stageW = Math.min(viewW - (isShortLand ? 48 : 96), Math.round((viewH - barH * 2 - (isShortLand ? 20 : 44)) * (16 / 9)));
-      const stageH = Math.round(stageW * (9 / 16));
-      const sx = Math.round((viewW - stageW) * 0.5);
-      const sy = Math.round((viewH - stageH) * 0.5 - (isShortLand ? 2 : 6));
+    const personaSpec = (typeof BOSS_PORTRAIT_DATA !== 'undefined' && BOSS_PORTRAIT_DATA) ? BOSS_PORTRAIT_DATA[bc.variant] : null;
 
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = '#080c16';
-      ctx.strokeStyle = accCol;
-      ctx.lineWidth = 2.4;
-      ctx.fillRect(sx - 3, sy - 3, stageW + 6, stageH + 6);
-      ctx.strokeRect(sx - 3, sy - 3, stageW + 6, stageH + 6);
-
+    if (alpha > 0.008) {
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(sx, sy, stageW, stageH);
-      ctx.clip();
-      const zoom = 1.02 + (prog % 0.34) * 0.14;
-      const dw = stageW * zoom, dh = stageH * zoom;
-      ctx.drawImage(activeFrame, sx - (dw - stageW) * 0.5, sy - (dh - stageH) * 0.5, dw, dh);
+      // 1. 全屏戏剧暗化衬底 + 破晓瞬闪刀光
+      ctx.globalAlpha = 0.78 * alpha;
+      ctx.fillStyle = isMythic ? '#13040b' : '#060913';
+      ctx.fillRect(0, 0, viewW, viewH);
+      if (elapsed < 0.12) {
+        ctx.globalAlpha = (1 - elapsed / 0.12) * 0.38;
+        ctx.fillStyle = isMythic ? '#ffd166' : '#ffffff';
+        ctx.fillRect(0, 0, viewW, viewH);
+      }
 
-      ctx.globalAlpha = 0.28 * alpha;
-      ctx.strokeStyle = storyPack.actKey === 'act2' ? '#bae6fd' : (storyPack.actKey === 'act3' ? '#d8b4fe' : '#fda4af');
-      ctx.lineWidth = 1.5;
-      for (let r = 0; r < 14; r++) {
-        const rx = sx + ((r * 97 + elapsed * 260) % stageW);
-        const ry = sy + ((r * 61 + (storyPack.actKey === 'act3' ? -elapsed * 220 + 900 : elapsed * 310)) % stageH);
+      // 2. 上下电影级黑金封幅与中央棱钻饰纹
+      const barH = Math.round(Math.min(isShortLand ? 38 : 54, viewH * 0.082) * enterP * (0.35 + 0.65 * exitP));
+      ctx.globalAlpha = 0.95 * alpha;
+      ctx.fillStyle = '#04060c';
+      ctx.fillRect(0, 0, viewW, barH);
+      ctx.fillRect(0, viewH - barH, viewW, barH);
+      ctx.fillStyle = accCol;
+      ctx.fillRect(0, Math.max(0, barH - 1.8), viewW, 1.8);
+      ctx.fillRect(0, viewH - barH, viewW, 1.8);
+
+      // 3. 双层斜切破框战幕横幅（底层主题色错位衬带 + 主层曜黑流金渐变带 + 内嵌细金线）
+      const cy = viewH * 0.5 - dissolveLift * 0.45;
+      const bandBaseH = portraitPortrait ? 252 : (isShortLand ? 168 : 210);
+      const bandH = bandBaseH * (0.86 + 0.14 * exitP);
+      const slant = portraitPortrait ? 18 : (isShortLand ? 24 : 34);
+      const xL = -24, xR = viewW + 24;
+
+      // 3a. 错位主题色暗影斜带
+      ctx.globalAlpha = 0.34 * alpha;
+      ctx.fillStyle = mainCol;
+      ctx.beginPath();
+      ctx.moveTo(xL, cy - bandH * 0.5 + slant + 8);
+      ctx.lineTo(xR, cy - bandH * 0.5 - slant + 8);
+      ctx.lineTo(xR, cy + bandH * 0.5 - slant + 10);
+      ctx.lineTo(xL, cy + bandH * 0.5 + slant + 10);
+      ctx.closePath();
+      ctx.fill();
+
+      // 3b. 主战幕斜带（线性金属暗泽渐变）
+      ctx.globalAlpha = 0.96 * alpha;
+      const ribGrad = ctx.createLinearGradient(0, cy - bandH * 0.5, viewW, cy + bandH * 0.5);
+      if (isMythic) {
+        ribGrad.addColorStop(0, '#14040c');
+        ribGrad.addColorStop(0.35, '#2b0818');
+        ribGrad.addColorStop(0.72, '#380b1f');
+        ribGrad.addColorStop(1, '#12040a');
+      } else {
+        ribGrad.addColorStop(0, '#070b16');
+        ribGrad.addColorStop(0.36, '#141129');
+        ribGrad.addColorStop(0.72, '#1b1533');
+        ribGrad.addColorStop(1, '#080c18');
+      }
+      ctx.fillStyle = ribGrad;
+      ctx.beginPath();
+      ctx.moveTo(xL, cy - bandH * 0.5 + slant);
+      ctx.lineTo(xR, cy - bandH * 0.5 - slant);
+      ctx.lineTo(xR, cy + bandH * 0.5 - slant);
+      ctx.lineTo(xL, cy + bandH * 0.5 + slant);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = isMythic ? '#ffd166' : mainCol;
+      ctx.lineWidth = 3.0;
+      ctx.stroke();
+
+      // 3c. 横幅内部裁剪层：巨幅英文暗纹、平行流光切线、飘散金红余烬星尘与内嵌双金线
+      ctx.save();
+      ctx.clip();
+
+      const inset = 6;
+      ctx.globalAlpha = 0.42 * alpha;
+      ctx.strokeStyle = accCol;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(xL, cy - bandH * 0.5 + slant + inset);
+      ctx.lineTo(xR, cy - bandH * 0.5 - slant + inset);
+      ctx.moveTo(xL, cy + bandH * 0.5 + slant - inset);
+      ctx.lineTo(xR, cy + bandH * 0.5 - slant - inset);
+      ctx.stroke();
+
+      // 背景水印排印
+      ctx.globalAlpha = 0.065 * alpha;
+      ctx.fillStyle = isMythic ? '#ffd166' : '#ffffff';
+      ctx.font = `italic 900 ${portraitPortrait ? 44 : 74}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.fillText(isMythic ? 'PHASE II · AWAKENING' : 'PHASE I · SOVEREIGN', viewW - 24, cy + (portraitPortrait ? 86 : 58));
+
+      // 斜向流光速度线
+      const slope = (-2 * slant) / Math.max(1, xR - xL);
+      ctx.globalAlpha = 0.30 * alpha;
+      ctx.strokeStyle = accCol;
+      ctx.lineWidth = 1.8;
+      for (let s = 0; s < 6; s++) {
+        const laneOff = -bandH * 0.36 + s * (bandH * 0.145);
+        const sx0 = ((elapsed * 380 + s * 175) % (viewW + 260)) - 130;
+        const sy0 = cy + laneOff + (sx0 - viewW * 0.5) * slope;
+        const len = 95 + (s % 3) * 48;
         ctx.beginPath();
-        ctx.moveTo(rx, ry);
-        ctx.lineTo(rx - 8, ry + (storyPack.actKey === 'act3' ? -22 : 24));
+        ctx.moveTo(sx0, sy0);
+        ctx.lineTo(sx0 + len, sy0 + len * slope);
+        ctx.stroke();
+      }
+
+      // 浮游棱钻星烬微粒（消逝阶段加速上飘散逸）
+      const moteCount = portraitPortrait ? 10 : 16;
+      for (let m = 0; m < moteCount; m++) {
+        const mx = ((m * 137 + elapsed * (52 + (m % 4) * 18)) % (viewW + 80)) - 40;
+        const my = cy + Math.sin(elapsed * 1.9 + m * 1.7) * (bandH * 0.36) - (1 - exitP) * (18 + (m % 5) * 9);
+        const mr = 2.2 + (m % 3) * 1.2;
+        ctx.globalAlpha = (0.28 + (m % 3) * 0.14) * alpha;
+        ctx.fillStyle = (m % 2 === 0) ? accCol : mainCol;
+        ctx.beginPath();
+        ctx.moveTo(mx, my - mr);
+        ctx.lineTo(mx + mr, my);
+        ctx.lineTo(mx, my + mr);
+        ctx.lineTo(mx - mr, my);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // 横幅下沿 5.0 秒鎏金展示进度丝线（满 5 秒归零后进入柔化消逝）
+      const holdRemain = Math.max(0, Math.min(1, 1 - elapsed / showDur));
+      if (holdRemain > 0.005) {
+        const progEnd = viewW * holdRemain;
+        const pyL = cy + bandH * 0.5 + slant - 3.2;
+        const pyR = pyL + progEnd * slope;
+        ctx.globalAlpha = 0.88 * alpha;
+        ctx.strokeStyle = isMythic ? '#ffd166' : accCol;
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        ctx.moveTo(0, pyL);
+        ctx.lineTo(progEnd, pyR);
         ctx.stroke();
       }
       ctx.restore();
 
+      // 4. 破框半身立绘（一阶段夏装 / 二阶段隐藏泳装）与主宰铭文排印
       ctx.globalAlpha = alpha;
-      const chapH = isShortLand ? 24 : 30;
-      ctx.fillStyle = 'rgba(7, 10, 18, 0.86)';
-      ctx.strokeStyle = 'rgba(229, 184, 105, 0.55)';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.roundRect(sx + 12, sy + 10, Math.min(390, stageW - 24), chapH, 7);
-      ctx.fill(); ctx.stroke();
-      ctx.font = `800 ${isShortLand ? 11.5 : 13}px -apple-system, sans-serif`;
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#f6d379';
-      ctx.fillText(`${storyPack.chapter}  ·  0${beatIdx + 1}/03`, sx + 22, sy + 10 + chapH * 0.70, Math.min(370, stageW - 44));
+      const slideOffset = (1 - enterP) * 64;
+      const phaseBadgeTxt = isMythic ? '⚡ PHASE II · 神话二阶立绘解封' : '👑 PHASE I · 首领降临立绘';
+      const personaShort = personaSpec ? personaSpec.personaName.split(' · ')[0] : '';
+      const skinTitle = personaSpec
+        ? (isMythic
+          ? `🔥 隐藏二阶 · ${personaShort}「${personaSpec.mythicTitle || personaSpec.summerTitle}」`
+          : `✨ 一阶夏装 · ${personaShort}「${personaSpec.summerTitle}」`)
+        : (bc.subtitle || '🕯️ 守誓主宰显圣');
 
-      const subH = isShortLand ? 68 : 92;
-      const subY = sy + stageH - subH;
-      ctx.fillStyle = 'rgba(6, 9, 17, 0.90)';
-      ctx.fillRect(sx, subY, stageW, subH);
-      ctx.fillStyle = accCol;
-      ctx.fillRect(sx, subY, stageW, 1.8);
-
-      drawBossPortrait(bc.variant, sx + (isShortLand ? 46 : 66), subY + (isShortLand ? 12 : 18), isShortLand ? 0.46 : 0.62, isMythic);
-
-      const tx = sx + (isShortLand ? 96 : 136);
-      const maxTxtW = Math.max(120, stageW - (isShortLand ? 112 : 156));
-      ctx.font = `900 ${isShortLand ? 13 : 15}px -apple-system, sans-serif`;
-      ctx.fillStyle = isMythic ? '#fda4af' : '#72efdd';
-      ctx.fillText(`${storyPack.speaker}  ·  ${bc.title || ''}`, tx, subY + (isShortLand ? 22 : 28), maxTxtW);
-
-      const fullLine = (storyPack.lines && storyPack.lines[beatIdx]) || bc.extraTag || '';
-      const beatLen = maxT / Math.max(1, storyPack.lines.length);
-      const localElapsed = Math.max(0, elapsed - beatIdx * beatLen);
-      const shownChars = Math.min(fullLine.length, Math.max(6, Math.floor((localElapsed / Math.max(0.35, beatLen * 0.62)) * fullLine.length)));
-      ctx.font = `800 ${isShortLand ? 14 : 17}px "Songti SC", "PingFang SC", serif`;
-      ctx.fillStyle = '#fbf6eb';
-      ctx.fillText(fullLine.slice(0, shownChars), tx, subY + (isShortLand ? 44 : 58), maxTxtW);
-
-      ctx.font = `700 ${isShortLand ? 11 : 12}px -apple-system, sans-serif`;
-      ctx.fillStyle = '#cbd5e1';
-      ctx.fillText(bc.extraTag || '', tx, subY + (isShortLand ? 61 : 80), maxTxtW);
-    } else if (activeFrame && portraitPortrait) {
-      // 3B-1. 手机竖屏 16:9 保真画框 + 下置特写台词席（不裁切左右人物、不压扁字体）
-      const stageW = viewW - 28;
-      const stageH = Math.round(stageW * (9 / 16));
-      const sx = 14;
-      const sy = Math.round(cy - stageH * 0.66);
-
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = '#080c16';
-      ctx.strokeStyle = accCol;
-      ctx.lineWidth = 2.0;
-      ctx.fillRect(sx - 2, sy - 2, stageW + 4, stageH + 4);
-      ctx.strokeRect(sx - 2, sy - 2, stageW + 4, stageH + 4);
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(sx, sy, stageW, stageH);
-      ctx.clip();
-      const zoom = 1.02 + (prog % 0.34) * 0.10;
-      const dw = stageW * zoom, dh = stageH * zoom;
-      ctx.drawImage(activeFrame, sx - (dw - stageW) * 0.5, sy - (dh - stageH) * 0.5, dw, dh);
-      ctx.restore();
-
-      const infoY = sy + stageH + 14;
-      ctx.fillStyle = 'rgba(8, 12, 24, 0.92)';
-      ctx.strokeStyle = 'rgba(229, 184, 105, 0.44)';
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      ctx.roundRect(sx, infoY, stageW, 96, 12);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.textAlign = 'center';
-      ctx.font = '800 12px -apple-system, sans-serif';
-      ctx.fillStyle = accCol;
-      ctx.fillText(bc.subtitle || storyPack.chapter || '🕯️ 守誓主宰降临', viewW * 0.5, infoY + 24, stageW - 20);
-      ctx.font = '900 19px -apple-system, sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(bc.title || '守层主宰', viewW * 0.5, infoY + 51, stageW - 20);
-      const lineTxt = (storyPack && storyPack.lines && storyPack.lines[beatIdx]) ? storyPack.lines[beatIdx] : (bc.extraTag || '');
-      ctx.font = '700 13px "Songti SC", "PingFang SC", serif';
-      ctx.fillStyle = '#e0fbfc';
-      ctx.fillText(lineTxt.slice(0, 24), viewW * 0.5, infoY + 78, stageW - 20);
-    } else {
-      // 3B-2. 奇遇首领立绘徽章特写横幅（无任何盖章框，干净凌厉）
-      const bandH = portraitPortrait ? 236 : 190;
-      const slant = portraitPortrait ? 20 : 34;
-      ctx.globalAlpha = 0.95 * alpha;
-      ctx.fillStyle = '#0d1322';
-      ctx.beginPath();
-      ctx.moveTo(-20, cy - bandH * 0.5 + slant);
-      ctx.lineTo(viewW + 20, cy - bandH * 0.5 - slant);
-      ctx.lineTo(viewW + 20, cy + bandH * 0.5 - slant);
-      ctx.lineTo(-20, cy + bandH * 0.5 + slant);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = mainCol;
-      ctx.lineWidth = 3.2;
-      ctx.stroke();
-
-      ctx.globalAlpha = alpha;
-      const slideOffset = (1 - enterP) * 52;
-      const lineTxt = (storyPack && storyPack.lines && storyPack.lines[beatIdx]) ? storyPack.lines[beatIdx] : (bc.extraTag || '');
       if (portraitPortrait) {
-        const pScale = Math.min(0.86, viewW / 450);
-        drawBossPortrait(bc.variant, viewW * 0.5 - slideOffset, cy - 44, pScale, isMythic);
+        const pScale = Math.min(0.92, viewW / 430);
+        drawBossPortrait(bc.variant, viewW * 0.5 - slideOffset * 0.65, cy - 52 - dissolveLift * 0.55, pScale, isMythic);
+
         ctx.textAlign = 'center';
-        ctx.font = '800 12.5px -apple-system, sans-serif';
-        ctx.fillStyle = accCol;
-        ctx.fillText(bc.subtitle || '🕯️ 守誓主宰降临', viewW * 0.5, cy + 52, viewW - 28);
-        ctx.font = '900 21px -apple-system, sans-serif';
-        ctx.strokeStyle = '#060913'; ctx.lineWidth = 5;
-        ctx.strokeText(bc.title || '守层主宰', viewW * 0.5, cy + 78, viewW - 24);
+        const pillW = Math.min(viewW - 36, 248);
+        const pillY = cy + 36;
+        ctx.fillStyle = isMythic ? 'rgba(225, 29, 72, 0.34)' : 'rgba(15, 23, 42, 0.82)';
+        ctx.strokeStyle = accCol;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.roundRect(viewW * 0.5 - pillW * 0.5, pillY, pillW, 21, 10.5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = '800 11px -apple-system, sans-serif';
+        ctx.fillStyle = '#fde68a';
+        ctx.fillText(phaseBadgeTxt, viewW * 0.5, pillY + 14.5, pillW - 16);
+
+        ctx.font = '800 12px -apple-system, sans-serif';
+        ctx.fillStyle = isMythic ? '#fda4af' : '#72efdd';
+        ctx.fillText(skinTitle, viewW * 0.5, cy + 73, viewW - 28);
+
+        ctx.font = '900 22px -apple-system, sans-serif';
+        ctx.strokeStyle = '#05070f';
+        ctx.lineWidth = 5;
+        ctx.strokeText(bc.title || '守层主宰', viewW * 0.5, cy + 99, viewW - 24);
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(bc.title || '守层主宰', viewW * 0.5, cy + 78, viewW - 24);
-        ctx.font = '700 12px -apple-system, sans-serif';
-        ctx.fillStyle = '#e0fbfc';
-        ctx.fillText(lineTxt.slice(0, 26), viewW * 0.5, cy + 101, viewW - 24);
+        ctx.fillText(bc.title || '守层主宰', viewW * 0.5, cy + 99, viewW - 24);
+
+        if (bc.extraTag || bc.subtitle) {
+          ctx.font = '700 11.5px -apple-system, sans-serif';
+          ctx.fillStyle = '#e2e8f0';
+          ctx.fillText((bc.extraTag || bc.subtitle || '').slice(0, 30), viewW * 0.5, cy + 119, viewW - 24);
+        }
       } else {
-        const portX = Math.max(164, viewW * 0.285) - slideOffset;
-        const textX = portX + 136 + slideOffset * 1.25;
-        drawBossPortrait(bc.variant, portX, cy - 2, 1.24, isMythic);
+        const portScale = isShortLand ? 0.90 : 1.16;
+        const portX = Math.max(isShortLand ? 138 : 186, viewW * 0.255) - slideOffset;
+        const textX = portX + (isShortLand ? 124 : 162) + slideOffset * 1.15;
+        const maxTxtW = Math.max(180, viewW - textX - 42);
+
+        drawBossPortrait(bc.variant, portX, cy - (isShortLand ? 4 : 8) - dissolveLift * 0.55, portScale, isMythic);
+
         ctx.textAlign = 'left';
-        ctx.font = '800 15px -apple-system, sans-serif';
+        // 阶段铭牌胶囊 + 专属换装立绘副题
+        const badgeW = isMythic ? 206 : 184;
+        const badgeH = isShortLand ? 21 : 24;
+        const badgeY = cy - (isShortLand ? 54 : 66);
+        ctx.fillStyle = isMythic ? 'rgba(225, 29, 72, 0.36)' : 'rgba(114, 239, 221, 0.14)';
+        ctx.strokeStyle = accCol;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(textX, badgeY, badgeW, badgeH, badgeH * 0.5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = `800 ${isShortLand ? 11 : 12}px -apple-system, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = isMythic ? '#ffd166' : '#72efdd';
+        ctx.fillText(phaseBadgeTxt, textX + badgeW * 0.5, badgeY + badgeH * 0.68);
+
+        ctx.textAlign = 'left';
+        ctx.font = `800 ${isShortLand ? 12.5 : 14.5}px -apple-system, sans-serif`;
         ctx.fillStyle = accCol;
-        ctx.fillText(bc.subtitle || '🕯️ 守誓主宰显圣', textX, cy - 34, Math.max(180, viewW - textX - 36));
-        ctx.font = '900 32px -apple-system, sans-serif';
-        ctx.strokeStyle = '#060913'; ctx.lineWidth = 6;
-        ctx.strokeText(bc.title || '守层主宰', textX, cy + 6, Math.max(180, viewW - textX - 36));
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(bc.title || '守层主宰', textX, cy + 6, Math.max(180, viewW - textX - 36));
-        ctx.font = '800 15px "Songti SC", "PingFang SC", serif';
+        ctx.fillText(skinTitle, textX + badgeW + 12, badgeY + badgeH * 0.70, Math.max(90, maxTxtW - badgeW - 12));
+
+        // 首领真名巨字排印
+        const titleSize = isShortLand ? 26 : 36;
+        const titleY = cy - (isShortLand ? 10 : 12);
+        ctx.font = `900 ${titleSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        ctx.strokeStyle = '#05070f';
+        ctx.lineWidth = 6.5;
+        ctx.strokeText(bc.title || '守层主宰', textX, titleY, maxTxtW);
+        ctx.fillStyle = isMythic ? '#fffbeb' : '#ffffff';
+        ctx.fillText(bc.title || '守层主宰', textX, titleY, maxTxtW);
+
+        // 鎏金分割饰线 + 棱钻端头
+        const divY = cy + (isShortLand ? 4 : 6);
+        const divW = Math.min(maxTxtW, 380);
+        ctx.strokeStyle = isMythic ? '#fb7185' : accCol;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(textX + 8, divY);
+        ctx.lineTo(textX + divW, divY);
+        ctx.stroke();
+        ctx.fillStyle = accCol;
+        ctx.beginPath();
+        ctx.moveTo(textX, divY);
+        ctx.lineTo(textX + 4.5, divY - 4.5);
+        ctx.lineTo(textX + 9, divY);
+        ctx.lineTo(textX + 4.5, divY + 4.5);
+        ctx.closePath();
+        ctx.fill();
+
+        // 称号副标
+        ctx.font = `800 ${isShortLand ? 13 : 15.5}px "Songti SC", "PingFang SC", serif`;
         ctx.fillStyle = '#e0fbfc';
-        ctx.fillText(lineTxt, textX, cy + 38, Math.max(180, viewW - textX - 36));
+        ctx.fillText(bc.subtitle || '🕯️ 守誓主宰显圣', textX, cy + (isShortLand ? 24 : 30), maxTxtW);
+
+        // 战术博弈提示条
         if (bc.extraTag) {
-          ctx.font = '700 12.5px -apple-system, sans-serif';
-          ctx.fillStyle = '#f6d379';
-          ctx.fillText(bc.extraTag, textX, cy + 62, Math.max(180, viewW - textX - 36));
+          const tipH = isShortLand ? 24 : 29;
+          const tipY = cy + (isShortLand ? 34 : 44);
+          const tipW = Math.min(maxTxtW, Math.max(240, bc.extraTag.length * (isShortLand ? 12.5 : 14) + 28));
+          ctx.fillStyle = isMythic ? 'rgba(217, 4, 41, 0.34)' : 'rgba(15, 23, 42, 0.72)';
+          ctx.strokeStyle = isMythic ? '#ffd166' : 'rgba(246, 211, 121, 0.55)';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.roundRect(textX, tipY, tipW, tipH, 7);
+          ctx.fill();
+          ctx.stroke();
+          ctx.font = `800 ${isShortLand ? 11.5 : 13}px -apple-system, sans-serif`;
+          ctx.fillStyle = isMythic ? '#ffd166' : '#f8fafc';
+          ctx.fillText(bc.extraTag, textX + 12, tipY + tipH * 0.68, tipW - 22);
         }
       }
-    }
 
-    if (elapsed > 0.35) {
-      ctx.globalAlpha = 0.74 * exitP;
-      ctx.font = '700 12px -apple-system, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#cbd5e1';
-      const skipMsg = (uiMode !== 'desktop' || isTouch) ? '轻触屏幕跳过演出 ▸' : '按 空格 / 点击屏幕 可跳过过场演出';
-      ctx.fillText(skipMsg, viewW * 0.5, viewH - barH - 14);
+      // 5. 右下角防误触手动跳过胶囊（避免走位摇杆或空格闪避误关 5 秒立绘演出）
+      if (elapsed > 0.60 && bc.t > fadeDur + 0.05) {
+        const skW = portraitPortrait ? 132 : 164;
+        const skH = 26;
+        const skX = viewW - skW - 18;
+        const skY = Math.max(viewH - Math.max(barH, 36) + (Math.max(barH, 36) - skH) * 0.5, viewH - 36);
+        bc._skipRect = { x: skX - 8, y: skY - 8, w: skW + 16, h: skH + 16 };
+        ctx.globalAlpha = 0.82 * exitP;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.strokeStyle = 'rgba(246, 211, 121, 0.55)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(skX, skY, skW, skH, 13);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = '700 11.5px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#e2e8f0';
+        const remSec = Math.max(0, Math.ceil(showDur - elapsed));
+        const skipTxt = portraitPortrait ? `跳过立绘 (${remSec}s) ▸` : `点击跳过 / Enter (${remSec}s) ▸`;
+        ctx.fillText(skipTxt, skX + skW * 0.5, skY + 17);
+      } else {
+        bc._skipRect = null;
+      }
+      ctx.restore();
     }
-    ctx.restore();
   }
 }
 
