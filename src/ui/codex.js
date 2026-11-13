@@ -100,17 +100,31 @@ function renderCodex() {
       if (codexFilter === 'ranged' && w.melee) return;
       if (SET_DEFS[codexFilter] && w.set !== codexFilter) return;
       const minT = w.minTier || 1;
+      const wpnArt = (typeof renderWeaponEmblemHtml === 'function')
+        ? renderWeaponEmblemHtml(id, Math.max(3, minT), '', w.icon)
+        : w.icon;
+      const evoHtml = Array.isArray(w.evos) && w.evos.length
+        ? `<div class="codex-evo-list">
+            <div class="codex-evo-head">◆ 五阶神话 · 二选一进化分支</div>
+            ${w.evos.map(ev => `<div class="codex-evo-item">
+              <span class="codex-evo-name" style="color:${ev.color || '#ff5c8a'}">★ ${ev.name}</span>
+              <span class="tag t5">${ev.tag || '神话'}</span>
+              <div class="codex-evo-desc">${ev.desc}</div>
+            </div>`).join('')}
+          </div>`
+        : '';
       const card = document.createElement('div');
       card.className = `codex-card t${minT}`;
       card.innerHTML = `
         <div class="codex-card-top">
-          <div class="item-emblem t${minT}">${w.icon}</div>
+          <div class="item-emblem t${Math.max(minT, 3)}">${wpnArt}</div>
           <div class="card-meta">
             <div class="codex-card-title">${w.name}</div>
             <div class="card-badges">
               <span class="tag">${SET_DEFS[w.set].label.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '')}</span>
               <span class="tag">${w.melee ? '近战挥砍' : '远程射击'}</span>
-              ${minT > 1 ? `<span class="tag t${minT}">最低${['','普通','精良','史诗','传说'][minT]}</span>` : ''}
+              <span class="tag t5">可升5阶</span>
+              ${minT > 1 ? `<span class="tag t${minT}">最低${['','普通','精良','史诗','传说','神话'][minT]}</span>` : ''}
             </div>
           </div>
         </div>
@@ -120,7 +134,8 @@ function renderCodex() {
           <span class="stat-chip">范围 ${w.range}</span>
           <span class="stat-chip">基准 ◇${w.cost}</span>
         </div>
-        <div class="codex-card-desc">${w.desc}</div>`;
+        <div class="codex-card-desc">${w.desc}</div>
+        ${evoHtml}`;
       gridEl.appendChild(card);
     });
   } else if (codexTab === 'items') {

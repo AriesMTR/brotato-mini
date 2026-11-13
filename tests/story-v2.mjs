@@ -289,6 +289,18 @@ export function runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap }) {
   assert.strictEqual(after.callbacks, 16, 'Every floor-after callback must execute once');
   assert.strictEqual(after.missing.length, 0, 'After-combat runtime omitted dialogue: ' + JSON.stringify(after.missing));
 
+  const abortEnv = make();
+  const aborted = evaluate(abortEnv, `(() => {
+    startGame('allrounder', { mode: 'story' }); __drainDirector();
+    let callbacks = 0;
+    SpireDirector.onFloorCleared(2, () => { callbacks++; player.mats += 999; });
+    const before = JSON.stringify({ story: player.story, mats: player.mats, seen: SpireDirector.getRunState() });
+    SpireDirector.abortActive(); SpireDirector.update(30);
+    return !SpireDirector.isActive() && callbacks === 0 && before ===
+      JSON.stringify({ story: player.story, mats: player.mats, seen: SpireDirector.getRunState() });
+  })()`);
+  assert(aborted, 'Aborting an unfinished narrative must cancel its callbacks while preserving run progress');
+
   // Story bosses always have exactly two phases, even on the lowest difficulty.
   // First-bar depletion is neither a reward event nor the death of a companion.
   const bossEnv = make();
@@ -309,6 +321,7 @@ export function runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap }) {
         player.mats === before.mats && player.kills === before.kills && pendingCrates === before.crates &&
         drops.length === before.drops && (!key || !getSpireStoryProgress().mementos[key]);
       const phaseCinematic = SpireDirector.isBlockingGameplay();
+      const noLegacyPhaseBanner = bossCutscene === null;
       const jialanSelfDamagePanel = floor !== 12 || document.querySelector('.story-scene-image')._storyArt.panel === 2;
       const phaseEvents = __drainDirector();
       const phaseVisuals = floor !== 4 || (phaseEvents[0].eventId === 'boss.jinyu.phase2.wound' &&
@@ -326,7 +339,7 @@ export function runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap }) {
       const after = { mats: player.mats, kills: player.kills, crates: pendingCrates };
       hurtEnemy(boss, 999999, true); killEnemyRewards(boss);
       const idempotent = player.mats === after.mats && player.kills === after.kills && pendingCrates === after.crates;
-      results.push({ floor, guaranteed, firstPhase, phaseCinematic, phaseVisuals, jialanPhasePreserved, jialanGiftAfterDefeat,
+      results.push({ floor, guaranteed, firstPhase, phaseCinematic, noLegacyPhaseBanner, phaseVisuals, jialanPhasePreserved, jialanGiftAfterDefeat,
         finalCinematic, rewardWaitsForFarewell,
         rewarded: !!boss._rewarded, idempotent,
         memento: !key || !!getSpireStoryProgress().mementos[key],
@@ -337,6 +350,25 @@ export function runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap }) {
   for (const result of bosses) {
     for (const [key, value] of Object.entries(result)) if (key !== 'floor') assert.strictEqual(!!value, true, `Floor ${result.floor}: ${key}`);
   }
+
+  const commanderEnv = make();
+  const commanders = evaluate(commanderEnv, `(() => {
+    const results = [];
+    for (const [floor, variant] of [[6, 'glacial_valkyrie'], [10, 'shadow_stalker'], [14, 'iron_warden']]) {
+      startGame('allrounder', { mode: 'story' }); __drainDirector();
+      wave = floor; beginWave(); __drainDirector();
+      const commander = createEnemy(player.x + 150, player.y, 'mini_boss', variant);
+      commander.canPhase2 = true; player.waveMythicAwakened = false;
+      const before = JSON.stringify({ story: player.story, mats: player.mats, kills: player.kills });
+      hurtEnemy(commander, commander.maxHp + 99999, true);
+      results.push({ floor, awakened: commander.mythicPhase2 && commander.hp > 0 && !commander._rewarded,
+        noWrongStory: !SpireDirector.isActive() && bossCutscene === null,
+        noPrematureReward: before === JSON.stringify({ story: player.story, mats: player.mats, kills: player.kills }) });
+    }
+    return results;
+  })()`);
+  for (const result of commanders) assert(result.awakened && result.noWrongStory && result.noPrematureReward,
+    'Floor ' + result.floor + ' commander awakening must not play a main boss\'s story or grant its reward');
 
   // A lethal player hit locks the result before a same-frame boss hit can grant rewards.
   const defeatEnv = make();
@@ -393,21 +425,57 @@ export function runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap }) {
   const saved = evaluate(saveEnv, `(() => {
     startGame('allrounder', { mode: 'story' }); __drainDirector();
     grantSpireMemento('jinyu'); rememberSpireMemento('jinyu');
+    player.weapons = [makeWeapon('katana', 5), makeWeapon('pistol', 3)];
+    applyWeaponEvolution(player.weapons[0], 1);
+    const evolution = player.weapons[0].evo;
     player.mats = 71; player.retryCount = 2;
     wave = 8; beginWave(); __drainDirector();
     const checkpoint = waveCheckpoint;
     player.story.mementos.astria = true; player.story.memories.jinyu = false;
+    player.weapons[0].evo = 'unsaved-local-change';
     const deepCopy = !checkpoint.player.story.mementos.astria && checkpoint.player.story.memories.jinyu === true;
+    const weaponCopy = checkpoint.player.weapons[0].tier === 5 && checkpoint.player.weapons[0].evo === evolution;
     const wrote = SpireSave.write(checkpoint);
     showStart(); continueSpireStory(); __drainDirector();
     const resumed = wave === 8 && state === 'wave' && player.mats === 71 && player.retryCount === 2 &&
       player.story.mementos.jinyu && player.story.memories.jinyu && !player.story.mementos.astria;
+    const evolutionResumed = player.weapons[0].tier === 5 && player.weapons[0].evo === evolution &&
+      player.weapons[0].evoName === WEAPONS.katana.evos[1].name && player.weapons[1].tier === 3;
     const current = SpireSave.load();
     const corrupted = JSON.parse(JSON.stringify(current.checkpoint)); corrupted.wave = 1000;
     const rejectsInvalid = !SpireSave.valid(corrupted);
-    return { deepCopy, wrote, resumed, rejectsInvalid };
+    const badTier = JSON.parse(JSON.stringify(current.checkpoint)); badTier.player.weapons[0].tier = MAX_WEAPON_TIER + 1;
+    const rejectsInvalidTier = !SpireSave.valid(badTier);
+    return { deepCopy, weaponCopy, wrote, resumed, evolutionResumed, rejectsInvalid, rejectsInvalidTier };
   })()`);
   for (const [key, value] of Object.entries(saved)) assert.strictEqual(value, true, 'Checkpoint invariant: ' + key);
+
+  // Upstream T5 weapons may be saved before their branch has been chosen. A
+  // resumed run must resolve that choice exactly once before starting combat.
+  const pendingEvolutionEnv = make(true);
+  const pendingEvolution = evaluate(pendingEvolutionEnv, `(() => {
+    startGame('allrounder', { mode: 'story' }); __drainDirector();
+    const checkpoint = JSON.parse(JSON.stringify(waveCheckpoint));
+    checkpoint.wave = 5; checkpoint.sceneId = 'glacier';
+    checkpoint.player.weapons = [makeWeapon('katana', 5)];
+    const saved = SpireSave.write(checkpoint);
+    showStart(); continueSpireStory();
+    const needsChoice = state === 'evolution' && !document.getElementById('evoModal').classList.contains('hidden');
+    const buttons = document.getElementById('evoChoices').querySelectorAll('.evo-pick-btn');
+    if (buttons.length !== 2) return { saved, needsChoice, twoBranches: false };
+    buttons[0].click(); __drainDirector();
+    const chosen = WEAPONS.katana.evos[0].id;
+    const resumesAfterChoice = state === 'wave' && wave === 5 && player.weapons[0].evo === chosen &&
+      SpireSave.load().checkpoint.player.weapons[0].evo === chosen;
+    buttons[1].click(); buttons[0].click();
+    const staleCannotReselect = player.weapons[0].evo === chosen && wave === 5;
+    showStart(); startGame('allrounder', { mode: 'story' }); __drainDirector();
+    const fresh = JSON.stringify({ weapons: player.weapons, wave, state });
+    buttons[1].click();
+    const staleCannotAffectNewRun = fresh === JSON.stringify({ weapons: player.weapons, wave, state });
+    return { saved, needsChoice, twoBranches: true, resumesAfterChoice, staleCannotReselect, staleCannotAffectNewRun };
+  })()`);
+  for (const [key, value] of Object.entries(pendingEvolution)) assert.strictEqual(value, true, 'Pending evolution invariant: ' + key);
 
   const newRunEnv = make();
   const newRun = evaluate(newRunEnv, `(() => {

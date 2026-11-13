@@ -1,5 +1,5 @@
 /* =========================================================================
-   《烬塔残响》手机端专属【黑曜镌金 · 一屏全显】触控与选项卡适配 (styles/mobile.css v1.3.6)
+   《烬塔残响》手机端专属【黑曜镌金 · 一屏全显】触控与选项卡适配 (styles/mobile.css v1.3.7)
    ========================================================================= */
 body.m-ui .m-only { display: flex !important; }
 body.m-ui .d-only { display: none !important; }
@@ -21,6 +21,9 @@ body.m-ui #shopMenu { justify-content: space-between; }
 
 body.m-ui .start-frame-ornament { inset: 6px; }
 body.m-ui .hud-right small { display: none; }
+/* Mobile volume controls remain available in the pause menu; the battle grid
+   reserves its right-hand slot for the pause control. */
+body.m-ui #hudAudioBtn { display: none; }
 body.m-ui .kicker-pill { display: none; }
 
 body.m-ui .pause-btn {
@@ -599,3 +602,9 @@ body.m-landscape .boss-cast-sub { margin-top: 2px; }
   body.m-landscape .slot, body.m-landscape .slot-empty { height: 44px; }
   body.m-landscape .mob-shop-bar { padding: 4px 7px; }
 }
+
+body.m-ui .pause-audio-strip { padding: 6px 8px; gap: 6px 10px; }
+body.m-ui .vol-step-btn { min-width: 32px; height: 30px; font-size: 15px; }
+body.m-ui .vol-step-btn.wide { font-size: 11.5px; padding: 0 9px; }
+body.m-ui .audio-box { width: 100%; max-width: 420px; padding: 14px; }
+body.m-ui .audio-ctrl-row { padding: 10px 11px; gap: 8px; }

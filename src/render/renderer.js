@@ -34,26 +34,42 @@ function drawSingleTerrain(tr, showLabel = false) {
   if (typeof ensureTerrainGeometry === 'function') ensureTerrainGeometry(tr);
   ctx.save();
   if (tr.kind === 'chasm') {
-    // 锯齿折线断层大裂谷：三层断崖阶地 + 地壳横裂纹 + 紫晶虚空深渊微光（彻底告别胶囊圆肠形）
+    // 锯齿折线断层大裂谷：四层凿石断崖阶地 + 岩壁斜切高光 + 地壳横裂纹 + 金紫虚空深渊微光
     if (tr.outerCliff && tr.outerCliff.length >= 6) {
-      ctx.fillStyle = '#4a3859';
+      ctx.fillStyle = '#3b2e4a';
       tracePolygon(tr.outerCliff);
       ctx.fill();
-      ctx.strokeStyle = '#23182e';
-      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = '#0d0914';
+      ctx.lineWidth = 2.8;
+      ctx.stroke();
+
+      // 断崖上沿碎石高光切边
+      ctx.strokeStyle = 'rgba(216, 180, 254, 0.34)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      for (let k = 0; k < Math.min(tr.outerCliff.length - 1, Math.ceil(tr.outerCliff.length * 0.5)); k++) {
+        if (k === 0) ctx.moveTo(tr.outerCliff[k].x, tr.outerCliff[k].y);
+        else ctx.lineTo(tr.outerCliff[k].x, tr.outerCliff[k].y);
+      }
       ctx.stroke();
 
       ctx.fillStyle = '#22172f';
       tracePolygon(tr.midCliff);
       ctx.fill();
+      ctx.strokeStyle = '#140c1f';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
 
-      ctx.fillStyle = '#07040d';
+      ctx.fillStyle = '#06030c';
       tracePolygon(tr.abyssPoly);
       ctx.fill();
+      ctx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
 
       if (tr.cracks) {
-        ctx.strokeStyle = '#322442';
-        ctx.lineWidth = 2.2;
+        ctx.strokeStyle = '#160e22';
+        ctx.lineWidth = 2.4;
         ctx.lineCap = 'round';
         ctx.beginPath();
         for (let c = 0; c < tr.cracks.length; c++) {
@@ -61,11 +77,14 @@ function drawSingleTerrain(tr, showLabel = false) {
           ctx.moveTo(ck.x1, ck.y1); ctx.lineTo(ck.mx, ck.my); ctx.lineTo(ck.x2, ck.y2);
         }
         ctx.stroke();
+        ctx.strokeStyle = 'rgba(233, 213, 255, 0.22)';
+        ctx.lineWidth = 0.9;
+        ctx.stroke();
       }
       if (tr.spine && tr.spine.length >= 2) {
-        ctx.strokeStyle = 'rgba(199, 125, 255, 0.48)';
-        ctx.lineWidth = 2.2;
-        ctx.setLineDash([10, 8]);
+        ctx.strokeStyle = 'rgba(216, 180, 254, 0.58)';
+        ctx.lineWidth = 2.0;
+        ctx.setLineDash([8, 6]);
         ctx.beginPath();
         for (let s = 0; s < tr.spine.length; s++) {
           if (s === 0) ctx.moveTo(tr.spine[s].x, tr.spine[s].y);
@@ -76,42 +95,73 @@ function drawSingleTerrain(tr, showLabel = false) {
       }
     }
   } else if (tr.kind === 'lava') {
-    // 多瓣裂地玄武熔岩火口：不规则焦黑玄武岩岸 + 三层律动熔流瓣 + 浮游黑曜石块
+    // 多瓣裂地玄武熔岩火口：双阶焦黑玄武岩砌岸 + 金红裂脉 + 三层律动熔流瓣 + 浮游黑曜岩岛
     const pls = Math.sin(tr.pulse || 0) * 0.035;
     const verts = tr.verts || [];
-    ctx.fillStyle = '#240f0e';
-    ctx.strokeStyle = '#120707';
-    ctx.lineWidth = 3;
+    ctx.fillStyle = '#1b0d0e';
+    ctx.strokeStyle = '#090406';
+    ctx.lineWidth = 3.2;
     ctx.beginPath();
     for (let k = 0; k < verts.length; k++) {
-      const vx = tr.x + (verts[k].x - tr.x) * 1.10;
-      const vy = tr.y + (verts[k].y - tr.y) * 1.10;
+      const vx = tr.x + (verts[k].x - tr.x) * 1.14;
+      const vy = tr.y + (verts[k].y - tr.y) * 1.14;
       if (k === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
     }
     ctx.closePath(); ctx.fill(); ctx.stroke();
 
-    ctx.fillStyle = '#dc2626';
+    ctx.fillStyle = '#2d1514';
+    ctx.strokeStyle = '#451a14';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let k = 0; k < verts.length; k++) {
+      const vx = tr.x + (verts[k].x - tr.x) * 1.06;
+      const vy = tr.y + (verts[k].y - tr.y) * 1.06;
+      if (k === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = '#b91c1c';
     tracePolygon(verts);
     ctx.fill();
 
-    ctx.fillStyle = '#f97316';
-    traceSmoothLoop(verts, tr.x, tr.y, 0.76 + pls);
+    ctx.fillStyle = '#ea580c';
+    traceSmoothLoop(verts, tr.x, tr.y, 0.82 + pls);
     ctx.fill();
 
-    ctx.fillStyle = '#facc15';
-    traceSmoothLoop(verts, tr.x + 5, tr.y - 3, 0.42 - pls);
+    ctx.fillStyle = '#fb923c';
+    traceSmoothLoop(verts, tr.x + 3, tr.y - 2, 0.58 - pls * 0.6);
     ctx.fill();
 
-    ctx.strokeStyle = '#fb923c';
-    ctx.lineWidth = 2;
+    ctx.fillStyle = '#fde047';
+    traceSmoothLoop(verts, tr.x + 5, tr.y - 3, 0.34 + pls * 0.5);
+    ctx.fill();
+
+    // 放射状赤金熔岩裂脉
+    if (verts.length >= 8) {
+      ctx.strokeStyle = 'rgba(254, 240, 138, 0.62)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      for (let k = 0; k < verts.length; k += 2) {
+        const vp = verts[k];
+        const mx = tr.x + (vp.x - tr.x) * 0.45, my = tr.y + (vp.y - tr.y) * 0.45;
+        const ex = tr.x + (vp.x - tr.x) * 0.92, ey = tr.y + (vp.y - tr.y) * 0.92;
+        ctx.moveTo(mx, my);
+        ctx.lineTo((mx + ex) * 0.5 + 4, (my + ey) * 0.5 - 3);
+        ctx.lineTo(ex, ey);
+      }
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = '#fdba74';
+    ctx.lineWidth = 1.8;
     tracePolygon(verts);
     ctx.stroke();
 
-    // 熔面漂浮焦黑玄武岩碎岛（多边形，零圆形）
+    // 熔面漂浮焦黑玄武岩碎岛
     if (tr.crusts) {
-      ctx.fillStyle = '#2b1410';
-      ctx.strokeStyle = '#f97316';
-      ctx.lineWidth = 1.4;
+      ctx.fillStyle = '#23110e';
+      ctx.strokeStyle = '#fb923c';
+      ctx.lineWidth = 1.5;
       for (let c = 0; c < tr.crusts.length; c++) {
         const cr = tr.crusts[c], sz = cr.sz;
         ctx.save();
@@ -125,10 +175,12 @@ function drawSingleTerrain(tr, showLabel = false) {
       }
     }
   } else if (tr.kind === 'swamp') {
-    // 曲岸阿米巴剧毒菌沼：平滑有机曲岸 + 离岸泥滩子池 + 岸边荧光毒蕈簇
+    // 曲岸阿米巴剧毒菌沼：暗苔碎石泥岸 + 层次毒潭波纹 + 岸畔荧光毒蕈簇
     const verts = tr.verts || [];
     if (tr.shoals) {
-      ctx.fillStyle = '#163528';
+      ctx.fillStyle = '#132c22';
+      ctx.strokeStyle = '#091712';
+      ctx.lineWidth = 1.6;
       for (let s = 0; s < tr.shoals.length; s++) {
         const sh = tr.shoals[s];
         ctx.save();
@@ -136,24 +188,27 @@ function drawSingleTerrain(tr, showLabel = false) {
         ctx.beginPath();
         ctx.moveTo(-sh.rx, 0); ctx.quadraticCurveTo(-sh.rx * 0.3, -sh.ry, sh.rx, -sh.ry * 0.2);
         ctx.quadraticCurveTo(sh.rx * 0.4, sh.ry, -sh.rx, 0);
-        ctx.closePath(); ctx.fill();
+        ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.restore();
       }
     }
-    ctx.fillStyle = '#12261e';
-    traceSmoothLoop(verts, tr.x, tr.y, 1.07);
+    ctx.fillStyle = '#0e2019';
+    ctx.strokeStyle = '#07110d';
+    ctx.lineWidth = 2.6;
+    traceSmoothLoop(verts, tr.x, tr.y, 1.08);
     ctx.fill();
+    ctx.stroke();
 
-    ctx.fillStyle = '#1e4635';
+    ctx.fillStyle = '#1b4332';
     traceSmoothLoop(verts, tr.x, tr.y, 0.99);
     ctx.fill();
 
-    ctx.fillStyle = 'rgba(132, 204, 22, 0.34)';
+    ctx.fillStyle = 'rgba(132, 204, 22, 0.36)';
     traceSmoothLoop(verts, tr.x - 4, tr.y + 3, 0.68 + Math.sin(tr.pulse || 0) * 0.03);
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(163, 230, 53, 0.72)';
-    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = 'rgba(190, 242, 100, 0.78)';
+    ctx.lineWidth = 2.0;
     traceSmoothLoop(verts, tr.x, tr.y, 0.98);
     ctx.stroke();
 
@@ -165,19 +220,32 @@ function drawSingleTerrain(tr, showLabel = false) {
         ctx.fillStyle = '#e2e8f0';
         ctx.fillRect(vp.x - 1.5, vp.y - 2, 3, 5);
         ctx.fillStyle = m % 2 === 0 ? '#a3e635' : '#c77dff';
+        ctx.strokeStyle = '#090d16';
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.moveTo(vp.x - 6, vp.y - 2); ctx.quadraticCurveTo(vp.x, vp.y - 9, vp.x + 6, vp.y - 2);
-        ctx.closePath(); ctx.fill();
+        ctx.closePath(); ctx.fill(); ctx.stroke();
       }
     }
   } else if (tr.kind === 'ice_sheet') {
-    // 多棱碎晶寒霜冰镜：折角多面体冰湖 + 内部冰裂折纹 + 平行四边形镜面高光带
+    // 多棱碎晶寒霜冰镜：深渊冰棱外框 + 多面体折射切面 + 内部冰裂折纹 + 双重镜面高光带
     const verts = tr.verts || [];
-    ctx.fillStyle = 'rgba(114, 239, 221, 0.24)';
+    ctx.fillStyle = 'rgba(14, 42, 66, 0.56)';
+    ctx.strokeStyle = '#081826';
+    ctx.lineWidth = 3.0;
+    ctx.beginPath();
+    for (let k = 0; k < verts.length; k++) {
+      const vx = tr.x + (verts[k].x - tr.x) * 1.05;
+      const vy = tr.y + (verts[k].y - tr.y) * 1.05;
+      if (k === 0) ctx.moveTo(vx, vy); else ctx.lineTo(vx, vy);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
     tracePolygon(verts);
     ctx.fill();
 
-    ctx.fillStyle = 'rgba(224, 242, 254, 0.20)';
+    ctx.fillStyle = 'rgba(224, 242, 254, 0.24)';
     ctx.beginPath();
     for (let k = 0; k < verts.length; k++) {
       const vx = tr.x + (verts[k].x - tr.x) * 0.72 - 6;
@@ -186,27 +254,36 @@ function drawSingleTerrain(tr, showLabel = false) {
     }
     ctx.closePath(); ctx.fill();
 
-    // 冰层内部折线冰脉与镜面反光带
+    // 冰层内部折线冰脉与双平行镜面反光带
     const ir = tr.r || 84;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
     ctx.beginPath();
-    ctx.moveTo(tr.x - ir * 0.45, tr.y - ir * 0.12);
-    ctx.lineTo(tr.x - ir * 0.05, tr.y - ir * 0.52);
-    ctx.lineTo(tr.x + ir * 0.12, tr.y - ir * 0.44);
-    ctx.lineTo(tr.x - ir * 0.28, tr.y - ir * 0.04);
+    ctx.moveTo(tr.x - ir * 0.46, tr.y - ir * 0.12);
+    ctx.lineTo(tr.x - ir * 0.05, tr.y - ir * 0.53);
+    ctx.lineTo(tr.x + ir * 0.11, tr.y - ir * 0.45);
+    ctx.lineTo(tr.x - ir * 0.30, tr.y - ir * 0.04);
+    ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.20)';
+    ctx.beginPath();
+    ctx.moveTo(tr.x - ir * 0.18, tr.y + ir * 0.26);
+    ctx.lineTo(tr.x + ir * 0.24, tr.y - ir * 0.16);
+    ctx.lineTo(tr.x + ir * 0.32, tr.y - ir * 0.10);
+    ctx.lineTo(tr.x - ir * 0.10, tr.y + ir * 0.32);
     ctx.closePath(); ctx.fill();
 
     if (verts.length >= 12) {
-      ctx.strokeStyle = 'rgba(224, 251, 252, 0.46)';
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = 'rgba(224, 251, 252, 0.58)';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(verts[1].x, verts[1].y); ctx.lineTo(tr.x - 8, tr.y + 4); ctx.lineTo(verts[9].x, verts[9].y);
       ctx.moveTo(tr.x - 8, tr.y + 4); ctx.lineTo(verts[5].x, verts[5].y);
+      ctx.moveTo(verts[3].x, verts[3].y); ctx.lineTo(tr.x + 12, tr.y - 10); ctx.lineTo(verts[11].x, verts[11].y);
       ctx.stroke();
     }
 
-    ctx.strokeStyle = 'rgba(186, 230, 253, 0.88)';
-    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.92)';
+    ctx.lineWidth = 2.4;
     tracePolygon(verts);
     ctx.stroke();
   }
@@ -302,6 +379,306 @@ function drawSinglePortal(p, partner, cooling, cdRemain) {
   ctx.restore();
 }
 
+// 实时视口裁剪超清矢量石砖微倒角 + 四面哥特精雕护栏/石灯柱（与弹道、岩浆同级原生设备像素光栅化，拉到最大视野依然 100% 锐利不糊，0 径向渐变 / 0 shadowBlur）
+const BALUSTRADE_THEMES = {
+  foundry: {
+    plinth: '#161f2e', railDark: '#1f2b3d', railMid: '#2d3e56', railHi: '#89c4d4',
+    outline: '#060911', spindle: '#394e6a', accent: '#52b788',
+    pierBase: '#1b2638', pierCap: '#334763', lanternFrame: '#0d131f',
+    flameOuter: 'rgba(76, 201, 240, 0.30)', flameMid: '#4cc9f0', flameCore: '#fff3b0'
+  },
+  glacier: {
+    plinth: '#112236', railDark: '#19334f', railMid: '#274c73', railHi: '#bae6fd',
+    outline: '#06101d', spindle: '#4895ef', accent: '#90e0ef',
+    pierBase: '#162d47', pierCap: '#2e5984', lanternFrame: '#0b1829',
+    flameOuter: 'rgba(144, 224, 239, 0.32)', flameMid: '#72efdd', flameCore: '#f8fafc'
+  },
+  wasteland: {
+    plinth: '#1b1526', railDark: '#2a2038', railMid: '#463556', railHi: '#f3d599',
+    outline: '#08050f', spindle: '#c89b54', accent: '#dfc084',
+    pierBase: '#241b31', pierCap: '#594269', lanternFrame: '#120d1c',
+    flameOuter: 'rgba(199, 125, 255, 0.30)', flameMid: '#c77dff', flameCore: '#ffe8a3'
+  },
+  desert: {
+    plinth: '#15111d', railDark: '#221b2e', railMid: '#362b47', railHi: '#f6d379',
+    outline: '#06040b', spindle: '#d4a656', accent: '#ff9f1c',
+    pierBase: '#1d1628', pierCap: '#47385c', lanternFrame: '#0d0914',
+    flameOuter: 'rgba(255, 159, 28, 0.30)', flameMid: '#ff9f1c', flameCore: '#fff8dc'
+  }
+};
+
+let _lowHpVigAlpha = 0;
+
+function _drawPierLantern(px, py, sz, th, sceneId, pulse) {
+  const hs = sz * 0.5;
+  // 石柱投影
+  ctx.fillStyle = 'rgba(4, 6, 12, 0.52)';
+  ctx.fillRect(px - hs - 3, py - hs + 4, sz + 6, sz + 4);
+  // 石柱外基座与倒角顶盖
+  ctx.fillStyle = th.pierBase;
+  ctx.strokeStyle = th.outline;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.roundRect(px - hs, py - hs, sz, sz, 3);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = th.pierCap;
+  ctx.beginPath();
+  ctx.roundRect(px - hs + 2.5, py - hs + 2.5, sz - 5, sz - 5, 2);
+  ctx.fill();
+  ctx.strokeStyle = th.railHi;
+  ctx.lineWidth = 0.95;
+  ctx.strokeRect(px - hs + 3, py - hs + 3, sz - 6, sz - 6);
+
+  if (sceneId === 'wasteland') {
+    // 钟楼黄铜发条十字栓
+    ctx.strokeStyle = th.accent;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.arc(px, py, hs * 0.48, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // 柱顶魂灯发光核（纯多层几何光晕，0 径向渐变 / 0 shadowBlur）
+  const rPulse = 1 + Math.sin(pulse + (px + py) * 0.015) * 0.12;
+  ctx.fillStyle = th.flameOuter;
+  ctx.beginPath();
+  ctx.arc(px, py, sz * 0.46 * rPulse, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = th.lanternFrame;
+  ctx.strokeStyle = th.accent;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(px, py - 6.5);
+  ctx.lineTo(px + 6.5, py);
+  ctx.lineTo(px, py + 6.5);
+  ctx.lineTo(px - 6.5, py);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = th.flameMid;
+  ctx.beginPath();
+  ctx.arc(px, py, 3.6 * rPulse, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = th.flameCore;
+  ctx.beginPath();
+  ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawCrispArenaBalustrade(vL, vR, vT, vB, sceneId) {
+  const th = BALUSTRADE_THEMES[sceneId] || BALUSTRADE_THEMES.foundry;
+  const W = WORLD.w, H = WORLD.h;
+  const pulse = ((typeof _frameNow === 'number' ? _frameNow : 0) * 0.0042);
+  const step = 36, pierStep = 180;
+
+  ctx.save();
+
+  // 1. 场地四周内侧路缘投影与石阶排水渠（仅当镜头靠近对应边界时绘制）
+  ctx.fillStyle = 'rgba(3, 5, 11, 0.48)';
+  if (vT < 26) ctx.fillRect(Math.max(0, vL), 0, Math.min(W, vR) - Math.max(0, vL), 16);
+  if (vB > H - 26) ctx.fillRect(Math.max(0, vL), H - 14, Math.min(W, vR) - Math.max(0, vL), 14);
+  if (vL < 26) ctx.fillRect(0, Math.max(0, vT), 15, Math.min(H, vB) - Math.max(0, vT));
+  if (vR > W - 26) ctx.fillRect(W - 15, Math.max(0, vT), 15, Math.min(H, vB) - Math.max(0, vT));
+
+  // 2. 上下水平哥特石雕护栏带（y = 0 与 y = H）
+  const hEdges = [];
+  if (vT < 34) hEdges.push({ yBase: -24, dir: 1 });
+  if (vB > H - 34) hEdges.push({ yBase: H - 4, dir: -1 });
+
+  for (let ei = 0; ei < hEdges.length; ei++) {
+    const { yBase } = hEdges[ei];
+    const x0 = Math.max(-24, vL - 36), x1 = Math.min(W + 24, vR + 36);
+    if (x1 <= x0) continue;
+
+    // 底层石质基座梁
+    ctx.fillStyle = th.plinth;
+    ctx.strokeStyle = th.outline;
+    ctx.lineWidth = 1.8;
+    ctx.fillRect(x0, yBase, x1 - x0, 28);
+    ctx.strokeRect(x0, yBase, x1 - x0, 28);
+
+    // 栏杆镂空立柱群（每 36px 一根精雕立柱 + 场景特色花饰）
+    const sStart = Math.max(step, Math.floor(x0 / step) * step);
+    const sEnd = Math.min(W - step, Math.ceil(x1 / step) * step);
+    for (let sx = sStart; sx <= sEnd; sx += step) {
+      if (sx % pierStep === 0) continue;
+      // 镂空暗窗底衬
+      ctx.fillStyle = '#070a12';
+      ctx.fillRect(sx - 12, yBase + 6, 24, 16);
+
+      // 双立柱雕花芯
+      ctx.fillStyle = th.spindle;
+      ctx.strokeStyle = th.outline;
+      ctx.lineWidth = 1.1;
+      ctx.fillRect(sx - 4.5, yBase + 5, 9, 18);
+      ctx.strokeRect(sx - 4.5, yBase + 5, 9, 18);
+
+      // 立柱受光金属/石棱高光
+      ctx.fillStyle = th.railHi;
+      ctx.fillRect(sx - 3, yBase + 6, 2, 16);
+
+      if (sceneId === 'foundry') {
+        // 雨夜长桥：哥特尖拱券与石栏青苔斑
+        ctx.strokeStyle = th.railMid;
+        ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        ctx.moveTo(sx - 12, yBase + 13);
+        ctx.lineTo(sx, yBase + 7);
+        ctx.lineTo(sx + 12, yBase + 13);
+        ctx.stroke();
+        if ((sx / step) % 2 === 0) {
+          ctx.fillStyle = th.accent;
+          ctx.fillRect(sx - 5, yBase + 20, 6, 2.2);
+        }
+      } else if (sceneId === 'glacier') {
+        // 永冻冰窟：棱晶冰枪尖刺雕花
+        ctx.fillStyle = th.accent;
+        ctx.beginPath();
+        ctx.moveTo(sx, yBase + 6.5);
+        ctx.lineTo(sx + 5, yBase + 14);
+        ctx.lineTo(sx, yBase + 21.5);
+        ctx.lineTo(sx - 5, yBase + 14);
+        ctx.closePath();
+        ctx.fill();
+      } else if (sceneId === 'wasteland') {
+        // 倒悬钟楼：咬合黄铜齿轮环
+        ctx.strokeStyle = th.accent;
+        ctx.lineWidth = 1.35;
+        ctx.beginPath();
+        ctx.arc(sx, yBase + 14, 5.2, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        // 日蚀镜界：黑曜金弦月徽记
+        ctx.strokeStyle = th.accent;
+        ctx.lineWidth = 1.25;
+        ctx.beginPath();
+        ctx.arc(sx, yBase + 14, 5.0, -0.7, Math.PI + 0.7);
+        ctx.stroke();
+      }
+    }
+
+    // 上下双层倒角压顶扶手石梁（锐利 1px 受光边）
+    ctx.fillStyle = th.railMid;
+    ctx.fillRect(x0, yBase, x1 - x0, 6.5);
+    ctx.fillStyle = th.railDark;
+    ctx.fillRect(x0, yBase + 22, x1 - x0, 6);
+
+    ctx.strokeStyle = th.railHi;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(x0, yBase + 1.5); ctx.lineTo(x1, yBase + 1.5);
+    ctx.moveTo(x0, yBase + 23.2); ctx.lineTo(x1, yBase + 23.2);
+    ctx.stroke();
+
+    ctx.strokeStyle = th.outline;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x0, yBase + 6.5); ctx.lineTo(x1, yBase + 6.5);
+    ctx.moveTo(x0, yBase + 22); ctx.lineTo(x1, yBase + 22);
+    ctx.stroke();
+  }
+
+  // 3. 左右垂直哥特石雕护栏带（x = 0 与 x = W）
+  const vEdges = [];
+  if (vL < 34) vEdges.push({ xBase: -24 });
+  if (vR > W - 34) vEdges.push({ xBase: W - 4 });
+
+  for (let ei = 0; ei < vEdges.length; ei++) {
+    const { xBase } = vEdges[ei];
+    const y0 = Math.max(-24, vT - 36), y1 = Math.min(H + 24, vB + 36);
+    if (y1 <= y0) continue;
+
+    ctx.fillStyle = th.plinth;
+    ctx.strokeStyle = th.outline;
+    ctx.lineWidth = 1.8;
+    ctx.fillRect(xBase, y0, 28, y1 - y0);
+    ctx.strokeRect(xBase, y0, 28, y1 - y0);
+
+    const sStart = Math.max(step, Math.floor(y0 / step) * step);
+    const sEnd = Math.min(H - step, Math.ceil(y1 / step) * step);
+    for (let sy = sStart; sy <= sEnd; sy += step) {
+      if (sy % pierStep === 0) continue;
+      ctx.fillStyle = '#070a12';
+      ctx.fillRect(xBase + 6, sy - 12, 16, 24);
+
+      ctx.fillStyle = th.spindle;
+      ctx.strokeStyle = th.outline;
+      ctx.lineWidth = 1.1;
+      ctx.fillRect(xBase + 5, sy - 4.5, 18, 9);
+      ctx.strokeRect(xBase + 5, sy - 4.5, 18, 9);
+
+      ctx.fillStyle = th.railHi;
+      ctx.fillRect(xBase + 6, sy - 3, 16, 2);
+
+      if (sceneId === 'wasteland' || sceneId === 'desert') {
+        ctx.strokeStyle = th.accent;
+        ctx.lineWidth = 1.25;
+        ctx.beginPath();
+        ctx.arc(xBase + 14, sy, 4.6, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (sceneId === 'glacier') {
+        ctx.fillStyle = th.accent;
+        ctx.fillRect(xBase + 11, sy - 2.5, 6, 5);
+      }
+    }
+
+    ctx.fillStyle = th.railMid;
+    ctx.fillRect(xBase, y0, 6.5, y1 - y0);
+    ctx.fillStyle = th.railDark;
+    ctx.fillRect(xBase + 22, y0, 6, y1 - y0);
+
+    ctx.strokeStyle = th.railHi;
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.moveTo(xBase + 1.5, y0); ctx.lineTo(xBase + 1.5, y1);
+    ctx.moveTo(xBase + 23.2, y0); ctx.lineTo(xBase + 23.2, y1);
+    ctx.stroke();
+
+    ctx.strokeStyle = th.outline;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(xBase + 6.5, y0); ctx.lineTo(xBase + 6.5, y1);
+    ctx.moveTo(xBase + 22, y0); ctx.lineTo(xBase + 22, y1);
+    ctx.stroke();
+  }
+
+  // 4. 每隔 180px 耸立的精雕石灯柱与四角重装镇界塔台（视口裁剪）
+  if (vT < 42) {
+    const p0 = Math.max(pierStep, Math.floor((vL - 30) / pierStep) * pierStep);
+    const p1 = Math.min(W - pierStep, Math.ceil((vR + 30) / pierStep) * pierStep);
+    for (let px = p0; px <= p1; px += pierStep) _drawPierLantern(px, -10, 28, th, sceneId, pulse);
+  }
+  if (vB > H - 42) {
+    const p0 = Math.max(pierStep, Math.floor((vL - 30) / pierStep) * pierStep);
+    const p1 = Math.min(W - pierStep, Math.ceil((vR + 30) / pierStep) * pierStep);
+    for (let px = p0; px <= p1; px += pierStep) _drawPierLantern(px, H + 10, 28, th, sceneId, pulse);
+  }
+  if (vL < 42) {
+    const p0 = Math.max(pierStep, Math.floor((vT - 30) / pierStep) * pierStep);
+    const p1 = Math.min(H - pierStep, Math.ceil((vB + 30) / pierStep) * pierStep);
+    for (let py = p0; py <= p1; py += pierStep) _drawPierLantern(-10, py, 28, th, sceneId, pulse);
+  }
+  if (vR > W - 42) {
+    const p0 = Math.max(pierStep, Math.floor((vT - 30) / pierStep) * pierStep);
+    const p1 = Math.min(H - pierStep, Math.ceil((vB + 30) / pierStep) * pierStep);
+    for (let py = p0; py <= p1; py += pierStep) _drawPierLantern(W + 10, py, 28, th, sceneId, pulse);
+  }
+
+  // 四角镇界主石柱台
+  const cornerBastions = [[-10, -10], [W + 10, -10], [-10, H + 10], [W + 10, H + 10]];
+  for (let ci = 0; ci < 4; ci++) {
+    const [cx, cy] = cornerBastions[ci];
+    if (cx + 32 < vL || cx - 32 > vR || cy + 32 < vT || cy - 32 > vB) continue;
+    _drawPierLantern(cx, cy, 38, th, sceneId, pulse);
+  }
+
+  ctx.restore();
+}
+
 // 战场主相机裁剪渲染、首领预警提示、悬浮摇杆绘制与 RAF 主循环
 function draw() {
   if (typeof _frameNow !== 'undefined') _frameNow = performance.now();
@@ -321,21 +698,13 @@ function draw() {
   const vL = cam.x - halfW - 64, vR = cam.x + halfW + 64;
   const vT = cam.y - halfH - 64, vB = cam.y + halfH + 64;
 
-  // 按缩放比例整数安全裁剪拷贝当前镜头可见区域的地面贴图（严格防受击震屏时浮点越界）
-  const wx0 = Math.max(-FLOOR_PAD, Math.floor(cam.x - halfW - 16));
-  const wy0 = Math.max(-FLOOR_PAD, Math.floor(cam.y - halfH - 16));
-  const wx1 = Math.min(WORLD.w + FLOOR_PAD, Math.ceil(cam.x + halfW + 16));
-  const wy1 = Math.min(WORLD.h + FLOOR_PAD, Math.ceil(cam.y + halfH + 16));
-  if (wx1 > wx0 && wy1 > wy0 && floorCanvas.width > 2 && floorCanvas.height > 2) {
-    const sc = curFloorScale || 0.8;
-    const sx0 = Math.max(0, Math.min(floorCanvas.width - 1, Math.floor((wx0 + FLOOR_PAD) * sc)));
-    const sy0 = Math.max(0, Math.min(floorCanvas.height - 1, Math.floor((wy0 + FLOOR_PAD) * sc)));
-    const sw = Math.max(0, Math.min(floorCanvas.width - sx0, Math.floor((wx1 - wx0) * sc)));
-    const sh = Math.max(0, Math.min(floorCanvas.height - sy0, Math.floor((wy1 - wy0) * sc)));
-    if (sw > 0 && sh > 0) {
-      ctx.drawImage(floorCanvas, sx0, sy0, sw, sh, wx0, wy0, wx1 - wx0, wy1 - wy0);
-    }
+  // 直接绘制常驻 GPU 硬件纹理的 <=3840px 超清地坪贴图（消除每帧动态子矩形取整与双网格叠加引起的闪烁抖动）
+  if (floorCanvas.width > 2 && floorCanvas.height > 2) {
+    ctx.drawImage(floorCanvas, -FLOOR_PAD, -FLOOR_PAD, WORLD.w + FLOOR_PAD * 2, WORLD.h + FLOOR_PAD * 2);
   }
+
+  const activeSceneId = (curScene && curScene.id) || 'foundry';
+  drawCrispArenaBalustrade(vL, vR, vT, vB, activeSceneId);
 
   if (state !== 'menu') {
     for (let i = 0; i < stains.length; i++) {
@@ -604,27 +973,102 @@ function draw() {
             ctx.setLineDash([9, 7]);
           }
           ctx.setLineDash([]);
+        } else if (e.sigKind === 'omega_cross_beam') {
+          // 欧米茄 · 十字重型等离子歼灭主炮充能导轨
+          for (let k = 0; k < 4; k++) {
+            const ba = baseA + k * (Math.PI * 0.5);
+            const ex = e.x + Math.cos(ba) * 460, ey = e.y + Math.sin(ba) * 460;
+            ctx.strokeStyle = `rgba(251, 146, 60, ${0.15 + sProg * 0.25})`;
+            ctx.lineWidth = 28;
+            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+            ctx.strokeStyle = '#fde68a';
+            ctx.lineWidth = 3.0;
+            ctx.setLineDash([12, 8]);
+            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(ba) * 460 * sProg, e.y + Math.sin(ba) * 460 * sProg); ctx.stroke();
+            ctx.setLineDash([]);
+          }
+          ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2.6;
+          ctx.beginPath(); ctx.arc(e.x, e.y, 64 + sProg * 28, 0, Math.PI * 2); ctx.stroke();
+        } else if (e.sigKind === 'venom_vortex') {
+          // 苍岚毒皇 · 万蛊翠岚龙卷阵
+          ctx.strokeStyle = `rgba(110, 231, 183, ${0.32 + sProg * 0.52})`;
+          ctx.lineWidth = 2.4;
+          ctx.beginPath(); ctx.arc(e.x, e.y, 168 * sProg, 0, Math.PI * 2); ctx.stroke();
+          for (let k = 0; k < 10; k++) {
+            const ba = baseA + (k / 10) * Math.PI * 2 + sProg * 0.5;
+            ctx.strokeStyle = k % 2 === 0 ? '#a3e635' : '#6ee7b7';
+            ctx.lineWidth = 2.2;
+            ctx.beginPath();
+            ctx.moveTo(e.x + Math.cos(ba) * 42, e.y + Math.sin(ba) * 42);
+            ctx.lineTo(e.x + Math.cos(ba + 0.25) * 176 * sProg, e.y + Math.sin(ba + 0.25) * 176 * sProg);
+            ctx.stroke();
+          }
         } else {
-          // 烬羽 · 断刃·千雨十字裂
+          // 烬羽 · 断刃·八荒血月斩
           const ways = (e.hp < e.maxHp * 0.55 || overtime || e.mythicPhase2) ? 8 : 4;
           for (let k = 0; k < ways; k++) {
             const ba = baseA + (k / ways) * Math.PI * 2;
-            const ex = e.x + Math.cos(ba) * 225, ey = e.y + Math.sin(ba) * 225;
+            const ex = e.x + Math.cos(ba) * 235, ey = e.y + Math.sin(ba) * 235;
             ctx.strokeStyle = `rgba(251, 113, 133, ${0.16 + sProg * 0.22})`;
-            ctx.lineWidth = 16;
+            ctx.lineWidth = 18;
             ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
             ctx.strokeStyle = '#fda4af';
             ctx.lineWidth = 2.4;
             ctx.setLineDash([8, 6]);
             ctx.beginPath();
             ctx.moveTo(e.x, e.y);
-            ctx.lineTo(e.x + Math.cos(ba) * 225 * sProg, e.y + Math.sin(ba) * 225 * sProg);
+            ctx.lineTo(e.x + Math.cos(ba) * 235 * sProg, e.y + Math.sin(ba) * 235 * sProg);
             ctx.stroke();
             ctx.setLineDash([]);
           }
         }
         ctx.restore();
-      } else if (e.lockedAim !== undefined && !e.dashing) {
+      }
+      // 艾丝特莉亚实时旋转双翼极光冰束 & 伽蓝十字次元锁定光轨（独立绘制，与冲刺/咏唱互不遮挡）
+      if ((e.beamSweepT || 0) > 0) {
+        const bLen = 350;
+        const ba0 = e.beamSweepA || 0;
+        ctx.save();
+        ctx.lineCap = 'round';
+        for (let side = -1; side <= 1; side += 2) {
+          const ba = ba0 + (side < 0 ? Math.PI : 0);
+          const bx2 = e.x + Math.cos(ba) * bLen, by2 = e.y + Math.sin(ba) * bLen;
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.28)';
+          ctx.lineWidth = 24;
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(bx2, by2); ctx.stroke();
+          ctx.strokeStyle = '#7dd3fc';
+          ctx.lineWidth = 9;
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(bx2, by2); ctx.stroke();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 3.2;
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(bx2, by2); ctx.stroke();
+        }
+        ctx.restore();
+      }
+      if ((e.laserGridT || 0) > 0) {
+        const gProg = Math.max(0.08, Math.min(1, 1 - e.laserGridT / Math.max(0.1, e.laserGridMaxT || 0.85)));
+        const gx = e.laserGridX, gy = e.laserGridY, ga = e.laserGridA || 0;
+        const span = 560;
+        ctx.save();
+        ctx.lineCap = 'round';
+        for (let k = 0; k < 2; k++) {
+          const la = ga + k * (Math.PI * 0.5);
+          const x1 = gx - Math.cos(la) * span, y1 = gy - Math.sin(la) * span;
+          const x2 = gx + Math.cos(la) * span, y2 = gy + Math.sin(la) * span;
+          ctx.strokeStyle = `rgba(199, 125, 255, ${0.14 + gProg * 0.26})`;
+          ctx.lineWidth = 24;
+          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+          ctx.strokeStyle = '#fde68a';
+          ctx.lineWidth = 2.4;
+          ctx.setLineDash([10, 7]);
+          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.strokeStyle = '#e0aaff'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(gx, gy, Math.max(12, 54 * (1 - gProg * 0.6)), 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+      if (e.lockedAim !== undefined && !e.dashing && !((e.sigWindupT || 0) > 0) && !e.aimA) {
         // 冲锋怪/统领/首领蓄力锁定预警走廊 + 蓄力推进条 + 精准落点箭头（预警多长就实打实冲多远！）
         const warnLen = Math.max(48, e.dashWarnLen || 255);
         const ca = Math.cos(e.lockedAim), sa = Math.sin(e.lockedAim);
@@ -720,6 +1164,26 @@ function draw() {
       ctx.moveTo(s.x - sz, s.y - sz); ctx.lineTo(s.x + sz, s.y + sz);
       ctx.moveTo(s.x + sz, s.y - sz); ctx.lineTo(s.x - sz, s.y + sz);
       ctx.stroke();
+    }
+
+    // 角色浅浅的收集（磁吸拾取）范围地面光圈（仅显示收集范围，不显示攻击射程圈）
+    if (state === 'wave' && player && player.hp > 0) {
+      const pulseActive = (player.magnetPulseT || 0) > 0;
+      const targetMagR = Math.max(28, (player.magnet || 130) + (pulseActive ? 135 : 0));
+      player._visMagR = player._visMagR === undefined
+        ? targetMagR
+        : player._visMagR + (targetMagR - player._visMagR) * 0.20;
+      const magR = player._visMagR;
+      ctx.save();
+      ctx.fillStyle = pulseActive ? 'rgba(114, 239, 221, 0.032)' : 'rgba(148, 210, 226, 0.018)';
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, magR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = pulseActive ? 'rgba(114, 239, 221, 0.24)' : 'rgba(148, 210, 226, 0.14)';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([7, 7]);
+      ctx.stroke();
+      ctx.restore();
     }
 
     // 晶石、血包与异星战利品箱绘制
@@ -865,8 +1329,10 @@ function draw() {
       ctx.restore();
     }
 
-    // 激光束与狙击枪高能贯穿轨迹（外层电浆辉光 + 白炽内芯 + 命中光斑）
-    for (const bm of beams) {
+    // 激光束与狙击枪高能贯穿轨迹（外层电浆辉光 + 白炽内芯 + 命中光斑 + 视口包围盒裁剪）
+    for (let i = 0; i < beams.length; i++) {
+      const bm = beams[i];
+      if ((bm.x1 < vL && bm.x2 < vL) || (bm.x1 > vR && bm.x2 > vR) || (bm.y1 < vT && bm.y2 < vT) || (bm.y1 > vB && bm.y2 > vB)) continue;
       const alpha = Math.max(0.04, bm.t / Math.max(0.01, bm.maxT));
       ctx.save();
       ctx.lineCap = 'round';
@@ -876,22 +1342,29 @@ function draw() {
       ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
       ctx.globalAlpha = alpha;
       ctx.lineWidth = (bm.thin ? 4 : 9) * alpha;
-      ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.stroke();
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = (bm.thin ? 1.8 : 3.5) * alpha;
-      ctx.beginPath(); ctx.moveTo(bm.x1, bm.y1); ctx.lineTo(bm.x2, bm.y2); ctx.stroke();
+      ctx.stroke();
       ctx.restore();
     }
 
-    // 连锁电弧（双层青紫电芒 + 白芯折线）
-    for (const lt of lightnings) {
+    // 连锁电弧（双层青紫电芒 + 白芯折线 + 视口裁剪）
+    for (let i = 0; i < lightnings.length; i++) {
+      const lt = lightnings[i];
+      const pts = lt.pts;
+      if (!pts || !pts.length) continue;
+      const p0 = pts[0], pN = pts[pts.length - 1];
+      if ((p0.x < vL && pN.x < vL) || (p0.x > vR && pN.x > vR) || (p0.y < vT && pN.y < vT) || (p0.y > vB && pN.y > vB)) continue;
       const alpha = Math.max(0.04, lt.t / Math.max(0.01, lt.maxT));
       ctx.save();
       ctx.lineJoin = 'round'; ctx.lineCap = 'round';
       ctx.globalAlpha = alpha * 0.42;
       ctx.strokeStyle = lt.color; ctx.lineWidth = 8 * alpha;
       ctx.beginPath();
-      lt.pts.forEach((pt, idx) => idx === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+      for (let idx = 0; idx < pts.length; idx++) {
+        idx === 0 ? ctx.moveTo(pts[idx].x, pts[idx].y) : ctx.lineTo(pts[idx].x, pts[idx].y);
+      }
       ctx.stroke();
       ctx.globalAlpha = alpha;
       ctx.lineWidth = 3.5 * alpha;
@@ -996,7 +1469,39 @@ function draw() {
       const bCol = b.color || '#ff3b6b';
       const br = Math.max(1.8, b.r || 5.2);
       const shp = b.shape;
-      if (shp === 'disc') {
+      if (shp === 'trident') {
+        // 醒目三叉戟弹幕：长柄 + 中央主锋 + 左右外扩双戟齿 + 白炽内芯
+        const ang = Math.atan2(b.vy, b.vx);
+        ctx.save();
+        ctx.translate(b.x, b.y); ctx.rotate(ang);
+        ctx.strokeStyle = '#090d16'; ctx.lineWidth = 4.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-br * 2.1, 0); ctx.lineTo(br * 2.25, 0);
+        ctx.moveTo(-br * 0.15, -br * 1.35); ctx.lineTo(br * 0.35, -br * 1.35); ctx.lineTo(br * 1.85, -br * 0.95);
+        ctx.moveTo(-br * 0.15, br * 1.35); ctx.lineTo(br * 0.35, br * 1.35); ctx.lineTo(br * 1.85, br * 0.95);
+        ctx.moveTo(br * 0.05, -br * 1.35); ctx.lineTo(br * 0.05, br * 1.35);
+        ctx.stroke();
+        ctx.strokeStyle = bCol; ctx.lineWidth = 2.3;
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(br * 2.45, 0); ctx.lineTo(br * 1.15, -br * 0.46); ctx.lineTo(br * 1.15, br * 0.46);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      } else if (shp === 'crescent') {
+        // 凌厉弯月刀波弹幕：首领与统领专属弧形剑气
+        const ang = Math.atan2(b.vy, b.vx);
+        ctx.save();
+        ctx.translate(b.x, b.y); ctx.rotate(ang);
+        ctx.fillStyle = bCol; ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.arc(-br * 0.35, 0, br * 1.65, -1.08, 1.08, false);
+        ctx.arc(-br * 0.95, 0, br * 1.48, 0.92, -0.92, true);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(-br * 0.38, 0, br * 1.36, -0.75, 0.75, false); ctx.stroke();
+        ctx.restore();
+      } else if (shp === 'disc') {
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(b.rot || 0);
         ctx.fillStyle = bCol; ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.2;
@@ -1081,8 +1586,14 @@ function draw() {
       const sp = sparks[i];
       if (sp.x < vL || sp.x > vR || sp.y < vT || sp.y > vB) continue;
       const life = Math.max(0, sp.t / sp.maxT);
-      const spd = Math.hypot(sp.vx, sp.vy) || 1;
-      const dx = (sp.vx / spd) * sp.len * life, dy = (sp.vy / spd) * sp.len * life;
+      let ux = sp.ux, uy = sp.uy;
+      if (ux === undefined) {
+        const spd = Math.hypot(sp.vx, sp.vy) || 1;
+        ux = sp.vx / spd; uy = sp.vy / spd;
+        sp.ux = ux; sp.uy = uy;
+      }
+      const reach = sp.len * life;
+      const dx = ux * reach, dy = uy * reach;
       ctx.globalAlpha = life;
       ctx.strokeStyle = sp.color; ctx.lineWidth = 2.6;
       ctx.beginPath(); ctx.moveTo(sp.x, sp.y); ctx.lineTo(sp.x - dx, sp.y - dy); ctx.stroke();
@@ -1165,7 +1676,7 @@ function draw() {
         const my = ((i * 113 + wt * 68) % viewH);
         ctx.beginPath(); ctx.arc(mx, my, 1.6 + (i % 3) * 0.6, 0, Math.PI * 2); ctx.fill();
       }
-    } else if (scId === 'clockwork') {
+    } else if (scId === 'wasteland') {
       ctx.fillStyle = 'rgba(253, 230, 138, 0.28)';
       for (let i = 0; i < moteCnt; i++) {
         const mx = ((i * 149 + Math.cos(wt + i) * 20) % viewW + viewW) % viewW;
@@ -1183,9 +1694,18 @@ function draw() {
     ctx.restore();
   }
 
-  // 屏幕四周电影感暗角（复用离屏预烘焙贴图，零实时渐变开销）
-  const lowHp = player && state === 'wave' && (player.hp / Math.max(1, player.maxHp) < 0.32);
-  ctx.drawImage(lowHp ? vigLowHp : vigNormal, 0, 0, viewW, viewH);
+  // 屏幕四周电影感暗角（平滑过渡残血红晕，杜绝吸血/再生在 32% 阈值反复横跳引起的红黑闪屏）
+  const wantLowHp = (player && state === 'wave' && (player.hp / Math.max(1, player.maxHp) < 0.32)) ? 1 : 0;
+  _lowHpVigAlpha += (wantLowHp - _lowHpVigAlpha) * 0.12;
+  if (_lowHpVigAlpha < 0.98) {
+    ctx.drawImage(vigNormal, 0, 0, viewW, viewH);
+  }
+  if (_lowHpVigAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, _lowHpVigAlpha);
+    ctx.drawImage(vigLowHp, 0, 0, viewW, viewH);
+    ctx.restore();
+  }
 
   // 屏幕顶部战术事件持久播报横幅（停留 3~4 秒，带剩余时间条，确保玩家不错过任何奇遇/环境异象）
   if (state === 'wave' && typeof banners !== 'undefined' && banners.length > 0) {
@@ -1299,231 +1819,318 @@ function draw() {
     ctx.restore();
   }
 
-  // 《烬塔残响》四幕暗黑作画剧场演出 & 首领真身显圣时停特写（0 实时渐变，0 滤镜，零盖章标签）
-  if (state === 'wave' && typeof bossCutscene !== 'undefined' && bossCutscene && bossCutscene.t > 0) {
+  // 👑 首领登场（一阶段 33% 概率）/ 神话二阶段觉醒（二阶段 33% 概率觉醒且 100% 必出立绘）全屏斜向破框立绘横幅
+  // 完整展示 5.0 秒后进入 0.85 秒丝滑上浮消逝动画（0 radialGradient / 0 shadowBlur）
+  if (state === 'wave' && endlessMode &&
+      typeof bossCutscene !== 'undefined' && bossCutscene && bossCutscene.t > 0 &&
+      !(typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.isBlockingGameplay === 'function' && SpireDirector.isBlockingGameplay())) {
     const bc = bossCutscene;
-    const maxT = Math.max(0.25, bc.maxT || 3.8);
-    const elapsed = maxT - bc.t;
-    const enterP = Math.min(1, elapsed / 0.22);
-    const exitP = Math.min(1, Math.max(0, bc.t / 0.25));
+    const fadeDur = Math.max(0.35, bc.fadeDur || 0.85);
+    const maxT = Math.max(fadeDur + 0.5, bc.maxT || 5.85);
+    const showDur = Math.max(0.5, maxT - fadeDur);
+    const elapsed = Math.max(0, maxT - bc.t);
+    const rawEnter = Math.min(1, elapsed / 0.30);
+    const enterP = 1 - Math.pow(1 - rawEnter, 3);
+    const rawExit = Math.min(1, Math.max(0, bc.t / fadeDur));
+    const exitP = rawExit * rawExit * (3 - 2 * rawExit);
     const alpha = enterP * exitP;
+    const dissolveLift = (1 - exitP) * 20;
     const isMythic = bc.mode === 'mythic_phase2';
-    const mainCol = bc.color || '#e11d48';
-    const accCol = bc.accent || '#f6d379';
+    const mainCol = isMythic ? '#ff2a55' : (bc.color || '#e11d48');
+    const accCol = isMythic ? '#ffd166' : (bc.accent || '#f6d379');
     const portraitPortrait = viewW < 620;
-    const storyPack = (typeof getSpireCutscenePack === 'function') ? getSpireCutscenePack(bc.variant) : null;
-    const prog = Math.max(0, Math.min(0.999, elapsed / maxT));
-    const beatIdx = storyPack && storyPack.lines ? Math.min(storyPack.lines.length - 1, Math.floor(prog * storyPack.lines.length)) : 0;
-    const activeFrame = (storyPack && storyPack.imgs) ? (storyPack.imgs[beatIdx] || storyPack.imgs[0]) : null;
-
-    ctx.save();
-    // 1. 全屏暗黑剧场遮罩与刀光瞬闪
-    ctx.globalAlpha = 0.86 * alpha;
-    ctx.fillStyle = isMythic ? '#12050b' : '#060913';
-    ctx.fillRect(0, 0, viewW, viewH);
-    if (elapsed < 0.09) {
-      ctx.globalAlpha = (1 - elapsed / 0.09) * 0.38;
-      ctx.fillStyle = isMythic ? '#f6d379' : '#ffffff';
-      ctx.fillRect(0, 0, viewW, viewH);
-    }
-
-    // 2. 宽银幕电影院黑边封幅与鎏金细线
-    const barH = Math.round(Math.min(56, viewH * 0.085) * enterP);
-    ctx.globalAlpha = 0.96 * exitP;
-    ctx.fillStyle = '#04060c';
-    ctx.fillRect(0, 0, viewW, barH);
-    ctx.fillRect(0, viewH - barH, viewW, barH);
-    ctx.fillStyle = accCol;
-    ctx.fillRect(0, barH - 1.5, viewW, 1.5);
-    ctx.fillRect(0, viewH - barH, viewW, 1.5);
-
-    const cy = viewH * 0.5;
     const isShortLand = !portraitPortrait && viewH < 500;
-    if (activeFrame && !portraitPortrait) {
-      // 3A. 16:9 暗黑热血作画过场三镜动态剧场（适配桌面端与手机横屏紧凑比例）
-      const stageW = Math.min(viewW - (isShortLand ? 48 : 96), Math.round((viewH - barH * 2 - (isShortLand ? 20 : 44)) * (16 / 9)));
-      const stageH = Math.round(stageW * (9 / 16));
-      const sx = Math.round((viewW - stageW) * 0.5);
-      const sy = Math.round((viewH - stageH) * 0.5 - (isShortLand ? 2 : 6));
+    const personaSpec = (typeof BOSS_PORTRAIT_DATA !== 'undefined' && BOSS_PORTRAIT_DATA) ? BOSS_PORTRAIT_DATA[bc.variant] : null;
 
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = '#080c16';
-      ctx.strokeStyle = accCol;
-      ctx.lineWidth = 2.4;
-      ctx.fillRect(sx - 3, sy - 3, stageW + 6, stageH + 6);
-      ctx.strokeRect(sx - 3, sy - 3, stageW + 6, stageH + 6);
-
+    if (alpha > 0.008) {
       ctx.save();
-      ctx.beginPath();
-      ctx.rect(sx, sy, stageW, stageH);
-      ctx.clip();
-      const zoom = 1.02 + (prog % 0.34) * 0.14;
-      const dw = stageW * zoom, dh = stageH * zoom;
-      ctx.drawImage(activeFrame, sx - (dw - stageW) * 0.5, sy - (dh - stageH) * 0.5, dw, dh);
+      // 1. 全屏戏剧暗化衬底 + 破晓瞬闪刀光
+      ctx.globalAlpha = 0.78 * alpha;
+      ctx.fillStyle = isMythic ? '#13040b' : '#060913';
+      ctx.fillRect(0, 0, viewW, viewH);
+      if (elapsed < 0.12) {
+        ctx.globalAlpha = (1 - elapsed / 0.12) * 0.38;
+        ctx.fillStyle = isMythic ? '#ffd166' : '#ffffff';
+        ctx.fillRect(0, 0, viewW, viewH);
+      }
 
-      ctx.globalAlpha = 0.28 * alpha;
-      ctx.strokeStyle = storyPack.actKey === 'act2' ? '#bae6fd' : (storyPack.actKey === 'act3' ? '#d8b4fe' : '#fda4af');
-      ctx.lineWidth = 1.5;
-      for (let r = 0; r < 14; r++) {
-        const rx = sx + ((r * 97 + elapsed * 260) % stageW);
-        const ry = sy + ((r * 61 + (storyPack.actKey === 'act3' ? -elapsed * 220 + 900 : elapsed * 310)) % stageH);
+      // 2. 上下电影级黑金封幅与中央棱钻饰纹
+      const barH = Math.round(Math.min(isShortLand ? 38 : 54, viewH * 0.082) * enterP * (0.35 + 0.65 * exitP));
+      ctx.globalAlpha = 0.95 * alpha;
+      ctx.fillStyle = '#04060c';
+      ctx.fillRect(0, 0, viewW, barH);
+      ctx.fillRect(0, viewH - barH, viewW, barH);
+      ctx.fillStyle = accCol;
+      ctx.fillRect(0, Math.max(0, barH - 1.8), viewW, 1.8);
+      ctx.fillRect(0, viewH - barH, viewW, 1.8);
+
+      // 3. 双层斜切破框战幕横幅（底层主题色错位衬带 + 主层曜黑流金渐变带 + 内嵌细金线）
+      const cy = viewH * 0.5 - dissolveLift * 0.45;
+      const bandBaseH = portraitPortrait ? 252 : (isShortLand ? 168 : 210);
+      const bandH = bandBaseH * (0.86 + 0.14 * exitP);
+      const slant = portraitPortrait ? 18 : (isShortLand ? 24 : 34);
+      const xL = -24, xR = viewW + 24;
+
+      // 3a. 错位主题色暗影斜带
+      ctx.globalAlpha = 0.34 * alpha;
+      ctx.fillStyle = mainCol;
+      ctx.beginPath();
+      ctx.moveTo(xL, cy - bandH * 0.5 + slant + 8);
+      ctx.lineTo(xR, cy - bandH * 0.5 - slant + 8);
+      ctx.lineTo(xR, cy + bandH * 0.5 - slant + 10);
+      ctx.lineTo(xL, cy + bandH * 0.5 + slant + 10);
+      ctx.closePath();
+      ctx.fill();
+
+      // 3b. 主战幕斜带（线性金属暗泽渐变）
+      ctx.globalAlpha = 0.96 * alpha;
+      const ribGrad = ctx.createLinearGradient(0, cy - bandH * 0.5, viewW, cy + bandH * 0.5);
+      if (isMythic) {
+        ribGrad.addColorStop(0, '#14040c');
+        ribGrad.addColorStop(0.35, '#2b0818');
+        ribGrad.addColorStop(0.72, '#380b1f');
+        ribGrad.addColorStop(1, '#12040a');
+      } else {
+        ribGrad.addColorStop(0, '#070b16');
+        ribGrad.addColorStop(0.36, '#141129');
+        ribGrad.addColorStop(0.72, '#1b1533');
+        ribGrad.addColorStop(1, '#080c18');
+      }
+      ctx.fillStyle = ribGrad;
+      ctx.beginPath();
+      ctx.moveTo(xL, cy - bandH * 0.5 + slant);
+      ctx.lineTo(xR, cy - bandH * 0.5 - slant);
+      ctx.lineTo(xR, cy + bandH * 0.5 - slant);
+      ctx.lineTo(xL, cy + bandH * 0.5 + slant);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = isMythic ? '#ffd166' : mainCol;
+      ctx.lineWidth = 3.0;
+      ctx.stroke();
+
+      // 3c. 横幅内部裁剪层：巨幅英文暗纹、平行流光切线、飘散金红余烬星尘与内嵌双金线
+      ctx.save();
+      ctx.clip();
+
+      const inset = 6;
+      ctx.globalAlpha = 0.42 * alpha;
+      ctx.strokeStyle = accCol;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(xL, cy - bandH * 0.5 + slant + inset);
+      ctx.lineTo(xR, cy - bandH * 0.5 - slant + inset);
+      ctx.moveTo(xL, cy + bandH * 0.5 + slant - inset);
+      ctx.lineTo(xR, cy + bandH * 0.5 - slant - inset);
+      ctx.stroke();
+
+      // 背景水印排印
+      ctx.globalAlpha = 0.065 * alpha;
+      ctx.fillStyle = isMythic ? '#ffd166' : '#ffffff';
+      ctx.font = `italic 900 ${portraitPortrait ? 44 : 74}px -apple-system, BlinkMacSystemFont, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.fillText(isMythic ? 'PHASE II · AWAKENING' : 'PHASE I · SOVEREIGN', viewW - 24, cy + (portraitPortrait ? 86 : 58));
+
+      // 斜向流光速度线
+      const slope = (-2 * slant) / Math.max(1, xR - xL);
+      ctx.globalAlpha = 0.30 * alpha;
+      ctx.strokeStyle = accCol;
+      ctx.lineWidth = 1.8;
+      for (let s = 0; s < 6; s++) {
+        const laneOff = -bandH * 0.36 + s * (bandH * 0.145);
+        const sx0 = ((elapsed * 380 + s * 175) % (viewW + 260)) - 130;
+        const sy0 = cy + laneOff + (sx0 - viewW * 0.5) * slope;
+        const len = 95 + (s % 3) * 48;
         ctx.beginPath();
-        ctx.moveTo(rx, ry);
-        ctx.lineTo(rx - 8, ry + (storyPack.actKey === 'act3' ? -22 : 24));
+        ctx.moveTo(sx0, sy0);
+        ctx.lineTo(sx0 + len, sy0 + len * slope);
+        ctx.stroke();
+      }
+
+      // 浮游棱钻星烬微粒（消逝阶段加速上飘散逸）
+      const moteCount = portraitPortrait ? 10 : 16;
+      for (let m = 0; m < moteCount; m++) {
+        const mx = ((m * 137 + elapsed * (52 + (m % 4) * 18)) % (viewW + 80)) - 40;
+        const my = cy + Math.sin(elapsed * 1.9 + m * 1.7) * (bandH * 0.36) - (1 - exitP) * (18 + (m % 5) * 9);
+        const mr = 2.2 + (m % 3) * 1.2;
+        ctx.globalAlpha = (0.28 + (m % 3) * 0.14) * alpha;
+        ctx.fillStyle = (m % 2 === 0) ? accCol : mainCol;
+        ctx.beginPath();
+        ctx.moveTo(mx, my - mr);
+        ctx.lineTo(mx + mr, my);
+        ctx.lineTo(mx, my + mr);
+        ctx.lineTo(mx - mr, my);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // 横幅下沿 5.0 秒鎏金展示进度丝线（满 5 秒归零后进入柔化消逝）
+      const holdRemain = Math.max(0, Math.min(1, 1 - elapsed / showDur));
+      if (holdRemain > 0.005) {
+        const progEnd = viewW * holdRemain;
+        const pyL = cy + bandH * 0.5 + slant - 3.2;
+        const pyR = pyL + progEnd * slope;
+        ctx.globalAlpha = 0.88 * alpha;
+        ctx.strokeStyle = isMythic ? '#ffd166' : accCol;
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        ctx.moveTo(0, pyL);
+        ctx.lineTo(progEnd, pyR);
         ctx.stroke();
       }
       ctx.restore();
 
+      // 4. 破框半身立绘（一阶段夏装 / 二阶段隐藏泳装）与主宰铭文排印
       ctx.globalAlpha = alpha;
-      const chapH = isShortLand ? 24 : 30;
-      ctx.fillStyle = 'rgba(7, 10, 18, 0.86)';
-      ctx.strokeStyle = 'rgba(229, 184, 105, 0.55)';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.roundRect(sx + 12, sy + 10, Math.min(390, stageW - 24), chapH, 7);
-      ctx.fill(); ctx.stroke();
-      ctx.font = `800 ${isShortLand ? 11.5 : 13}px -apple-system, sans-serif`;
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#f6d379';
-      ctx.fillText(`${storyPack.chapter}  ·  0${beatIdx + 1}/03`, sx + 22, sy + 10 + chapH * 0.70, Math.min(370, stageW - 44));
+      const slideOffset = (1 - enterP) * 64;
+      const phaseBadgeTxt = isMythic ? '⚡ PHASE II · 神话二阶立绘解封' : '👑 PHASE I · 首领降临立绘';
+      const personaShort = personaSpec ? personaSpec.personaName.split(' · ')[0] : '';
+      const skinTitle = personaSpec
+        ? (isMythic
+          ? `🔥 隐藏二阶 · ${personaShort}「${personaSpec.mythicTitle || personaSpec.summerTitle}」`
+          : `✨ 一阶夏装 · ${personaShort}「${personaSpec.summerTitle}」`)
+        : (bc.subtitle || '🕯️ 守誓主宰显圣');
 
-      const subH = isShortLand ? 68 : 92;
-      const subY = sy + stageH - subH;
-      ctx.fillStyle = 'rgba(6, 9, 17, 0.90)';
-      ctx.fillRect(sx, subY, stageW, subH);
-      ctx.fillStyle = accCol;
-      ctx.fillRect(sx, subY, stageW, 1.8);
-
-      drawBossPortrait(bc.variant, sx + (isShortLand ? 46 : 66), subY + (isShortLand ? 12 : 18), isShortLand ? 0.46 : 0.62, isMythic);
-
-      const tx = sx + (isShortLand ? 96 : 136);
-      const maxTxtW = Math.max(120, stageW - (isShortLand ? 112 : 156));
-      ctx.font = `900 ${isShortLand ? 13 : 15}px -apple-system, sans-serif`;
-      ctx.fillStyle = isMythic ? '#fda4af' : '#72efdd';
-      ctx.fillText(`${storyPack.speaker}  ·  ${bc.title || ''}`, tx, subY + (isShortLand ? 22 : 28), maxTxtW);
-
-      const fullLine = (storyPack.lines && storyPack.lines[beatIdx]) || bc.extraTag || '';
-      const beatLen = maxT / Math.max(1, storyPack.lines.length);
-      const localElapsed = Math.max(0, elapsed - beatIdx * beatLen);
-      const shownChars = Math.min(fullLine.length, Math.max(6, Math.floor((localElapsed / Math.max(0.35, beatLen * 0.62)) * fullLine.length)));
-      ctx.font = `800 ${isShortLand ? 14 : 17}px "Songti SC", "PingFang SC", serif`;
-      ctx.fillStyle = '#fbf6eb';
-      ctx.fillText(fullLine.slice(0, shownChars), tx, subY + (isShortLand ? 44 : 58), maxTxtW);
-
-      ctx.font = `700 ${isShortLand ? 11 : 12}px -apple-system, sans-serif`;
-      ctx.fillStyle = '#cbd5e1';
-      ctx.fillText(bc.extraTag || '', tx, subY + (isShortLand ? 61 : 80), maxTxtW);
-    } else if (activeFrame && portraitPortrait) {
-      // 3B-1. 手机竖屏 16:9 保真画框 + 下置特写台词席（不裁切左右人物、不压扁字体）
-      const stageW = viewW - 28;
-      const stageH = Math.round(stageW * (9 / 16));
-      const sx = 14;
-      const sy = Math.round(cy - stageH * 0.66);
-
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = '#080c16';
-      ctx.strokeStyle = accCol;
-      ctx.lineWidth = 2.0;
-      ctx.fillRect(sx - 2, sy - 2, stageW + 4, stageH + 4);
-      ctx.strokeRect(sx - 2, sy - 2, stageW + 4, stageH + 4);
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(sx, sy, stageW, stageH);
-      ctx.clip();
-      const zoom = 1.02 + (prog % 0.34) * 0.10;
-      const dw = stageW * zoom, dh = stageH * zoom;
-      ctx.drawImage(activeFrame, sx - (dw - stageW) * 0.5, sy - (dh - stageH) * 0.5, dw, dh);
-      ctx.restore();
-
-      const infoY = sy + stageH + 14;
-      ctx.fillStyle = 'rgba(8, 12, 24, 0.92)';
-      ctx.strokeStyle = 'rgba(229, 184, 105, 0.44)';
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      ctx.roundRect(sx, infoY, stageW, 96, 12);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.textAlign = 'center';
-      ctx.font = '800 12px -apple-system, sans-serif';
-      ctx.fillStyle = accCol;
-      ctx.fillText(bc.subtitle || storyPack.chapter || '🕯️ 守誓主宰降临', viewW * 0.5, infoY + 24, stageW - 20);
-      ctx.font = '900 19px -apple-system, sans-serif';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(bc.title || '守层主宰', viewW * 0.5, infoY + 51, stageW - 20);
-      const lineTxt = (storyPack && storyPack.lines && storyPack.lines[beatIdx]) ? storyPack.lines[beatIdx] : (bc.extraTag || '');
-      ctx.font = '700 13px "Songti SC", "PingFang SC", serif';
-      ctx.fillStyle = '#e0fbfc';
-      ctx.fillText(lineTxt.slice(0, 24), viewW * 0.5, infoY + 78, stageW - 20);
-    } else {
-      // 3B-2. 奇遇首领立绘徽章特写横幅（无任何盖章框，干净凌厉）
-      const bandH = portraitPortrait ? 236 : 190;
-      const slant = portraitPortrait ? 20 : 34;
-      ctx.globalAlpha = 0.95 * alpha;
-      ctx.fillStyle = '#0d1322';
-      ctx.beginPath();
-      ctx.moveTo(-20, cy - bandH * 0.5 + slant);
-      ctx.lineTo(viewW + 20, cy - bandH * 0.5 - slant);
-      ctx.lineTo(viewW + 20, cy + bandH * 0.5 - slant);
-      ctx.lineTo(-20, cy + bandH * 0.5 + slant);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = mainCol;
-      ctx.lineWidth = 3.2;
-      ctx.stroke();
-
-      ctx.globalAlpha = alpha;
-      const slideOffset = (1 - enterP) * 52;
-      const lineTxt = (storyPack && storyPack.lines && storyPack.lines[beatIdx]) ? storyPack.lines[beatIdx] : (bc.extraTag || '');
       if (portraitPortrait) {
-        const pScale = Math.min(0.86, viewW / 450);
-        drawBossPortrait(bc.variant, viewW * 0.5 - slideOffset, cy - 44, pScale, isMythic);
+        const pScale = Math.min(0.92, viewW / 430);
+        drawBossPortrait(bc.variant, viewW * 0.5 - slideOffset * 0.65, cy - 52 - dissolveLift * 0.55, pScale, isMythic);
+
         ctx.textAlign = 'center';
-        ctx.font = '800 12.5px -apple-system, sans-serif';
-        ctx.fillStyle = accCol;
-        ctx.fillText(bc.subtitle || '🕯️ 守誓主宰降临', viewW * 0.5, cy + 52, viewW - 28);
-        ctx.font = '900 21px -apple-system, sans-serif';
-        ctx.strokeStyle = '#060913'; ctx.lineWidth = 5;
-        ctx.strokeText(bc.title || '守层主宰', viewW * 0.5, cy + 78, viewW - 24);
+        const pillW = Math.min(viewW - 36, 248);
+        const pillY = cy + 36;
+        ctx.fillStyle = isMythic ? 'rgba(225, 29, 72, 0.34)' : 'rgba(15, 23, 42, 0.82)';
+        ctx.strokeStyle = accCol;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.roundRect(viewW * 0.5 - pillW * 0.5, pillY, pillW, 21, 10.5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = '800 11px -apple-system, sans-serif';
+        ctx.fillStyle = '#fde68a';
+        ctx.fillText(phaseBadgeTxt, viewW * 0.5, pillY + 14.5, pillW - 16);
+
+        ctx.font = '800 12px -apple-system, sans-serif';
+        ctx.fillStyle = isMythic ? '#fda4af' : '#72efdd';
+        ctx.fillText(skinTitle, viewW * 0.5, cy + 73, viewW - 28);
+
+        ctx.font = '900 22px -apple-system, sans-serif';
+        ctx.strokeStyle = '#05070f';
+        ctx.lineWidth = 5;
+        ctx.strokeText(bc.title || '守层主宰', viewW * 0.5, cy + 99, viewW - 24);
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(bc.title || '守层主宰', viewW * 0.5, cy + 78, viewW - 24);
-        ctx.font = '700 12px -apple-system, sans-serif';
-        ctx.fillStyle = '#e0fbfc';
-        ctx.fillText(lineTxt.slice(0, 26), viewW * 0.5, cy + 101, viewW - 24);
+        ctx.fillText(bc.title || '守层主宰', viewW * 0.5, cy + 99, viewW - 24);
+
+        if (bc.extraTag || bc.subtitle) {
+          ctx.font = '700 11.5px -apple-system, sans-serif';
+          ctx.fillStyle = '#e2e8f0';
+          ctx.fillText((bc.extraTag || bc.subtitle || '').slice(0, 30), viewW * 0.5, cy + 119, viewW - 24);
+        }
       } else {
-        const portX = Math.max(164, viewW * 0.285) - slideOffset;
-        const textX = portX + 136 + slideOffset * 1.25;
-        drawBossPortrait(bc.variant, portX, cy - 2, 1.24, isMythic);
+        const portScale = isShortLand ? 0.90 : 1.16;
+        const portX = Math.max(isShortLand ? 138 : 186, viewW * 0.255) - slideOffset;
+        const textX = portX + (isShortLand ? 124 : 162) + slideOffset * 1.15;
+        const maxTxtW = Math.max(180, viewW - textX - 42);
+
+        drawBossPortrait(bc.variant, portX, cy - (isShortLand ? 4 : 8) - dissolveLift * 0.55, portScale, isMythic);
+
         ctx.textAlign = 'left';
-        ctx.font = '800 15px -apple-system, sans-serif';
+        // 阶段铭牌胶囊 + 专属换装立绘副题
+        const badgeW = isMythic ? 206 : 184;
+        const badgeH = isShortLand ? 21 : 24;
+        const badgeY = cy - (isShortLand ? 54 : 66);
+        ctx.fillStyle = isMythic ? 'rgba(225, 29, 72, 0.36)' : 'rgba(114, 239, 221, 0.14)';
+        ctx.strokeStyle = accCol;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect(textX, badgeY, badgeW, badgeH, badgeH * 0.5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = `800 ${isShortLand ? 11 : 12}px -apple-system, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = isMythic ? '#ffd166' : '#72efdd';
+        ctx.fillText(phaseBadgeTxt, textX + badgeW * 0.5, badgeY + badgeH * 0.68);
+
+        ctx.textAlign = 'left';
+        ctx.font = `800 ${isShortLand ? 12.5 : 14.5}px -apple-system, sans-serif`;
         ctx.fillStyle = accCol;
-        ctx.fillText(bc.subtitle || '🕯️ 守誓主宰显圣', textX, cy - 34, Math.max(180, viewW - textX - 36));
-        ctx.font = '900 32px -apple-system, sans-serif';
-        ctx.strokeStyle = '#060913'; ctx.lineWidth = 6;
-        ctx.strokeText(bc.title || '守层主宰', textX, cy + 6, Math.max(180, viewW - textX - 36));
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(bc.title || '守层主宰', textX, cy + 6, Math.max(180, viewW - textX - 36));
-        ctx.font = '800 15px "Songti SC", "PingFang SC", serif';
+        ctx.fillText(skinTitle, textX + badgeW + 12, badgeY + badgeH * 0.70, Math.max(90, maxTxtW - badgeW - 12));
+
+        // 首领真名巨字排印
+        const titleSize = isShortLand ? 26 : 36;
+        const titleY = cy - (isShortLand ? 10 : 12);
+        ctx.font = `900 ${titleSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        ctx.strokeStyle = '#05070f';
+        ctx.lineWidth = 6.5;
+        ctx.strokeText(bc.title || '守层主宰', textX, titleY, maxTxtW);
+        ctx.fillStyle = isMythic ? '#fffbeb' : '#ffffff';
+        ctx.fillText(bc.title || '守层主宰', textX, titleY, maxTxtW);
+
+        // 鎏金分割饰线 + 棱钻端头
+        const divY = cy + (isShortLand ? 4 : 6);
+        const divW = Math.min(maxTxtW, 380);
+        ctx.strokeStyle = isMythic ? '#fb7185' : accCol;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(textX + 8, divY);
+        ctx.lineTo(textX + divW, divY);
+        ctx.stroke();
+        ctx.fillStyle = accCol;
+        ctx.beginPath();
+        ctx.moveTo(textX, divY);
+        ctx.lineTo(textX + 4.5, divY - 4.5);
+        ctx.lineTo(textX + 9, divY);
+        ctx.lineTo(textX + 4.5, divY + 4.5);
+        ctx.closePath();
+        ctx.fill();
+
+        // 称号副标
+        ctx.font = `800 ${isShortLand ? 13 : 15.5}px "Songti SC", "PingFang SC", serif`;
         ctx.fillStyle = '#e0fbfc';
-        ctx.fillText(lineTxt, textX, cy + 38, Math.max(180, viewW - textX - 36));
+        ctx.fillText(bc.subtitle || '🕯️ 守誓主宰显圣', textX, cy + (isShortLand ? 24 : 30), maxTxtW);
+
+        // 战术博弈提示条
         if (bc.extraTag) {
-          ctx.font = '700 12.5px -apple-system, sans-serif';
-          ctx.fillStyle = '#f6d379';
-          ctx.fillText(bc.extraTag, textX, cy + 62, Math.max(180, viewW - textX - 36));
+          const tipH = isShortLand ? 24 : 29;
+          const tipY = cy + (isShortLand ? 34 : 44);
+          const tipW = Math.min(maxTxtW, Math.max(240, bc.extraTag.length * (isShortLand ? 12.5 : 14) + 28));
+          ctx.fillStyle = isMythic ? 'rgba(217, 4, 41, 0.34)' : 'rgba(15, 23, 42, 0.72)';
+          ctx.strokeStyle = isMythic ? '#ffd166' : 'rgba(246, 211, 121, 0.55)';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.roundRect(textX, tipY, tipW, tipH, 7);
+          ctx.fill();
+          ctx.stroke();
+          ctx.font = `800 ${isShortLand ? 11.5 : 13}px -apple-system, sans-serif`;
+          ctx.fillStyle = isMythic ? '#ffd166' : '#f8fafc';
+          ctx.fillText(bc.extraTag, textX + 12, tipY + tipH * 0.68, tipW - 22);
         }
       }
-    }
 
-    if (elapsed > 0.35) {
-      ctx.globalAlpha = 0.74 * exitP;
-      ctx.font = '700 12px -apple-system, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#cbd5e1';
-      const skipMsg = (uiMode !== 'desktop' || isTouch) ? '轻触屏幕跳过演出 ▸' : '按 空格 / 点击屏幕 可跳过过场演出';
-      ctx.fillText(skipMsg, viewW * 0.5, viewH - barH - 14);
+      // 5. 右下角防误触手动跳过胶囊（避免走位摇杆或空格闪避误关 5 秒立绘演出）
+      if (elapsed > 0.60 && bc.t > fadeDur + 0.05) {
+        const skW = portraitPortrait ? 132 : 164;
+        const skH = 26;
+        const skX = viewW - skW - 18;
+        const skY = Math.max(viewH - Math.max(barH, 36) + (Math.max(barH, 36) - skH) * 0.5, viewH - 36);
+        bc._skipRect = { x: skX - 8, y: skY - 8, w: skW + 16, h: skH + 16 };
+        ctx.globalAlpha = 0.82 * exitP;
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.strokeStyle = 'rgba(246, 211, 121, 0.55)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(skX, skY, skW, skH, 13);
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = '700 11.5px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#e2e8f0';
+        const remSec = Math.max(0, Math.ceil(showDur - elapsed));
+        const skipTxt = portraitPortrait ? `跳过立绘 (${remSec}s) ▸` : `点击跳过 / Enter (${remSec}s) ▸`;
+        ctx.fillText(skipTxt, skX + skW * 0.5, skY + 17);
+      } else {
+        bc._skipRect = null;
+      }
+      ctx.restore();
     }
-    ctx.restore();
   }
 }
 

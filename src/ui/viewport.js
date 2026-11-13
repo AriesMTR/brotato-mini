@@ -121,9 +121,12 @@ function syncArenaAndZoom(forceBake = false) {
   } else {
     arenaOwner = null;
   }
-  const nextScale = (uiMode !== 'desktop' || isTouch) ? 0.78 : 1.0;
+  const mobilePerf = uiMode !== 'desktop';
+  const nextBakeScale = typeof computeFloorBakeScale === 'function'
+    ? computeFloorBakeScale(targetW, targetH, mobilePerf, dpr || 1)
+    : (mobilePerf ? 1.20 : 1.64);
   const activeSceneId = (curScene && curScene.id) ? curScene.id : 'foundry';
-  const wantKey = `${targetW}x${targetH}_${nextScale}_${activeSceneId}_${sceneSeed}`;
+  const wantKey = `${targetW}x${targetH}_${nextBakeScale}_${activeSceneId}_${sceneSeed}`;
 
   if (forceBake || WORLD.w !== targetW || WORLD.h !== targetH || bakedSceneKey !== wantKey) {
     const prevW = Math.max(1, WORLD.w || targetW), prevH = Math.max(1, WORLD.h || targetH);
@@ -259,6 +262,6 @@ window.addEventListener('wheel', e => {
   if (e.target !== cv || state !== 'wave' || !player || bossCutscene ||
       (typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay())) return;
   userZoomed = true;
-  camZoom = Math.max(0.38, Math.min(1.55, camZoom - e.deltaY * 0.0005));
+  camZoom = Math.max(0.38, Math.min(1.75, camZoom - e.deltaY * 0.0005));
   if (bootReady) clampCam();
 }, { passive: true });

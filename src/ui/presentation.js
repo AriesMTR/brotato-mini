@@ -9,7 +9,12 @@ var SpireSave = (function () {
     if (!p || p.cls !== 'allrounder' || !DIFFS[c.selectedDiff]) return false;
     if (!Number.isFinite(p.hp) || !Number.isFinite(p.maxHp) || p.maxHp <= 0 || p.hp <= 0) return false;
     if (!Array.isArray(p.weapons) || !p.weapons.length || p.weapons.length > 12) return false;
-    if (!p.weapons.every(w => w && WEAPONS[w.id] && Number.isInteger(w.tier) && w.tier >= 1 && w.tier <= 4)) return false;
+    if (!p.weapons.every(w => {
+      const tpl = w && WEAPONS[w.id];
+      if (!tpl || !Number.isInteger(w.tier) || w.tier < 1 || w.tier > MAX_WEAPON_TIER) return false;
+      // 未选择分支的五阶检查点允许恢复；有分支时必须属于这把五阶武器。
+      return !w.evo || (w.tier === MAX_WEAPON_TIER && Array.isArray(tpl.evos) && tpl.evos.some(e => e.id === w.evo));
+    })) return false;
     return Number.isFinite(p.lv) && Number.isFinite(p.mats) && SCENES.some(s => s.id === c.sceneId);
   }
   function load() {

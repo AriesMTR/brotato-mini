@@ -20,7 +20,10 @@ const MIME_BY_EXT = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
-  '.svg': 'image/svg+xml'
+  '.svg': 'image/svg+xml',
+  '.wav': 'audio/wav',
+  '.mp3': 'audio/mpeg',
+  '.ogg': 'audio/ogg'
 };
 
 function toDataUri(absPath) {
@@ -41,8 +44,9 @@ if (fs.existsSync(path.join(ROOT, 'assets/icon.png'))) {
 if (fs.existsSync(path.join(ROOT, 'assets/icon.svg'))) {
   inlineAssets['assets/icon.svg'] = toDataUri(path.join(ROOT, 'assets/icon.svg'));
 }
-const spireDir = path.join(ROOT, 'assets/spire');
-if (fs.existsSync(spireDir)) {
+for (const subDir of ['assets/spire', 'assets/audio']) {
+  const absDir = path.join(ROOT, subDir);
+  if (!fs.existsSync(absDir)) continue;
   const collect = dir => {
     for (const name of fs.readdirSync(dir).sort()) {
       const abs = path.join(dir, name);
@@ -53,7 +57,7 @@ if (fs.existsSync(spireDir)) {
       inlineAssets[path.relative(ROOT, abs).split(path.sep).join('/')] = toDataUri(abs);
     }
   };
-  collect(spireDir);
+  collect(absDir);
 }
 
 // Collect all CSS <link rel="stylesheet" href="...">

@@ -70,7 +70,8 @@
     <div class="hud-right">
       <div class="hud-right-top">
         <div id="matText" class="mat-num">◇ 0</div>
-        <button id="hudBgmBtn" class="icon-pill-btn d-only" onclick="toggleSpireAudio()" title="切换场景环境音景">音景</button>
+        <button id="hudAudioBtn" class="icon-pill-btn" onclick="openAudioModal()" title="调节背景音乐与音效音量">🔊 28%</button>
+        <button id="hudBgmBtn" class="icon-pill-btn d-only" onclick="toggleSpireAudio()" title="一键静音 / 恢复音景">音景</button>
         <button id="pauseBtn" class="pause-btn" onclick="togglePause()">驻留</button>
       </div>
       <small>WASD 走位  ·  Space / 右键 瞬步  ·  Esc 驻留</small>
@@ -91,11 +92,26 @@
       <p id="pauseInfo" class="sub"></p>
       <div id="pauseStats" class="stats-row"></div>
       <div id="pauseSets" class="set-row"></div>
+      <div class="pause-audio-strip" aria-label="快速音量调节">
+        <div class="pa-item">
+          <span class="pa-lbl">背景音乐</span>
+          <button type="button" class="vol-step-btn" onclick="adjustBgmVolume(-10)" aria-label="降低背景音乐">−</button>
+          <span id="pauseBgmVal" class="pa-val">28%</span>
+          <button type="button" class="vol-step-btn" onclick="adjustBgmVolume(10)" aria-label="提高背景音乐">+</button>
+        </div>
+        <div class="pa-item">
+          <span class="pa-lbl">战斗音效</span>
+          <button type="button" class="vol-step-btn" onclick="adjustSfxVolume(-10)" aria-label="降低战斗音效">−</button>
+          <span id="pauseSfxVal" class="pa-val">32%</span>
+          <button type="button" class="vol-step-btn" onclick="adjustSfxVolume(10)" aria-label="提高战斗音效">+</button>
+        </div>
+        <button type="button" id="pauseMuteBtn" class="vol-step-btn wide" onclick="toggleSpireAudio()">🔊 一键静音</button>
+      </div>
       <div class="pause-actions">
         <button class="btn btn-go" onclick="resumeGame()">◆ 继续登塔</button>
         <button class="btn btn-sec" onclick="openCodex('weapons')">烬塔圣典</button>
         <button class="btn btn-sec" onclick="restartRun()">重启本局</button>
-        <button class="btn btn-sec" onclick="toggleSpireAudio()">切换音景</button>
+        <button class="btn btn-sec" onclick="openAudioModal()">音量调节</button>
         <button id="pauseUiBtn" class="btn btn-sec" onclick="cycleUIPref()">视界模式 · 自动</button>
         <button class="btn btn-sec" onclick="openLogModal()">诊断日志</button>
         <button class="btn btn-sec" onclick="quitToMenu()">返回主殿</button>
@@ -112,8 +128,11 @@
     <!-- 视图 A：极简书卷原画主界面 -->
     <section id="menuHomeView" class="menu-stage">
       <header class="home-topbar">
-        <span id="startVersionPill" class="home-ver-pill">ECHOES OF THE ASHEN SPIRE · v2.0.0</span>
-        <button id="menuBgmBtn" class="ghost-pill-btn" onclick="toggleSpireAudio()">音景 · 开启</button>
+        <span id="startVersionPill" class="home-ver-pill">ECHOES OF THE ASHEN SPIRE · v2.1.1</span>
+        <nav class="home-top-actions" aria-label="声音设置">
+          <button id="menuAudioBtn" class="ghost-pill-btn" onclick="openAudioModal()">音量 · 28%</button>
+          <button id="menuBgmBtn" class="ghost-pill-btn" onclick="toggleSpireAudio()">音景 · 开启</button>
+        </nav>
       </header>
       <div class="home-centerpiece">
         <p class="brand-en-sub">ECHOES OF THE ASHEN SPIRE</p>
@@ -260,6 +279,7 @@
       <div class="shop-wallet-group">
         <span id="shopMat" class="wallet-pill">◇ 0</span>
         <button id="rerollBtn" class="btn btn-sec d-only" onclick="rerollShop()">刷新陈列 (1)</button>
+        <button id="shopAudioBtn" class="icon-pill-btn" title="音量调节" onclick="openAudioModal()">🔊 28%</button>
         <button class="icon-pill-btn" title="烬塔圣典" onclick="openCodex('weapons')">圣典</button>
         <button class="icon-pill-btn" title="运行日志" onclick="openLogModal()">日志</button>
       </div>
@@ -284,6 +304,14 @@
       <button id="mobRerollBtn" class="btn btn-sec" onclick="rerollShop()">刷新 (1)</button>
       <button id="mobNextBtn" class="btn btn-go" onclick="nextWave()">◆ 登往下一层 →</button>
     </div>
+  </div>
+
+  <!-- 五阶神话兵装二选一进化祭坛弹窗 -->
+  <div id="evoModal" class="overlay evo-modal hidden">
+    <span class="kicker-pill">MYTHIC AWAKENING  ·  五阶神话二选一进化</span>
+    <h2 id="evoTitle">守誓兵装晋升五阶神话 · 择定进化形态</h2>
+    <p id="evoSub" class="sub" style="margin-top:-4px">择定唯一神话觉醒方向，永久重塑兵装圣徽外观与专属战斗机制</p>
+    <div id="evoChoices" class="crate-card-wrap evo-card-wrap"></div>
   </div>
 
   <!-- 结算界面 -->
@@ -326,7 +354,7 @@
   <div id="changelogModal" class="overlay log-modal hidden">
     <div class="log-box changelog-box">
       <div class="log-head">
-        <h2 id="changelogTitle">烬塔纪元志 · v1.3.6</h2>
+        <h2 id="changelogTitle">烬塔纪元志 · v1.4.0</h2>
         <button class="icon-pill-btn" onclick="closeChangelogModal()">✕ 关闭</button>
       </div>
       <div id="changelogList" class="changelog-list"></div>
@@ -353,9 +381,48 @@
       </div>
     </div>
   </div>
+
+  <!-- 音景与音效独立音量调节弹窗 -->
+  <div id="audioModal" class="overlay log-modal audio-modal hidden">
+    <div class="log-box audio-box">
+      <div class="log-head">
+        <h2>音景与音效调节</h2>
+        <button class="icon-pill-btn" onclick="closeAudioModal()">✕ 关闭</button>
+      </div>
+      <div class="audio-ctrl-list">
+        <div class="audio-ctrl-row">
+          <div class="audio-ctrl-head">
+            <span class="audio-ctrl-title">🎵 背景音乐（层域环境音景）</span>
+            <span id="bgmVolVal" class="audio-ctrl-val">28%</span>
+          </div>
+          <div class="audio-ctrl-bar">
+            <button type="button" class="vol-step-btn" onclick="adjustBgmVolume(-10)" aria-label="背景音乐减 10%">−</button>
+            <input id="bgmVolSlider" class="vol-slider" type="range" min="0" max="100" step="1" value="28" oninput="setBgmVolumePct(this.value)" aria-label="背景音乐音量滑块">
+            <button type="button" class="vol-step-btn" onclick="adjustBgmVolume(10)" aria-label="背景音乐加 10%">+</button>
+          </div>
+        </div>
+        <div class="audio-ctrl-row">
+          <div class="audio-ctrl-head">
+            <span class="audio-ctrl-title">⚔️ 战斗音效（射击 / 受击 / 交互）</span>
+            <span id="sfxVolVal" class="audio-ctrl-val">32%</span>
+          </div>
+          <div class="audio-ctrl-bar">
+            <button type="button" class="vol-step-btn" onclick="adjustSfxVolume(-10)" aria-label="战斗音效减 10%">−</button>
+            <input id="sfxVolSlider" class="vol-slider cyan" type="range" min="0" max="100" step="1" value="32" oninput="setSfxVolumePct(this.value, false)" onchange="previewSfxVolume()" aria-label="战斗音效音量滑块">
+            <button type="button" class="vol-step-btn" onclick="adjustSfxVolume(10)" aria-label="战斗音效加 10%">+</button>
+          </div>
+        </div>
+      </div>
+      <div class="log-actions">
+        <button type="button" id="audioModalMuteBtn" class="btn btn-sec" onclick="toggleSpireAudio()">🔊 一键全部静音</button>
+        <button type="button" class="btn btn-sec" onclick="resetAudioDefaults()">推荐默认</button>
+        <button type="button" class="btn btn-go" onclick="closeAudioModal()">完成</button>
+      </div>
+    </div>
+  </div>
 </div>
 
-  <!-- 模块化脚本按依赖拓扑顺序统一 defer 加载（v2.0.0） -->
+  <!-- 模块化脚本按依赖拓扑顺序统一 defer 加载（v2.1.1） -->
   <script defer src="src/core/env.js?v=2.1.1"></script>
   <script defer src="src/core/logger.js?v=2.1.1"></script>
   <script defer src="src/data/scenes.js?v=2.1.1"></script>

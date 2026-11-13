@@ -354,8 +354,16 @@ window.addEventListener('keydown', e => {
       }
     }
   }
-  if ((k === ' ' || k === 'enter') && bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
-    bossCutscene.t = Math.min(bossCutscene.t, 0.08);
+  if (k === 'enter' && bossCutscene) {
+    const fadeDur = bossCutscene.fadeDur || 0.85;
+    if ((bossCutscene.maxT - bossCutscene.t) > 0.60 && bossCutscene.t > fadeDur) {
+      bossCutscene.t = fadeDur;
+    }
+    return;
+  }
+  if (k === 'escape' && typeof isAudioModalOpen === 'function' && isAudioModalOpen()) {
+    if (e.preventDefault) e.preventDefault();
+    closeAudioModal();
     return;
   }
   if (k === 'escape' || k === 'p') {
@@ -405,9 +413,15 @@ if (cv.addEventListener) {
   const canvasTouches = list => Array.from(list || []).filter(t => !t.target || t.target === cv);
   const canTouchBattle = () => state === 'wave' && !bossCutscene &&
     !(typeof SpireDirector !== 'undefined' && SpireDirector.isBlockingGameplay());
-  cv.addEventListener('mousedown', () => {
-    if (bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
-      bossCutscene.t = Math.min(bossCutscene.t, 0.08);
+  cv.addEventListener('mousedown', e => {
+    if (bossCutscene && bossCutscene._skipRect) {
+      const fadeDur = bossCutscene.fadeDur || 0.85;
+      const r = bossCutscene._skipRect;
+      const cx = e && typeof e.clientX === 'number' ? e.clientX : -1;
+      const cy = e && typeof e.clientY === 'number' ? e.clientY : -1;
+      if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h && bossCutscene.t > fadeDur) {
+        bossCutscene.t = fadeDur;
+      }
     }
   });
   cv.addEventListener('contextmenu', e => {
@@ -420,8 +434,13 @@ if (cv.addEventListener) {
   });
   cv.addEventListener('touchstart', e => {
     isTouch = true;
-    if (bossCutscene && bossCutscene.t < bossCutscene.maxT - 0.35) {
-      bossCutscene.t = Math.min(bossCutscene.t, 0.08);
+    if (bossCutscene && bossCutscene._skipRect && e.changedTouches && e.changedTouches.length > 0) {
+      const fadeDur = bossCutscene.fadeDur || 0.85;
+      const r = bossCutscene._skipRect;
+      const t0 = e.changedTouches[0];
+      if (t0.clientX >= r.x && t0.clientX <= r.x + r.w && t0.clientY >= r.y && t0.clientY <= r.y + r.h && bossCutscene.t > fadeDur) {
+        bossCutscene.t = fadeDur;
+      }
     }
     if (!canTouchBattle()) { resetJoy(); return; }
     e.preventDefault();
@@ -450,7 +469,7 @@ if (cv.addEventListener) {
       const d = Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
       if (pinchDist > 10) {
         userZoomed = true;
-        camZoom = Math.max(0.38, Math.min(1.55, camZoom * (d / pinchDist)));
+        camZoom = Math.max(0.38, Math.min(1.75, camZoom * (d / pinchDist)));
         if (bootReady) clampCam();
       }
       joy.id = null; joy.active = false; joy.dx = 0; joy.dy = 0; joy.mag = 0;
@@ -536,12 +555,12 @@ function makeWeapon(id, tier = 1) {
 const _EMPTY_SET_BONUSES = {
   counts: { primitive: 0, precise: 0, gun: 0, heavy: 0, elemental: 0, tech: 0 },
   hp: 0, crit: 0, range: 0, aspd: 0, armor: 0, blast: 0, elem: 0, tech: 0,
-  rocks: 0, sticks: 0, meleeCnt: 0, screwdrivers: 0, maxMineTier: 1
+  rocks: 0, sticks: 0, meleeCnt: 0, screwdrivers: 0, maxMineTier: 1, doubleMines: 0
 };
 const _PRIM_STEPS = [2, 4, 6], _PREC_STEPS = [2, 3, 5], _GUN_STEPS = [2, 4, 6];
 const _HVY_STEPS = [2, 3, 5], _ELEM_STEPS = [2, 3, 5], _TECH_STEPS = [2, 3, 5];
-const _HP_TIERS = [0, 6, 14, 24], _CRIT_TIERS = [0, 0.08, 0.16, 0.26], _RNG_TIERS = [0, 40, 85, 140];
-const _ASPD_TIERS = [0, 0.06, 0.14, 0.22], _ARM_TIERS = [0, 2, 5, 9], _ELEM_TIERS = [0, 0.15, 0.32, 0.55], _TECH_TIERS = [0, 0.22, 0.48, 0.80];
+const _HP_TIERS = [0, 8, 18, 30], _CRIT_TIERS = [0, 0.06, 0.12, 0.20], _RNG_TIERS = [0, 45, 95, 155];
+const _ASPD_TIERS = [0, 0.08, 0.16, 0.25], _ARM_TIERS = [0, 3, 6, 10], _ELEM_TIERS = [0, 0.18, 0.38, 0.62], _TECH_TIERS = [0, 0.25, 0.52, 0.85];
 
 function _tierOfSet(c, steps) {
   return c >= steps[2] ? 3 : (c >= steps[1] ? 2 : (c >= steps[0] ? 1 : 0));
@@ -555,7 +574,7 @@ function getSetBonuses() {
     let match = true;
     for (let i = 0; i < ws.length; i++) {
       const w = ws[i];
-      if (!w || cache._ids[i] !== w.id || cache._tiers[i] !== w.tier) { match = false; break; }
+      if (!w || cache._ids[i] !== w.id || cache._tiers[i] !== w.tier || cache._evos[i] !== (w.evo || '')) { match = false; break; }
     }
     if (match) return cache;
   }
@@ -563,22 +582,24 @@ function getSetBonuses() {
     cache = {
       counts: { primitive: 0, precise: 0, gun: 0, heavy: 0, elemental: 0, tech: 0 },
       hp: 0, crit: 0, range: 0, aspd: 0, armor: 0, blast: 0, elem: 0, tech: 0,
-      rocks: 0, sticks: 0, meleeCnt: 0, screwdrivers: 0, maxMineTier: 1,
-      _len: 0, _ids: [], _tiers: []
+      rocks: 0, sticks: 0, meleeCnt: 0, screwdrivers: 0, maxMineTier: 1, doubleMines: 0,
+      _len: 0, _ids: [], _tiers: [], _evos: []
     };
     player._sbCache = cache;
   }
   const counts = cache.counts;
   counts.primitive = 0; counts.precise = 0; counts.gun = 0; counts.heavy = 0; counts.elemental = 0; counts.tech = 0;
-  let rocks = 0, sticks = 0, meleeCnt = 0, screwdrivers = 0, maxMineTier = 1;
+  let rocks = 0, sticks = 0, meleeCnt = 0, screwdrivers = 0, maxMineTier = 1, doubleMines = 0;
   cache._len = ws.length;
   cache._ids.length = ws.length;
   cache._tiers.length = ws.length;
+  cache._evos.length = ws.length;
   for (let i = 0; i < ws.length; i++) {
     const w = ws[i];
-    if (!w) { cache._ids[i] = ''; cache._tiers[i] = 0; continue; }
+    if (!w) { cache._ids[i] = ''; cache._tiers[i] = 0; cache._evos[i] = ''; continue; }
     cache._ids[i] = w.id;
     cache._tiers[i] = w.tier;
+    cache._evos[i] = w.evo || '';
     const tpl = WEAPONS[w.id];
     if (!tpl) continue;
     if (tpl.set && counts[tpl.set] !== undefined) counts[tpl.set]++;
@@ -588,6 +609,8 @@ function getSetBonuses() {
     else if (w.id === 'screwdriver') {
       screwdrivers++;
       if (w.tier > maxMineTier) maxMineTier = w.tier;
+      const ev = typeof getWeaponEvo === 'function' ? getWeaponEvo(w) : null;
+      if (ev && ev.doubleMine) doubleMines++;
     }
   }
   const tPrim = _tierOfSet(counts.primitive, _PRIM_STEPS);
@@ -601,7 +624,7 @@ function getSetBonuses() {
   cache.range = _RNG_TIERS[tGun];
   cache.aspd  = _ASPD_TIERS[tGun];
   cache.armor = _ARM_TIERS[tHvy];
-  cache.blast = tHvy > 0 ? 0.15 : 0;
+  cache.blast = tHvy > 0 ? 0.20 : 0;
   cache.elem  = _ELEM_TIERS[tElem];
   cache.tech  = _TECH_TIERS[tTech];
   cache.rocks = rocks;
@@ -609,6 +632,7 @@ function getSetBonuses() {
   cache.meleeCnt = meleeCnt;
   cache.screwdrivers = screwdrivers;
   cache.maxMineTier = maxMineTier;
+  cache.doubleMines = doubleMines;
   return cache;
 }
 
@@ -631,6 +655,7 @@ function syncSetHp() {
 let waveCratesDropped = 0, waveCheckpoint = null;
 
 function startGame(cls, opts) {
+  if (typeof resetWeaponEvolutionUI === 'function') resetWeaponEvolutionUI();
   const options = opts || {};
   const reqMode = options.mode ? options.mode : ((cls && cls !== 'allrounder') ? 'endless' : 'story');
   const runEndless = reqMode === 'endless' || !!options.endless;
@@ -651,18 +676,19 @@ function startGame(cls, opts) {
     dashHasteT: 0, turretOverclockT: 0, magnetPulseT: 0,
     hp: 30, maxHp: 30, _setHp: 0, regen: 0.5, regenAcc: 0, noRegen: false, lifesteal: 0,
     armor: 0, maxShield: 0, shield: 0, shieldRegenT: 0, shieldHitT: 0,
-    spd: 194, spdMul: 1, dmgMul: 1, meleeBonus: 0, elemBonus: 0, techBonus: 0, atkSpd: 0.90, crit: 0.06, critDmg: 0,
-    dodge: 0, dodgeCap: 0.80, maxSlots: 6, bonusTurrets: 0, laserTurrets: 0, mineLayers: 0, mineCd: 1.4, turretCrit: false, turretElem: false, bullCd: 0,
+    spd: 194, spdMul: 1, dmgMul: 1, meleeBonus: 0, rangedBonus: 0, elemBonus: 0, techBonus: 0, atkSpd: 0.90, crit: 0.05, critDmg: 0,
+    dodge: 0, dodgeCap: 0.80, maxSlots: 6, bonusTurrets: 0, laserTurrets: 0, mineLayers: 0, mineCd: 1.4, turretCrit: false, turretElem: false, turretSalvo: false, _salvoCd: 0, bullCd: 0,
     magnet: 130, harvest: 1, harvestFlat: 0, luck: 0, rangeBonus: 0, _displayRange: 140,
-    pierceBonus: 0, bounceBonus: 0, shopDiscount: 0, freeRerolls: 0, bonusTrees: 0,
-    enemySlow: 0, thorns: 0, cyberball: 0, critHeal: 0, critMeleeHeal: false, rangeToDmg: false, hpToDmg: 0, armorToDmg: 0, hasAnvil: false, healBonus: 0,
-    burnChance: 0, chillChance: 0, freezeChance: 0, poisonChance: 0, maxPoisonStacks: 8, plagueSpread: false, elemSynergy: false,
-    meleeBossGuard: 0, meleeSweepBonus: 0, meleeShockwave: false, blastChance: 0, explosionScale: 1, napalmBlast: false, bloodNova: false,
+    pierceBonus: 0, bounceBonus: 0, bounceAmpDmg: 0, shopDiscount: 0, freeRerolls: 0, bonusTrees: 0,
+    enemySlow: 0, thorns: 0, cyberball: 0, critHeal: 0, critMeleeHeal: false, ailmentLeech: 0, rangeToDmg: false, hpToDmg: 0, armorToDmg: 0, hasAnvil: false, healBonus: 0,
+    burnChance: 0, chillChance: 0, chillDmgBonus: 0, freezeChance: 0, freezeDeathNova: false, poisonChance: 0, maxPoisonStacks: 8, plagueSpread: false, elemSynergy: false, reactionBlast: false,
+    meleeBossGuard: 0, meleeSweepBonus: 0, meleeShockwave: false, meleeSunder: false, strideQuake: false, _strideDist: 0, blastChance: 0, explosionScale: 1, napalmBlast: false, bloodNova: false,
     interest: 0, teslaCount: 0, teslaCd: 1.0, healDropBonus: 0, chillSlowT: 0, inSpore: false,
+    dashCdMul: 1, dashFreezeNova: false, dashSurge: false, dashSurgeT: 0, shieldPulseNova: false, executeLowHp: 0,
     invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, mythicCratesQueued: 0, recentCrateIds: [],
     rarePortraitShown: false, shownBossPortraits: {}, mythicAwakenedCount: 0, waveMythicAwakened: false, retryCount: 0,
     lavaExposure: 0, lavaTick: 0, terrainHintT: 0, terrainSpdMul: 1,
-    lv: 1, xp: 0, xpNeed: 10, mats: diff.matBonus, kills: 0, invuln: 0, walkT: 0, dustT: 0, moving: false,
+    lv: 1, xp: 0, xpNeed: 10, mats: Math.round(diff.matBonus * (typeof CRYSTAL_YIELD_MUL === 'number' ? CRYSTAL_YIELD_MUL : 0.70)), kills: 0, invuln: 0, hurtFlashT: 0, walkT: 0, dustT: 0, moving: false,
     weapons: [], items: {}
   };
   if (cls === 'allrounder') {
@@ -707,6 +733,7 @@ function replayOpeningCutscene() {
 }
 
 function showStart() {
+  if (typeof resetWeaponEvolutionUI === 'function') resetWeaponEvolutionUI();
   state = 'menu';
   resetJoy();
   if (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.resetForNewRun === 'function') {
@@ -722,7 +749,11 @@ function showStart() {
   if (cdx) cdx.classList.add('hidden');
   const clm = document.getElementById('changelogModal');
   if (clm) clm.classList.add('hidden');
+  const am = document.getElementById('audioModal');
+  if (am) am.classList.add('hidden');
+  if (typeof SpireAudio !== 'undefined' && SpireAudio.refreshButtons) SpireAudio.refreshButtons();
   bossCutscene = null;
+  if (typeof pendingBossCutscene !== 'undefined') pendingBossCutscene = null;
   waveCheckpoint = null;
   document.getElementById('hud').classList.add('hidden');
   const sm = document.getElementById('startMenu');
@@ -737,7 +768,8 @@ function renderBuildSummary(statsId, setsId) {
   const setB = getSetBonuses();
   const arm = getTotalArmor(), mit = Math.round(getArmorMitigation() * 100);
   const dmgPct = Math.round(getEffectiveDmgMul() * 100);
-  const aspdPct = Math.round((player.atkSpd + setB.aspd) * 100);
+  const aspdScale = typeof PLAYER_ASPD_SCALE === 'number' ? PLAYER_ASPD_SCALE : 0.70;
+  const aspdPct = Math.round((player.atkSpd + setB.aspd) * aspdScale * 100);
   const critPct = Math.round(getEffectiveCrit() * 100);
   const critDmgPct = Math.round((1.95 + (player.critDmg || 0)) * 100);
   const rng = getTotalRangeBonus();
@@ -805,6 +837,7 @@ function pauseGame() {
     `<b>${diff.badge}</b>  ·  层域：<b>${curScene.name}</b>  ·  登塔者：<b>${clsObj ? clsObj.name : ''}</b>  ·  进度：<b>${waveTag}（${timeTxt}）</b>  ·  等级：<b>Lv.${player.lv}</b>  ·  晶石：<b style="color:#dfc084">◇ ${player.mats}</b>`;
   renderBuildSummary('pauseStats', 'pauseSets');
   refreshUIPrefControls();
+  if (typeof SpireAudio !== 'undefined' && SpireAudio.refreshButtons) SpireAudio.refreshButtons();
   const pm = document.getElementById('pauseMenu');
   pm.classList.remove('hidden');
   pm.scrollTop = 0;
@@ -912,6 +945,7 @@ function retryFailedWave(options) {
   player.rarePortraitShown = Object.keys(mergedPortraits).length > 0;
   player.retryCount = nextRetryCount;
   player.invuln = 0;
+  player.hurtFlashT = 0;
   inHurtPlayer = false;
 
   for (const k in keys) keys[k] = false;

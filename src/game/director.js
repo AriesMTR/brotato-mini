@@ -562,7 +562,10 @@ const SpireDirector = (function () {
     if (!items.length) { preview = false; return false; } replayDone = once(done); auto = skipRead = false; enqueue(items); return true;
   }
   function closeReplay() { if (!preview) return false; queue = []; cur = null; hideStage(); return true; }
-  function resetForNewRun() { queue = []; cur = null; seen = {}; history = []; auto = skipRead = false; hitstop = 0; hideStage(); }
+  // Abort transport without completing queued callbacks or changing run progress.
+  // Retry/menu callers from the combat layer use this compatibility interface.
+  function abortActive() { queue = []; cur = null; auto = skipRead = false; hitstop = 0; hideStage(); }
+  function resetForNewRun() { seen = {}; history = []; abortActive(); }
   function getState() {
     const ln = line(); return { active: isActive(), kind: cur && cur.kind, eventId: cur && cur.id, lineIndex: cur && cur.idx, text: ln ? ln.text : '', speaker: ln ? ln.speaker : '', portraitId: ln ? speakerId(ln.speaker) : null,
       revealed: !!(cur && cur.revealed), awaitingScroll: !!(cur && cur.awaitingScroll), preview, hiddenUi: hidden, logOpen, auto, skipRead, history: history.map(x => Object.assign({}, x)),
@@ -574,7 +577,7 @@ const SpireDirector = (function () {
   function triggerHitstop(t) { if (!prefs.reducedMotion) hitstop = Math.max(hitstop, Math.min(.09, Number(t) || .03)); }
   function getRunState() { return { seen: Object.assign({}, seen) }; }
   function restoreRunState(value) { seen = Object.assign({}, value && value.seen || {}); }
-  return { CHAR_CAST: CAST, onResize: fitArt, resetForNewRun, triggerHitstop, toggleAutoPlay, setAutoPlay, isAutoPlay: () => auto,
+  return { CHAR_CAST: CAST, onResize: fitArt, abortActive, resetForNewRun, triggerHitstop, toggleAutoPlay, setAutoPlay, isAutoPlay: () => auto,
     playOpeningSequence, onWaveStart, onBossPhase2, onBossDefeated, onFloorCleared, onPlayerDefeated, onFinalChoice, playEnding,
     advanceOrSkip, update, render: function () {}, isBlockingGameplay: isActive, isActive, getTimeScale: () => hitstop > 0 ? .04 : 1,
     replayEvent, getReplayEvents, closeReplay, getPreferences, setPreferences, getState, choose, getRunState, restoreRunState,
