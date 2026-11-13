@@ -201,17 +201,18 @@ function getArmorMitigation() {
 function getEffectiveDmgMul() {
   if (!player) return 1;
   const penalty = player.cls === 'multitasker' ? player.weapons.length * 0.04 : 0;
-  const rangeConvert = player.rangeToDmg ? Math.max(0, Math.floor(getTotalRangeBonus() / 15)) * 0.01 : 0;
+  const rangeConvert = player.rangeToDmg ? Math.max(0, Math.floor(getTotalRangeBonus() / 12)) * 0.01 : 0;
   const hpConvert = (player.hpToDmg || 0) > 0 ? Math.max(0, Math.floor(player.maxHp / 5)) * 0.02 * player.hpToDmg : 0;
   const armorConvert = (player.armorToDmg || 0) > 0 ? Math.max(0, getTotalArmor()) * 0.015 * player.armorToDmg : 0;
-  return Math.max(0.25, player.dmgMul - penalty + rangeConvert + hpConvert + armorConvert);
+  const dashSurgeBonus = (player.dashSurgeT || 0) > 0 ? 0.22 : 0;
+  return Math.max(0.25, player.dmgMul - penalty + rangeConvert + hpConvert + armorConvert + dashSurgeBonus);
 }
 function getEffectiveAtkSpd() {
   const scale = typeof PLAYER_ASPD_SCALE === 'number' ? PLAYER_ASPD_SCALE : 0.70;
   if (!player) return scale;
   const missingBonus = player.cls === 'vampire' ? (1 - Math.max(0, player.hp) / Math.max(1, player.maxHp)) * 0.9 : 0;
   const sporeBonus = player.inSpore ? 0.14 : 0;
-  const dashBonus = (player.dashHasteT || 0) > 0 ? 0.20 : 0;
+  const dashBonus = ((player.dashHasteT || 0) > 0 ? 0.20 : 0) + ((player.dashSurgeT || 0) > 0 ? 0.18 : 0);
   return Math.max(0.18, (player.atkSpd + getSetBonuses().aspd + missingBonus + sporeBonus + dashBonus) * scale);
 }
 function getEffectiveCrit() { return (player ? player.crit : 0) + getSetBonuses().crit; }
@@ -257,7 +258,7 @@ function triggerSoulDash() {
   dy /= len;
 
   const ox = player.x, oy = player.y;
-  const cdMax = player.cls === 'ghost' ? 2.5 : 3.2;
+  const cdMax = Math.max(1.15, (player.cls === 'ghost' ? 2.5 : 3.2) * (player.dashCdMul || 1));
   player.dashMaxCd = cdMax;
   player.dashCd = cdMax;
   player.dashT = 0.17;
@@ -266,12 +267,33 @@ function triggerSoulDash() {
   player.dashVy = dy * dashSpd;
   player.lookA = Math.atan2(dy, dx);
   if (Math.abs(dx) > 0.08) player.faceDir = dx > 0 ? 1 : -1;
-  player.invuln = Math.max(player.invuln || 0, 0.30);
+  player.invuln = 0;
   player.magnetPulseT = Math.max(player.magnetPulseT || 0, 1.15);
+  if (player.dashSurge) player.dashSurgeT = 2.6;
+
+  // 瞬步起手即斩碎近身敌方弹幕（无全局无敌帧下依靠主动身法与斩弹操作规避伤害）
+  for (let bi = eBullets.length - 1; bi >= 0; bi--) {
+    const eb = eBullets[bi];
+    if (eb && Math.hypot(eb.x - ox, eb.y - oy) <= 54 + (eb.r || 5)) {
+      addSparks(eb.x, eb.y, Math.random() * 6.28, '#72efdd', 2);
+      eBullets.splice(bi, 1);
+    }
+  }
 
   beep(680, 0.065, 'triangle', 0.048);
   addBurst(ox, oy, '#72efdd', 9, 185);
   if (rings.length < 40) rings.push({ x: ox, y: oy, r: 48, color: '#72efdd', t: 0.20, maxT: 0.20 });
+
+  if (player.dashFreezeNova && player.cls !== 'ranger') {
+    if (rings.length < 40) rings.push({ x: ox, y: oy, r: 112, color: '#7dd3fc', t: 0.22, maxT: 0.22 });
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (e && e.hp > 0 && !e.primed && Math.hypot(e.x - ox, e.y - oy) <= 115 + e.r) {
+        applyFreeze(e, 1.15);
+      }
+    }
+  }
+  if (player.turretSalvo) triggerTurretSalvo();
 
   const cls = player.cls || 'allrounder';
   const baseDmg = (22 + wave * 4.6) * getEffectiveDmgMul();
@@ -390,10 +412,11 @@ function triggerSoulDash() {
   }
   return true;
 }
-// 对齐中后期 <=80 同屏怪上限后的单怪晶石购买力曲线
+// 对齐中后期 <=80 同屏怪上限后的单怪晶石购买力曲线（全局金币/晶石产出下调 30%）
 function getWaveMatRate(w) {
   const wv = Math.max(1, w || 1);
-  return 0.92 / (1 + Math.min(5, Math.max(0, wv - 1)) * 0.14 + Math.max(0, wv - 6) * 0.075);
+  const yieldMul = typeof CRYSTAL_YIELD_MUL === 'number' ? CRYSTAL_YIELD_MUL : 0.70;
+  return (0.92 * yieldMul) / (1 + Math.min(5, Math.max(0, wv - 1)) * 0.14 + Math.max(0, wv - 6) * 0.075);
 }
 
 // 冰冻与剧毒元素状态施加函数
@@ -443,9 +466,9 @@ function triggerBossMythicPhase2(e) {
   waveTime = Math.min(135, waveTime + 60);
   waveMaxTime = Math.max(waveMaxTime, waveTime);
 
-  // 清空玩家身边密集敌弹并给予无敌帧保护，保证二阶段转场公平且充满史诗仪式感
+  // 清空玩家身边密集敌弹，保证二阶段转场公平且充满史诗仪式感（已取消主角全局无敌帧）
   if (player) {
-    player.invuln = Math.max(player.invuln || 0, 1.85);
+    player.invuln = 0;
     for (let i = eBullets.length - 1; i >= 0; i--) {
       if (Math.hypot(eBullets[i].x - player.x, eBullets[i].y - player.y) < 260) eBullets.splice(i, 1);
     }
@@ -512,17 +535,24 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
     }
   }
 
-  // 远近战公平性与三系元素联动增伤：
-  // 1) 近战武器对首领/统领自带 +28% 破甲加成，杜绝近战打首领吃亏
+  // 远近战公平性与流派专精增伤联动：
+  // 1) 近战武器对首领/统领自带破甲加成，杜绝近战打首领吃亏
   const isBossTarget = e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss';
-  if (opts.isMelee && isBossTarget) rawDmg *= 1.22;
+  if (opts.isMelee && isBossTarget) rawDmg *= 1.24;
+  // 1b) 【精钢磨刀石】近战破甲易伤印记：受破甲目标承受全源伤害 +10%
+  if ((e.sunderT || 0) > 0) rawDmg *= 1.10;
+  if (opts.isMelee && player && player.meleeSunder) e.sunderT = 3.2;
   // 2) 首领大招后的【破绽暴露】窗口期承受额外高额伤害（近战 +25%，远程 +15%）
   if (e.exposeT > 0) rawDmg *= (opts.isMelee ? 1.25 : 1.15);
   // 3) 【剧毒】叠层腐蚀易伤：每层使目标承受伤害 +3%
   if (e.poisonT > 0 && e.poisonStacks > 0) rawDmg *= (1 + e.poisonStacks * 0.03);
-  // 4) 【冰冻碎裂】：对冰冻态（或持有绝对零度棱镜时的冰缓态）敌人暴击额外 +25% 伤害
+  // 3b) 【液氮冷却罐】霜蚀增伤：对冰缓/冰冻敌人直接造成额外伤害（不绑定暴击）
+  if (player && (player.chillDmgBonus || 0) > 0 && ((e.chillT || 0) > 0 || (e.freezeT || 0) > 0)) {
+    rawDmg *= (1 + player.chillDmgBonus);
+  }
+  // 4) 【冰冻碎裂】：对冰冻态敌人暴击额外 +22% 伤害
   const shatterCrit = isCrit && ((e.freezeT || 0) > 0 || (player && player.freezeChance > 0 && (e.chillT || 0) > 0));
-  if (shatterCrit) rawDmg *= 1.25;
+  if (shatterCrit) rawDmg *= 1.22;
   // 5) 【三象元素秘典】元素共鸣：目标身上每存在 1 种元素异常（灼烧/冰缓或冰冻/剧毒），额外承受 +12% 伤害
   if (player && player.elemSynergy) {
     const ailCnt = ((e.burnT || 0) > 0 ? 1 : 0) + (((e.chillT || 0) > 0 || (e.freezeT || 0) > 0) ? 1 : 0) + ((e.poisonT || 0) > 0 ? 1 : 0);
@@ -531,6 +561,11 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
 
   const dmg = Math.max(1, Math.round(rawDmg));
   e.hp -= dmg;
+  // 【噬魂死神镰】斩魂处决：常规与精英敌人生命低于阈值时直接斩杀
+  if (e.hp > 0 && !isBossTarget && player && (player.executeLowHp || 0) > 0 && e.hp <= e.maxHp * player.executeLowHp) {
+    e.hp = 0;
+    addText(e.x, e.y - e.r - 14, '💀斩魂!', '#e0aaff', 14, 0.52, false);
+  }
   if (!opts.isDot && !(e._flashCd > 0)) {
     e.hitFlash = 0.042;
     e._flashCd = 0.095;
@@ -588,27 +623,41 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
       applyPoison(e, 1);
     }
     if (!opts.noProc && (!e._reactCd || e._reactCd <= 0)) {
+      let triggeredReaction = false;
       if ((hadBurn && (procFreeze || procChill)) || (hadCryo && procBurn)) {
         e._reactCd = 0.65;
+        triggeredReaction = true;
         if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: e.r + 36, color: '#fb923c', t: 0.24, maxT: 0.24, fill: true });
         addText(e.x, e.y - e.r - 14, '🔥❄️ 融毁!', '#fde68a', 14, 0.55, false);
       } else if (shatterCrit) {
         e._reactCd = 0.65;
+        triggeredReaction = true;
         if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: e.r + 32, color: '#72efdd', t: 0.22, maxT: 0.22 });
         addText(e.x, e.y - e.r - 14, '🧊⚡ 超导碎冰!', '#72efdd', 14, 0.55, false);
       } else if (hadWind && (procBurn || procFreeze || procChill)) {
         e._reactCd = 0.70;
+        triggeredReaction = true;
         if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: e.r + 42, color: '#5ef29b', t: 0.24, maxT: 0.24 });
         addText(e.x, e.y - e.r - 14, '🍃 扩散共鸣!', '#80ed99', 14, 0.55, false);
+      }
+      if (triggeredReaction && player) {
+        if (player.reactionBlast) {
+          triggerExplosion(e.x, e.y, 84 * getBlastScale(), (16 + wave * 3.6) * getElemMul() * getEffectiveDmgMul(), false, 0, '#fde68a', false);
+        }
+        if (player.turretSalvo) {
+          triggerTurretSalvo();
+        }
       }
     }
     if (!opts.noProc && player.blastChance > 0 && Math.random() < player.blastChance) {
       triggerExplosion(e.x, e.y, 68 * getBlastScale(), dmg * 0.55 * getElemMul(), false, 0, '#ff9f1c', true);
     }
 
-    // 生命窃取、【暴击触手】与【暗影处决徽章】近战暴击回血判定（含【猩红血契】鲜血新星联动）
+    // 生命窃取、【蚀骨寄生触手】异常吸血与【暗影处决徽章】近战回血判定（含【猩红血契】鲜血新星联动）
     let healedByHit = false;
-    if (player.lifesteal > 0 && player.hp > 0 && player.hp < player.maxHp && Math.random() < player.lifesteal) {
+    const hasAilment = (e.burnT || 0) > 0 || (e.chillT || 0) > 0 || (e.freezeT || 0) > 0 || (e.poisonStacks || 0) > 0;
+    const effLifesteal = (player.lifesteal || 0) + ((player.ailmentLeech || 0) > 0 && hasAilment ? player.ailmentLeech : 0);
+    if (effLifesteal > 0 && player.hp > 0 && player.hp < player.maxHp && Math.random() < effLifesteal) {
       player.hp = Math.min(player.maxHp, player.hp + 1);
       addText(player.x, player.y - 24, '+1 🩸', '#ff4d6d', 13, 0.58, false);
       healedByHit = true;
@@ -706,14 +755,21 @@ function killEnemyRewards(e) {
     }
   }
 
-  if (enemies.length < 155) {
+  if (enemies.length < 190) {
     if (e.type === 'splitter') {
-      createEnemy(e.x - 15, e.y - 4, 'mini_slime');
-      createEnemy(e.x + 15, e.y - 4, 'mini_slime');
-      createEnemy(e.x, e.y + 14, 'mini_slime');
+      addText(e.x, e.y - e.r - 8, '💥分裂×3!', '#74c69d', 13, 0.55, false);
+      for (let sk = 0; sk < 3; sk++) {
+        const sa = (sk / 3) * Math.PI * 2 + (e.phase || 0);
+        const child = createEnemy(e.x + Math.cos(sa) * 18, e.y + Math.sin(sa) * 18, 'mini_slime');
+        if (child) {
+          child.vx = Math.cos(sa) * 160;
+          child.vy = Math.sin(sa) * 160;
+        }
+      }
     } else if (e.type === 'spore_mother') {
-      createEnemy(e.x - 14, e.y, 'mini_slime');
-      createEnemy(e.x + 14, e.y, 'mini_slime');
+      addText(e.x, e.y - e.r - 8, '🍄孢裂×2!', '#c77dff', 13, 0.55, false);
+      createEnemy(e.x - 16, e.y, 'mini_slime');
+      createEnemy(e.x + 16, e.y, 'mini_slime');
     }
   }
   if (e.type === 'magma_imp') {
@@ -721,6 +777,23 @@ function killEnemyRewards(e) {
   }
 
   dropCrystals(e.x, e.y, e.mat);
+
+  // 【绝对零度棱镜】冰爆亡语：冰缓/冰冻敌人死亡时向四周迸射 6 枚穿透寒霜冰锥！
+  if (player && player.freezeDeathNova && ((e.freezeT || 0) > 0 || (e.chillT || 0) > 0)) {
+    const baseA = Math.random() * Math.PI * 2;
+    const iceDmg = (14 + wave * 3.0) * getEffectiveDmgMul() * getElemMul();
+    for (let k = 0; k < 6 && bullets.length < 220; k++) {
+      const ba = baseA + (k / 6) * Math.PI * 2;
+      bullets.push({
+        x: e.x, y: e.y, px: e.x, py: e.y,
+        vx: Math.cos(ba) * 520, vy: Math.sin(ba) * 520,
+        dmg: iceDmg, isCrit: false, angle: ba, pierce: 1, bounces: 0,
+        isIce: true, freezeHit: 0.25,
+        life: 0.48, maxLife: 0.48, color: '#72efdd', r: 4.8,
+        hit: null, lastHit: null
+      });
+    }
+  }
 
   // 【瘟疫炼金瓶】毒杀/灼烧亡语传染：向周围怪物扩散剧毒与烈焰！
   if (player.plagueSpread && ((e.poisonStacks || 0) > 0 || (e.burnT || 0) > 0)) {
@@ -739,7 +812,7 @@ function killEnemyRewards(e) {
   }
 
   // 【噬魂死神镰】击杀敌人概率降下噬魂雷击（零数组分配随机抽样）
-  if (player.soulBolt && enemies.length > 0 && Math.random() < 0.18) {
+  if (player.soulBolt && enemies.length > 0 && Math.random() < 0.28) {
     const te = pickRandomAliveEnemy(e);
     if (te) {
       const sbDmg = (18 + wave * 3.5) * getEffectiveDmgMul();
@@ -806,7 +879,7 @@ function killEnemyRewards(e) {
     if (!otherBoss && !spawns.some(s => s.type === 'boss' || s.type === 'special_boss')) {
       eBullets.length = 0;
       hazards.length = 0;
-      if (player) player.invuln = Math.max(player.invuln || 0, 3.0);
+      if (player) player.invuln = 0;
       const isStoryActBoss = (!endlessMode && e.type === 'boss' && wave <= MAX_WAVE && wave % 4 === 0);
       if (isStoryActBoss) {
         // 守誓者解脱：净化场上残余杂兵与刷怪点，并将首领秘宝与晶石牵引至提灯人身边
@@ -855,6 +928,47 @@ function triggerThornsNova() {
   }
 }
 
+function triggerShieldPulse() {
+  if (!player || !player.shieldPulseNova) return;
+  const rad = 122 * getBlastScale();
+  const pdmg = (15 + wave * 3.0) * getEffectiveDmgMul() * getElemMul();
+  if (rings.length < 40) rings.push({ x: player.x, y: player.y, r: rad, color: '#72efdd', t: 0.24, maxT: 0.24, fill: true });
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    if (!e || e.hp <= 0 || e.primed) continue;
+    const dx = e.x - player.x, dy = e.y - player.y, lim = rad + e.r;
+    if (dx * dx + dy * dy <= lim * lim) {
+      e.chillT = Math.max(e.chillT || 0, 2.0);
+      hurtEnemy(e, pdmg, false, Math.atan2(dy, dx), true, { noProc: true, knockMult: 1.35 });
+    }
+  }
+}
+
+function triggerTurretSalvo() {
+  if (!player || !player.turretSalvo || (player._salvoCd || 0) > 0 || !turrets.length) return;
+  player._salvoCd = 0.85;
+  const salvoDmg = (13 + wave * 2.8) * getEffectiveDmgMul() * getTechMul();
+  for (let ti = 0; ti < turrets.length; ti++) {
+    const t = turrets[ti];
+    const target = pickRandomAliveEnemy(null);
+    if (!target) break;
+    const baseA = Math.atan2(target.y - t.y, target.x - t.x);
+    t.angle = baseA;
+    t.recoil = 6;
+    for (let k = -1; k <= 1; k += 2) {
+      if (bullets.length >= 220) break;
+      const ba = baseA + k * 0.08;
+      bullets.push({
+        x: t.x, y: t.y, px: t.x, py: t.y,
+        vx: Math.cos(ba) * 680, vy: Math.sin(ba) * 680,
+        dmg: salvoDmg, isCrit: false, angle: ba, pierce: 1, bounces: 0,
+        life: 0.62, maxLife: 0.62, color: '#fde68a', r: 4.8,
+        hit: null, lastHit: null
+      });
+    }
+  }
+}
+
 function triggerBullNova() {
   if (!player || player.cls !== 'bull' || player.bullCd > 0) return;
   player.bullCd = 0.34;
@@ -862,16 +976,15 @@ function triggerBullNova() {
   triggerExplosion(player.x, player.y, 165 * getBlastScale(), novaDmg, false, 0, '#ff9f1c');
 }
 
-// 全面加固受击结算（防重入锁 + 状态校验 + 阵亡即时熔断，彻底根治受击瞬间卡死或二次爆炸异常）
+// 全面加固受击结算（已彻底取消主角全局无敌帧：每一次未闪避的受击与重叠弹幕均真实结算，防重入锁杜绝递归异常）
 function hurtPlayer(rawDmg) {
-  if (!player || state !== 'wave' || player.hp <= 0 || player.invuln > 0 || inHurtPlayer) return;
+  if (!player || state !== 'wave' || player.hp <= 0 || inHurtPlayer) return;
   if (!Number.isFinite(rawDmg) || rawDmg <= 0) return;
   inHurtPlayer = true;
   try {
-    const invScale = 1 + Math.min(0.60, player.invulnBonus || 0);
+    player.invuln = 0;
     if (Math.random() < Math.min(player.dodgeCap || 0.80, player.dodge || 0)) {
       addText(player.x, player.y - 28, '闪避!', '#4cc9f0', 17, 0.65, false);
-      player.invuln = 0.16 * invScale;
       if ((player.dashCd || 0) > 0) player.dashCd = Math.max(0, player.dashCd - 0.6);
       if (player.thorns > 0) triggerThornsNova();
       if (player.cls === 'ghost') {
@@ -881,7 +994,7 @@ function hurtPlayer(rawDmg) {
     }
 
     // 近战流派全程随身招架减伤 + 贴身抗首领保护：
-    // 每把近战武器提供 2.5% 常驻招架减伤（最高 15%）；且首领在近身范围时额外获得最高 34% 贴身减伤！
+    // 每把近战武器提供 2.5% 常驻招架减伤（最高 15%）；且首领在近身范围时额外获得最高 32% 贴身减伤！
     let closeGuard = 0;
     const meleeCnt = getSetBonuses().meleeCnt || 0;
     const meleeParry = Math.min(0.15, meleeCnt * 0.025);
@@ -914,8 +1027,8 @@ function hurtPlayer(rawDmg) {
       if (rings.length < 40) rings.push({ x: player.x, y: player.y, r: 42, color: '#72efdd', t: 0.2, maxT: 0.2 });
       addSparks(player.x, player.y, Math.random() * 6.28, '#72efdd', 5);
       beep(540, 0.06, 'sine', 0.05);
+      if (player.shieldPulseNova) triggerShieldPulse();
       if (dmg <= 0) {
-        player.invuln = 0.30 * invScale;
         addText(player.x, player.y - 28, `护盾 -${absorbed}`, '#72efdd', 15, 0.72, false);
         if (player.thorns > 0) triggerThornsNova();
         triggerBullNova();
@@ -924,7 +1037,6 @@ function hurtPlayer(rawDmg) {
     }
 
     player.hp -= dmg;
-    player.invuln = 0.42 * invScale;
     player.hurtFlashT = 0.22;
     shake = 4.5;
     beep(115, 0.15, 'sawtooth', 0.08);

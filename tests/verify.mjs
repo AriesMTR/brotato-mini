@@ -108,7 +108,7 @@ function makeEl(tag = "div", stats = null, drawCalls = null) {
     tagName: tag.toUpperCase(),
     width: tag.toLowerCase() === "canvas" ? 300 : undefined,
     height: tag.toLowerCase() === "canvas" ? 150 : undefined,
-    style: {},
+    style: { setProperty(k, v) { this[k] = v; } },
     children,
     scrollTop: 0,
     scrollHeight: 200,
@@ -295,9 +295,72 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
 // ============================================================================
 {
   const { sandbox: s } = createEnv(false, 1440, 900, 2);
-  assert.strictEqual(vm.runInContext("APP_VERSION", s), "v1.3.8", "APP_VERSION must be v1.3.8");
+  assert.strictEqual(vm.runInContext("APP_VERSION", s), "v1.4.0", "APP_VERSION must be v1.4.0");
+  assert.strictEqual(vm.runInContext("MAX_WEAPON_TIER", s), 5, "MAX_WEAPON_TIER must be 5");
   assert.strictEqual(vm.runInContext("MAX_WAVE", s), 16, "MAX_WAVE must be strictly 16 floors");
   assert.strictEqual(vm.runInContext("menuStage", s), "home", "Game must boot onto clean Main Title Screen (menuStage === 'home')");
+
+  // Verify v1.4.0: 32 weapons x 2 evolutions = 64 unique evolutions, T4+T4 -> T5 merge + 2-choice evolution modal,
+  // HD baked sprites across all 32 weapons, mid-late 2.0x HP & DMG wave curve, and desktop Retina floorBakeScale >= 2.0
+  const v140Audit = vm.runInContext(`(() => {
+    const wIds = Object.keys(WEAPONS);
+    if (wIds.length !== 32) return { ok: false, reason: 'Expected 32 weapons, got ' + wIds.length };
+    const evoIds = new Set();
+    for (const id of wIds) {
+      const w = WEAPONS[id];
+      if (!Array.isArray(w.evos) || w.evos.length !== 2) return { ok: false, reason: 'Weapon missing 2 evos: ' + id };
+      for (const ev of w.evos) {
+        if (!ev.id || !ev.name || !ev.desc || !ev.color || evoIds.has(ev.id)) return { ok: false, reason: 'Bad/dup evo on ' + id };
+        evoIds.add(ev.id);
+        const cv = getBakedWeaponSprite(id, 5, ev.id);
+        if (!cv || cv.width !== 192 || cv.height !== 192) return { ok: false, reason: 'Failed HD sprite bake for ' + id };
+      }
+    }
+    if (evoIds.size !== 64) return { ok: false, reason: 'Expected 64 unique evolutions, got ' + evoIds.size };
+    if (getMidLateWaveHpMul(1) !== 1 || Math.abs(getMidLateWaveHpMul(16) - 2.0) > 1e-6) return { ok: false, reason: 'Bad midLateHpMul curve' };
+    if (getMidLateWaveDmgMul(1) !== 1 || Math.abs(getMidLateWaveDmgMul(16) - 2.0) > 1e-6) return { ok: false, reason: 'Bad midLateDmgMul curve' };
+
+    // Test T4 + T4 -> T5 merge & 2-choice evolution modal
+    startGame('allrounder');
+    if (typeof SpireDirector !== 'undefined') SpireDirector.advanceOrSkip(true);
+    openShop(true);
+    player.weapons = [makeWeapon('katana', 4), makeWeapon('katana', 4)];
+    mergeSlot(0);
+    const modalOpen = !document.getElementById('evoModal').classList.contains('hidden');
+    const choiceCards = document.getElementById('evoChoices').children.length;
+    applyWeaponEvolution(player.weapons[0], 1);
+    checkPendingWeaponEvolutions();
+    const modalClosed = document.getElementById('evoModal').classList.contains('hidden');
+    const evolvedOk = player.weapons[0].tier === 5 && player.weapons[0].evo === WEAPONS.katana.evos[1].id;
+
+    // Touchscreen desktop laptop should keep crisp Retina floorBakeScale >= 1.60 while strictly capping floorCanvas <= 3840px (<4096 GPU texture limit, zero flicker!)
+    isTouch = true;
+    uiMode = 'desktop';
+    syncArenaAndZoom();
+    const touchDesktopSharp = floorBakeScale >= 1.60 && floorCanvas.width <= 3840 && floorCanvas.height <= 3840;
+    isTouch = false;
+    syncArenaAndZoom();
+
+    // Verify lowered initial volumes (BGM 28% / SFX 32%), volume step buttons, mute-all (including beep SFX), and #audioModal
+    const initVolOk = Math.abs(AudioBank.bgmVol - 0.28) < 1e-6 && Math.abs(AudioBank.sfxVol - 0.32) < 1e-6 && !AudioBank.bgmMuted;
+    openAudioModal();
+    const audioModalOpened = isAudioModalOpen();
+    adjustBgmVolume(-10);
+    adjustSfxVolume(10);
+    const steppedVolOk = Math.round(AudioBank.bgmVol * 100) === 18 && Math.round(AudioBank.sfxVol * 100) === 42 &&
+      document.getElementById('bgmVolVal').textContent === '18%' && document.getElementById('sfxVolVal').textContent === '42%';
+    toggleSpireAudio(); // mute all
+    const mutedOk = AudioBank.bgmMuted === true && document.getElementById('hudAudioBtn').textContent.includes('🔇');
+    resetAudioDefaults();
+    closeAudioModal();
+    const resetAudioOk = !isAudioModalOpen() && !AudioBank.bgmMuted && Math.round(AudioBank.bgmVol * 100) === 28 && Math.round(AudioBank.sfxVol * 100) === 32;
+
+    return {
+      ok: modalOpen && choiceCards === 2 && modalClosed && evolvedOk && touchDesktopSharp && initVolOk && audioModalOpened && steppedVolOk && mutedOk && resetAudioOk,
+      reason: JSON.stringify({ modalOpen, choiceCards, modalClosed, evolvedOk, touchDesktopSharp, initVolOk, audioModalOpened, steppedVolOk, mutedOk, resetAudioOk })
+    };
+  })()`, s);
+  assert.strictEqual(v140Audit.ok, true, "v1.4.0 audit failed: " + v140Audit.reason);
 
   // Verify across multiple runs AND D5 difficulty that Waves 1..16 follow exact Act scenes and fixed non-random Bosses
   const climbAudit = vm.runInContext(`(() => {
@@ -700,13 +763,16 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
     openShop(true);
     const endlessShopTitle = document.getElementById('shopTitle').textContent;
 
-    // 1) Boss Floor One-Shot Protection (<= 42% maxHp single-hit cap on Boss floors 4/8/12/16)
+    // 1) Boss Floor One-Shot Protection (<= 42% maxHp single-hit cap on Boss floors 4/8/12/16) & Zero Player Invuln
     wave = 4; beginWave();
     player.maxHp = 100; player.hp = 100; player.armor = 0; player.dodge = 0; player.shield = 0; player.invuln = 0;
     hurtPlayer(500);
     const hpAfterBossNuke = player.hp;
+    const invulnAfterHit = player.invuln;
+    hurtPlayer(10);
+    const consecutiveHitRegistered = player.hp < hpAfterBossNuke;
 
-    // 2) Codex all 5 tabs render cleanly with 6 heroes, 4 Spire scenes, 32 weapons, 68 items
+    // 2) Codex all 5 tabs render cleanly with 6 heroes, 4 Spire scenes, 32 weapons, 74 items
     openCodex('weapons'); const wCnt = document.getElementById('codexGrid').children.length;
     setCodexTab('items'); const iCnt = document.getElementById('codexGrid').children.length;
     setCodexTab('heroes'); const hCnt = document.getElementById('codexGrid').children.length;
@@ -724,14 +790,16 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
     const preHp = player.maxHp;
     player.mats += 50;
     player.dodge = 0; player.armor = 0; player.shield = 0; player.invuln = 0;
-    // Deal 3 hits to bypass one-shot protection and die cleanly
-    for (let k = 0; k < 4; k++) { player.invuln = 0; hurtPlayer(999); }
+    // Deal 4 consecutive hits without needing to clear invuln manually (zero i-frames!)
+    for (let k = 0; k < 4; k++) { hurtPlayer(999); }
     const diedCleanly = state === 'end';
     retryFailedWave();
     while (SpireDirector.isBlockingGameplay()) SpireDirector.advanceOrSkip(true);
     for (let k = 0; k < 25; k++) update(0.05);
+    draw();
+    const magCircleDrawn = typeof player._visMagR === 'number' && player._visMagR >= 120;
     const retryBoss = enemies.find(e => e.type === 'boss');
-    const retryOk = state === 'wave' && wave === 8 && player.cls === 'allrounder' && !endlessMode && player.mats === 88 && player.hp === preHp && retryBoss && retryBoss.variant === 'frost_queen';
+    const retryOk = state === 'wave' && wave === 8 && player.cls === 'allrounder' && !endlessMode && player.mats === 88 && player.hp === preHp && retryBoss && retryBoss.variant === 'frost_queen' && magCircleDrawn;
 
     return {
       bootOnHome, storyViewShown, storyLockedToZero, returnedHome,
@@ -739,7 +807,8 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
       combatHtmlOk, traitsHtmlOk, scenePaneShown, diffPaneRestored,
       keyDigitHero, keyArrowHero,
       endlessRangerOk, endlessShopTitle,
-      hpAfterBossNuke, wCnt, iCnt, hCnt, mCnt, sCnt, diedCleanly, retryOk
+      hpAfterBossNuke, invulnAfterHit, consecutiveHitRegistered,
+      wCnt, iCnt, hCnt, mCnt, sCnt, diedCleanly, retryOk
     };
   })()`, s);
 
@@ -761,8 +830,10 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
   const mobPortraitStandees = mobDirDraws.filter(d => d.img && d.img.height === 768 && d.args.length === 8);
   assert(mobPortraitStandees.length >= 4, "Mobile Portrait AVG must render both foreground speaker and background listener standees cleanly");
   assert(coreCheck.hpAfterBossNuke >= 58, `Boss floor one-shot protection must cap single hit at <=42% maxHp (HP left: ${coreCheck.hpAfterBossNuke})`);
+  assert.strictEqual(coreCheck.invulnAfterHit, 0, "Player must have ZERO invulnerability frames after taking damage");
+  assert.strictEqual(coreCheck.consecutiveHitRegistered, true, "Back-to-back hits must immediately register damage without i-frame immunity");
   assert.strictEqual(coreCheck.wCnt, 32, "Codex must render 32 weapons");
-  assert.strictEqual(coreCheck.iCnt, 68, "Codex must render 68 items");
+  assert.strictEqual(coreCheck.iCnt, 74, "Codex must render 74 items");
   assert.strictEqual(coreCheck.hCnt, 6, "Codex must render 6 Spire heroes");
   assert.strictEqual(coreCheck.mCnt, 37, "Codex must render all 37 unique Spire monsters, commanders & bosses");
   assert.strictEqual(coreCheck.sCnt, 4, "Codex must render 4 Spire scenes");
@@ -818,4 +889,4 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
   }
 }
 
-console.log(`ALL 5 V1.3.8 VERIFICATION SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+console.log(`ALL 5 V1.4.0 VERIFICATION SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);

@@ -508,3 +508,9 @@ body.m-landscape .codex-grid.wide {
   gap: 7px;
 }
 body.m-landscape .stats-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+body.m-ui .pause-audio-strip { padding: 6px 8px; gap: 6px 10px; }
+body.m-ui .vol-step-btn { min-width: 32px; height: 30px; font-size: 15px; }
+body.m-ui .vol-step-btn.wide { font-size: 11.5px; padding: 0 9px; }
+body.m-ui .audio-box { width: 100%; max-width: 420px; padding: 14px; }
+body.m-ui .audio-ctrl-row { padding: 10px 11px; gap: 8px; }
