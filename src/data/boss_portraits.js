@@ -125,7 +125,6 @@ const SpireAssets = (function () {
     brawler:       'assets/spire/hero_jinyu_sheet.png',
     vampire:       'assets/spire/hero_jinyu_sheet.png',
     butcher:       'assets/spire/hero_jinyu_sheet.png',
-    crimson_lord:  'assets/spire/hero_jinyu_sheet.png',
     astria:        'assets/spire/hero_astria_sheet.png',
     ranger:        'assets/spire/hero_astria_sheet.png',
     frost_queen:   'assets/spire/hero_astria_sheet.png',
@@ -180,30 +179,49 @@ const SpireAssets = (function () {
     desert:    'assets/spire/prop_s4_monolith.png'
   };
 
-  const SCENE_MOBS = {
-    foundry:   { melee: 'assets/spire/mob_s1_ronin.png',   ranged: 'assets/spire/mob_s1_umbrella.png', heavy: 'assets/spire/mob_s1_guard.png' },
-    glacier:   { melee: 'assets/spire/mob_s2_spider.png',  ranged: 'assets/spire/mob_s2_prism.png',    heavy: 'assets/spire/mob_s2_knight.png' },
-    wasteland: { melee: 'assets/spire/mob_s3_duelist.png', ranged: 'assets/spire/mob_s3_gyro.png',     heavy: 'assets/spire/mob_s3_bomb.png' },
-    desert:    { melee: 'assets/spire/mob_s4_shade.png',   ranged: 'assets/spire/mob_s4_seraph.png',   heavy: 'assets/spire/mob_s4_colossus.png' }
+  // 全 21 种普通怪与层域专属精英怪 1:1 独立高清贴图映射（零复用、造型与攻击机制严密对应）
+  const MONSTER_SPRITE_MAP = {
+    chaser:       'assets/spire/mob_s1_ronin.png',
+    swarmer:      'assets/spire/mob_swarmer.png',
+    stalker:      'assets/spire/mob_stalker.png',
+    magma_imp:    'assets/spire/mob_s1_umbrella.png',
+    shielder:     'assets/spire/mob_shielder.png',
+    shooter:      'assets/spire/mob_s2_prism.png',
+    charger:      'assets/spire/mob_charger.png',
+    sniper_bug:   'assets/spire/mob_sniper_bug.png',
+    frost_wisp:   'assets/spire/mob_frost_wisp.png',
+    bomber:       'assets/spire/mob_bomber.png',
+    spinner:      'assets/spire/mob_spinner.png',
+    mortar:       'assets/spire/mob_mortar.png',
+    rad_scorpion: 'assets/spire/mob_rad_scorpion.png',
+    splitter:     'assets/spire/mob_splitter.png',
+    mini_slime:   'assets/spire/mob_mini_slime.png',
+    summoner:     'assets/spire/mob_summoner.png',
+    healer:       'assets/spire/mob_healer.png',
+    brute:        'assets/spire/mob_brute.png',
+    juggernaut:   'assets/spire/mob_juggernaut.png',
+    sand_worm:    'assets/spire/mob_sand_worm.png',
+    spore_mother: 'assets/spire/mob_s5_reliquary.png'
   };
 
+  // 全 16 位守誓主宰、先锋统领与无尽祭坛首领 1:1 独立贴图映射（零复用）
   const BOSS_SPRITE_MAP = {
     butcher:          'assets/spire/hero_jinyu.png',
-    crimson_lord:     'assets/spire/hero_jinyu.png',
     frost_queen:      'assets/spire/hero_astria.png',
-    glacial_valkyrie: 'assets/spire/mob_s2_knight.png',
     void_weaver:      'assets/spire/hero_jialan.png',
-    mech_colossus:    'assets/spire/mob_s4_colossus.png',
+    mech_colossus:    'assets/spire/boss_mech_colossus.png',
     plague_empress:   'assets/spire/hero_qingyu.png',
     solar_seraph:     'assets/spire/hero_eclipse.png',
-    abyss_devourer:   'assets/spire/mob_s4_seraph.png',
-    golden_golem:     'assets/spire/mob_s4_colossus.png',
-    vanguard:         'assets/spire/mob_s1_guard.png',
-    pyro_lord:        'assets/spire/mob_s1_umbrella.png',
-    shadow_stalker:   'assets/spire/mob_s3_duelist.png',
-    venom_matriarch:  'assets/spire/mob_s1_ronin.png',
-    iron_warden:      'assets/spire/mob_s4_colossus.png',
-    storm_siren:      'assets/spire/mob_s3_gyro.png'
+    crimson_lord:     'assets/spire/sb_crimson_lord.png',
+    golden_golem:     'assets/spire/sb_golden_golem.png',
+    abyss_devourer:   'assets/spire/sb_abyss_devourer.png',
+    vanguard:         'assets/spire/mb_vanguard.png',
+    pyro_lord:        'assets/spire/mb_pyro_lord.png',
+    glacial_valkyrie: 'assets/spire/mb_glacial_valkyrie.png',
+    shadow_stalker:   'assets/spire/mb_shadow_stalker.png',
+    storm_siren:      'assets/spire/mb_storm_siren.png',
+    venom_matriarch:  'assets/spire/mb_venom_matriarch.png',
+    iron_warden:      'assets/spire/mb_iron_warden.png'
   };
 
   function resolve(relPath) {
@@ -238,10 +256,10 @@ const SpireAssets = (function () {
     return rec.ready ? img : null;
   }
 
-  // 高清 256px Retina 级单帧贴图与受击白影预烘焙
+  // 高清 256~300px Retina 级单帧贴图与柔和受击高光预烘焙
   function ensureSpriteEntry(relPath, maxPx) {
     if (!relPath || typeof document === 'undefined') return null;
-    const cap = maxPx || 240;
+    const cap = maxPx || 256;
     const cacheKey = relPath + '@' + cap;
     let entry = _spriteBank[cacheKey];
     if (entry) return entry.ready ? entry : null;
@@ -264,8 +282,8 @@ const SpireAssets = (function () {
       cFlash.width = tw; cFlash.height = th;
       const gf = cFlash.getContext('2d');
       gf.drawImage(cNorm, 0, 0);
-      gf.globalCompositeOperation = 'source-in';
-      gf.fillStyle = '#ffffff';
+      gf.globalCompositeOperation = 'source-atop';
+      gf.fillStyle = 'rgba(255, 250, 240, 0.32)';
       gf.fillRect(0, 0, tw, th);
 
       entry.normal = cNorm;
@@ -277,7 +295,7 @@ const SpireAssets = (function () {
     return entry.ready ? entry : null;
   }
 
-  // 原生 1024×256（单格 256×256）四帧精灵表与受击白影预烘焙
+  // 原生 1024×256（单格 256×256）四帧精灵表与柔和受击高光预烘焙
   function ensureSheetEntry(relPath) {
     if (!relPath || typeof document === 'undefined') return null;
     let entry = _sheetBank[relPath];
@@ -302,8 +320,8 @@ const SpireAssets = (function () {
       cFlash.width = nw; cFlash.height = nh;
       const gf = cFlash.getContext('2d');
       gf.drawImage(cNorm, 0, 0);
-      gf.globalCompositeOperation = 'source-in';
-      gf.fillStyle = '#ffffff';
+      gf.globalCompositeOperation = 'source-atop';
+      gf.fillStyle = 'rgba(255, 250, 240, 0.32)';
       gf.fillRect(0, 0, nw, nh);
 
       entry.normal = cNorm;
@@ -344,38 +362,20 @@ const SpireAssets = (function () {
   }
 
   function pickMonsterPath(e) {
-    if (!e) return 'assets/spire/mob_s1_ronin.png';
+    if (!e) return MONSTER_SPRITE_MAP.chaser;
     if ((e.type === 'boss' || e.type === 'mini_boss' || e.type === 'special_boss') && e.variant && BOSS_SPRITE_MAP[e.variant]) {
       return BOSS_SPRITE_MAP[e.variant];
     }
-    const scId = (typeof curScene !== 'undefined' && curScene && curScene.id) ? curScene.id : 'foundry';
-    const pack = SCENE_MOBS[scId] || SCENE_MOBS.foundry;
-
-    switch (e.type) {
-      case 'magma_imp':    return 'assets/spire/mob_s1_umbrella.png';
-      case 'frost_wisp':   return 'assets/spire/mob_s2_prism.png';
-      case 'rad_scorpion': return 'assets/spire/mob_s3_duelist.png';
-      case 'sand_worm':    return 'assets/spire/mob_s4_shade.png';
-      case 'spore_mother': return 'assets/spire/mob_s4_seraph.png';
-      case 'bomber':       return 'assets/spire/mob_s3_bomb.png';
-      case 'spinner':      return 'assets/spire/mob_s3_gyro.png';
-      case 'juggernaut':   return 'assets/spire/mob_s4_colossus.png';
-      case 'summoner':
-      case 'healer':       return scId === 'foundry' ? 'assets/spire/mob_s1_umbrella.png' : 'assets/spire/mob_s4_seraph.png';
-      case 'shooter':
-      case 'sniper_bug':
-      case 'mortar':       return pack.ranged;
-      case 'brute':
-      case 'shielder':
-      case 'charger':      return pack.heavy;
-      default:             return pack.melee;
+    if (e.type && MONSTER_SPRITE_MAP[e.type]) {
+      return MONSTER_SPRITE_MAP[e.type];
     }
+    return MONSTER_SPRITE_MAP.chaser;
   }
 
   function getMonsterSprite(e, flash) {
     const rel = pickMonsterPath(e);
     const isBig = e && (e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss' || e.type === 'juggernaut');
-    const ent = ensureSpriteEntry(rel, isBig ? 256 : 208);
+    const ent = ensureSpriteEntry(rel, isBig ? 300 : 256);
     if (!ent) return null;
     return { canvas: flash ? ent.flash : ent.normal, w: ent.w, h: ent.h };
   }
@@ -436,7 +436,9 @@ const SpireAssets = (function () {
     uniquePortraits.forEach(p => loadImage(p));
     Object.values(HERO_MAP).forEach(p => ensureSpriteEntry(p, 256));
     ensureSpriteEntry(PROP_MAP.foundry, 224);
-    Object.values(SCENE_MOBS.foundry).forEach(p => ensureSpriteEntry(p, 208));
+    ['chaser', 'swarmer', 'stalker', 'magma_imp', 'shielder', 'shooter'].forEach(k => {
+      ensureSpriteEntry(MONSTER_SPRITE_MAP[k], 256);
+    });
 
     const idle = (typeof requestIdleCallback === 'function')
       ? cb => requestIdleCallback(cb, { timeout: 1000 })
@@ -447,10 +449,11 @@ const SpireAssets = (function () {
         getArenaBg(sc);
         loadImage(SPIRE_STORY_PACK.vistaMaps[sc]);
         ensureSpriteEntry(PROP_MAP[sc], 224);
-        Object.values(SCENE_MOBS[sc]).forEach(p => ensureSpriteEntry(p, 208));
       });
-      ensureSpriteEntry('assets/spire/mob_s3_bomb.png', 208);
-      ensureSpriteEntry('assets/spire/mob_s4_colossus.png', 256);
+      Object.entries(MONSTER_SPRITE_MAP).forEach(([k, p]) => {
+        ensureSpriteEntry(p, k === 'juggernaut' ? 300 : 256);
+      });
+      Object.values(BOSS_SPRITE_MAP).forEach(p => ensureSpriteEntry(p, 300));
     });
 
     setTimeout(function () {
@@ -472,6 +475,7 @@ const SpireAssets = (function () {
     getHeroSheet,
     getHeroSprite,
     getPropSprite,
+    pickMonsterPath,
     getMonsterSprite,
     getArenaBg,
     getPortrait,

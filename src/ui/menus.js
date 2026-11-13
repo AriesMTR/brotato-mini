@@ -623,7 +623,7 @@ function startGame(cls, opts) {
     invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, mythicCratesQueued: 0, recentCrateIds: [],
     rarePortraitShown: false, shownBossPortraits: {}, mythicAwakenedCount: 0, waveMythicAwakened: false, retryCount: 0,
     lavaExposure: 0, lavaTick: 0, terrainHintT: 0, terrainSpdMul: 1,
-    lv: 1, xp: 0, xpNeed: 10, mats: diff.matBonus, kills: 0, invuln: 0, walkT: 0, dustT: 0, moving: false,
+    lv: 1, xp: 0, xpNeed: 10, mats: diff.matBonus, kills: 0, invuln: 0, hurtFlashT: 0, walkT: 0, dustT: 0, moving: false,
     weapons: [], items: {}
   };
   if (cls === 'allrounder') {
@@ -698,7 +698,8 @@ function renderBuildSummary(statsId, setsId) {
   const setB = getSetBonuses();
   const arm = getTotalArmor(), mit = Math.round(getArmorMitigation() * 100);
   const dmgPct = Math.round(getEffectiveDmgMul() * 100);
-  const aspdPct = Math.round((player.atkSpd + setB.aspd) * 100);
+  const aspdScale = typeof PLAYER_ASPD_SCALE === 'number' ? PLAYER_ASPD_SCALE : 0.70;
+  const aspdPct = Math.round((player.atkSpd + setB.aspd) * aspdScale * 100);
   const critPct = Math.round(getEffectiveCrit() * 100);
   const critDmgPct = Math.round((1.95 + (player.critDmg || 0)) * 100);
   const rng = getTotalRangeBonus();
@@ -870,6 +871,7 @@ function retryFailedWave() {
   player.rarePortraitShown = Object.keys(mergedPortraits).length > 0;
   player.retryCount = nextRetryCount;
   player.invuln = 0;
+  player.hurtFlashT = 0;
   inHurtPlayer = false;
 
   for (const k in keys) keys[k] = false;

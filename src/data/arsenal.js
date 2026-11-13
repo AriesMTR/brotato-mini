@@ -85,51 +85,58 @@ const SET_DEFS = {
   tech:      { label: '⚙️发条机巧', steps: [2, 3, 5], desc: '2/3/5把: 发条机关攻速与伤害 +22%/+48%/+80%' }
 };
 
-// 32 把守誓兵装（严格保留全部内部 key 与平衡数值）
+// 全局硬核平衡缩放常量（主角射程 -20%、攻速 -30%；常规怪血量 +50% 且随波数线性增长；首领血量 +300%）
+const PLAYER_RANGE_SCALE = 0.80;
+const PLAYER_ASPD_SCALE = 0.70;
+const MONSTER_HP_BASE_MUL = 1.50;
+const MONSTER_HP_LINEAR_SLOPE = 0.72;
+const BOSS_HP_MUL = 4.00;
+
+// 32 把守誓兵装（严格保留全部内部 key，整体射程下调 20%）
 const WEAPONS = {
   // --- 🌿 古誓套装 (5 把) ---
-  stick:     { name: '守誓残杖',   icon: '🪵', set: 'primitive', melee: true,  dmg: 12.0, cd: 0.69, range: 118, cost: 12, mode: 'blunt', arcColor: '#72efdd', desc: '刻有旧王城铭文的古木残杖，每多持一把基础伤害 +3（近战自带招架减伤与近身斩弹）' },
-  rock:      { name: '镇塔碑石',   icon: '🪨', set: 'primitive', melee: true,  dmg: 20,   cd: 0.96, range: 114, cost: 14, knockMult: 2.0, mode: 'blunt', arcColor: '#cbd5e1', desc: '崩落的封印碑石重击，每装备 1 块被动提供 +1护甲 与 +3生命' },
-  spear:     { name: '银月长枪',   icon: '🔱', set: 'primitive', melee: true,  dmg: 17.8, cd: 0.81, range: 192, cost: 16, mode: 'spear', arcColor: '#f6d379', desc: '王城守桥骑士长枪，超长直线突刺贯穿路径上所有目标' },
-  slingshot: { name: '回响灵石索', icon: '🪃', set: 'primitive', melee: false, dmg: 15.0, cd: 0.58, range: 340, spd: 650, bounce: 2, isPebble: true, cost: 15, desc: '发射共鸣灵石，在怪物之间清脆连续弹射 2 次' },
-  blowgun:   { name: '风语毒羽筒', icon: '🎋', set: 'primitive', melee: false, dmg: 13.2, cd: 0.44, range: 345, spd: 715, pierce: 1, poisonHit: 1.0, hpScale: 0.06, isDart: true, cost: 15, desc: '青羽秘传风毒吹箭！自带 1 穿透且命中必叠【风蚀剧毒】，受最大生命加成伤害' },
+  stick:     { name: '守誓残杖',   icon: '🪵', set: 'primitive', melee: true,  dmg: 12.0, cd: 0.69, range: 94,  cost: 12, mode: 'blunt', arcColor: '#72efdd', desc: '刻有旧王城铭文的古木残杖，每多持一把基础伤害 +3（近战自带招架减伤与近身斩弹）' },
+  rock:      { name: '镇塔碑石',   icon: '🪨', set: 'primitive', melee: true,  dmg: 20,   cd: 0.96, range: 91,  cost: 14, knockMult: 2.0, mode: 'blunt', arcColor: '#cbd5e1', desc: '崩落的封印碑石重击，每装备 1 块被动提供 +1护甲 与 +3生命' },
+  spear:     { name: '银月长枪',   icon: '🔱', set: 'primitive', melee: true,  dmg: 17.8, cd: 0.81, range: 154, cost: 16, mode: 'spear', arcColor: '#f6d379', desc: '王城守桥骑士长枪，超长直线突刺贯穿路径上所有目标' },
+  slingshot: { name: '回响灵石索', icon: '🪃', set: 'primitive', melee: false, dmg: 15.0, cd: 0.58, range: 272, spd: 650, bounce: 2, isPebble: true, cost: 15, desc: '发射共鸣灵石，在怪物之间清脆连续弹射 2 次' },
+  blowgun:   { name: '风语毒羽筒', icon: '🎋', set: 'primitive', melee: false, dmg: 13.2, cd: 0.44, range: 276, spd: 715, pierce: 1, poisonHit: 1.0, hpScale: 0.06, isDart: true, cost: 15, desc: '青羽秘传风毒吹箭！自带 1 穿透且命中必叠【风蚀剧毒】，受最大生命加成伤害' },
 
   // --- 🎯 星芒套装 (6 把) ---
-  knife:     { name: '泣血短刃',   icon: '🗡️', set: 'precise',   melee: true,  dmg: 10.2, cd: 0.45, range: 112, cost: 14, critBonus: 0.18, critMult: 2.22, mode: 'stab', arcColor: '#72efdd', desc: '极速寒芒突刺，自带 +18% 暴击率与 222% 暴击伤害' },
-  claws:     { name: '白狐裂影爪', icon: '🐾', set: 'precise',   melee: true,  dmg: 10.2, cd: 0.36, range: 118, cost: 18, critBonus: 0.18, critMult: 2.15, aspdScale: true, mode: 'claw', arcColor: '#fb7185', desc: '三道绯红撕裂爪痕，额外受攻击速度加成基础伤害' },
-  katana:    { name: '绯红断刃太刀',icon: '⚔️', set: 'precise',   melee: true,  dmg: 22.0, cd: 0.72, range: 156, cost: 20, critBonus: 0.16, critMult: 2.25, mode: 'crescent', arcColor: '#fda4af', desc: '烬羽同款居合残刃，暴击伤害高达 225% 且挥砍月牙可斩碎近身弹幕' },
-  crossbow:  { name: '观星猎魔弩', icon: '🏹', set: 'precise',   melee: false, dmg: 22.0, cd: 0.72, range: 415, spd: 780, pierce: 1, rangeScale: 0.05, critBonus: 0.15, cost: 17, desc: '攻击范围越高伤害越高！暴击时星矢穿透次数额外 +2' },
-  shuriken:  { name: '苍翠旋风翎', icon: '💠', set: 'precise',   melee: false, dmg: 14.5, cd: 0.45, range: 330, spd: 660, bounce: 2, critBonus: 0.12, isStar: true, poisonHit: 0.30, cost: 17, desc: '高速旋转的魔女风翎，命中自动弹射 2 次（暴击+1次）并概率叠风毒' },
-  sniper:    { name: '贯星裁决狙', icon: '🔭', set: 'precise',   melee: false, dmg: 50,   cd: 1.30, range: 560, isSniper: true, pierce: 3, rangeScale: 0.04, critBonus: 0.22, critMult: 2.35, cost: 23, desc: '超远程瞬发贯星圣弹，享受攻击范围增伤并贯穿 3 名敌人' },
+  knife:     { name: '泣血短刃',   icon: '🗡️', set: 'precise',   melee: true,  dmg: 10.2, cd: 0.45, range: 90,  cost: 14, critBonus: 0.18, critMult: 2.22, mode: 'stab', arcColor: '#72efdd', desc: '极速寒芒突刺，自带 +18% 暴击率与 222% 暴击伤害' },
+  claws:     { name: '白狐裂影爪', icon: '🐾', set: 'precise',   melee: true,  dmg: 10.2, cd: 0.36, range: 94,  cost: 18, critBonus: 0.18, critMult: 2.15, aspdScale: true, mode: 'claw', arcColor: '#fb7185', desc: '三道绯红撕裂爪痕，额外受攻击速度加成基础伤害' },
+  katana:    { name: '绯红断刃太刀',icon: '⚔️', set: 'precise',   melee: true,  dmg: 22.0, cd: 0.72, range: 125, cost: 20, critBonus: 0.16, critMult: 2.25, mode: 'crescent', arcColor: '#fda4af', desc: '烬羽同款居合残刃，暴击伤害高达 225% 且挥砍月牙可斩碎近身弹幕' },
+  crossbow:  { name: '观星猎魔弩', icon: '🏹', set: 'precise',   melee: false, dmg: 22.0, cd: 0.72, range: 332, spd: 780, pierce: 1, rangeScale: 0.05, critBonus: 0.15, cost: 17, desc: '攻击范围越高伤害越高！暴击时星矢穿透次数额外 +2' },
+  shuriken:  { name: '苍翠旋风翎', icon: '💠', set: 'precise',   melee: false, dmg: 14.5, cd: 0.45, range: 264, spd: 660, bounce: 2, critBonus: 0.12, isStar: true, poisonHit: 0.30, cost: 17, desc: '高速旋转的魔女风翎，命中自动弹射 2 次（暴击+1次）并概率叠风毒' },
+  sniper:    { name: '贯星裁决狙', icon: '🔭', set: 'precise',   melee: false, dmg: 50,   cd: 1.30, range: 448, isSniper: true, pierce: 3, rangeScale: 0.04, critBonus: 0.22, critMult: 2.35, cost: 23, desc: '超远程瞬发贯星圣弹，享受攻击范围增伤并贯穿 3 名敌人' },
 
   // --- 🔫 封魂铳套装 (5 把) ---
-  pistol:    { name: '封魂短铳',   icon: '🔫', set: 'gun',     melee: false, dmg: 19.2, cd: 0.52, range: 365, spd: 720, pierce: 1, cost: 13, desc: '均衡青焰魂弹点射，自带 1 次穿透' },
-  revolver:  { name: '六道断罪轮', icon: '🤠', set: 'gun',     melee: false, dmg: 26.0, cd: 0.67, range: 385, spd: 785, pierce: 1, critBonus: 0.12, critMult: 2.15, knockMult: 1.6, sixthCrit: true, cost: 17, desc: '暗金六连左轮！单发高伤强击退，每第 6 发魂弹必定暴击且穿透额外 +2' },
-  smg:       { name: '疾风连发铳', icon: '💨', set: 'gun',     melee: false, dmg: 7.2,  cd: 0.155,range: 320, spd: 750, pierce: 1, spread: 0.15, cost: 16, desc: '倾泻高密度青蓝魂弹雨，自带 1 次轻穿透清理机关潮' },
-  shotgun:   { name: '余烬散弹铳', icon: '💥', set: 'gun',     melee: false, dmg: 11.2, cd: 0.86, range: 280, spd: 660, pellets: 5, pierce: 1, spread: 0.34, cost: 18, desc: '一次轰出 5 颗穿透余烬散弹，中近距粉碎敌群' },
-  shredder:  { name: '裂魂爆破铳', icon: '🧨', set: 'gun',     melee: false, dmg: 17.5, cd: 0.76, range: 375, spd: 690, pierce: 1, shredBlast: 0.62, blastR: 76, cost: 19, desc: '封魂铳与爆破跨界利器！贯穿弹头命中高概率引爆赤金冲击波' },
+  pistol:    { name: '封魂短铳',   icon: '🔫', set: 'gun',     melee: false, dmg: 19.2, cd: 0.52, range: 292, spd: 720, pierce: 1, cost: 13, desc: '均衡青焰魂弹点射，自带 1 次穿透' },
+  revolver:  { name: '六道断罪轮', icon: '🤠', set: 'gun',     melee: false, dmg: 26.0, cd: 0.67, range: 308, spd: 785, pierce: 1, critBonus: 0.12, critMult: 2.15, knockMult: 1.6, sixthCrit: true, cost: 17, desc: '暗金六连左轮！单发高伤强击退，每第 6 发魂弹必定暴击且穿透额外 +2' },
+  smg:       { name: '疾风连发铳', icon: '💨', set: 'gun',     melee: false, dmg: 7.2,  cd: 0.155,range: 256, spd: 750, pierce: 1, spread: 0.15, cost: 16, desc: '倾泻高密度青蓝魂弹雨，自带 1 次轻穿透清理机关潮' },
+  shotgun:   { name: '余烬散弹铳', icon: '💥', set: 'gun',     melee: false, dmg: 11.2, cd: 0.86, range: 224, spd: 660, pellets: 5, pierce: 1, spread: 0.34, cost: 18, desc: '一次轰出 5 颗穿透余烬散弹，中近距粉碎敌群' },
+  shredder:  { name: '裂魂爆破铳', icon: '🧨', set: 'gun',     melee: false, dmg: 17.5, cd: 0.76, range: 300, spd: 690, pierce: 1, shredBlast: 0.62, blastR: 76, cost: 19, desc: '封魂铳与爆破跨界利器！贯穿弹头命中高概率引爆赤金冲击波' },
 
   // --- 🛡️ 黑曜重装套装 (5 把) ---
-  hammer:           { name: '碎星重锤',     icon: '🔨', set: 'heavy', melee: true,  dmg: 33,  cd: 1.06, range: 142, cost: 19, knockMult: 2.4, slam: true, mode: 'blunt', arcColor: '#f6d379', desc: '重击震出暗金裂地冲击圈，强力击退并震伤成片敌人' },
-  spiked_shield:    { name: '黑曜棱刺盾',   icon: '🛡️', set: 'heavy', melee: true,  dmg: 19,  cd: 0.82, range: 128, cost: 17, knockMult: 2.4, armorScale: 2.4, slam: true, mode: 'blunt', arcColor: '#94a3b8', desc: '攻防一体盾击震波！每拥有 1 点【护甲】直接额外提升 +2.4 基础伤害' },
-  grenade_launcher: { name: '余烬榴弹炮',   icon: '💣', set: 'heavy', melee: false, dmg: 27,  cd: 1.08, range: 370, spd: 505, bounce: 1, isGrenade: true, blastR: 88, cost: 20, desc: '抛射弹跳余烬火雷，弹跳 1 次并在每次落点引发范围轰炸！' },
-  minigun:          { name: '钟楼六管机炮', icon: '⚙️', set: 'heavy', melee: false, dmg: 5.8, cd: 0.108,range: 350, spd: 780, pierce: 1, spread: 0.18, minTier: 2, cost: 25, desc: '倒悬钟楼重装六管火神炮，狂暴倾泻穿甲魂弹幕' },
-  rocket:           { name: '陨星重炮',     icon: '🚀', set: 'heavy', melee: false, dmg: 38,  cd: 1.38, range: 435, spd: 475, isRocket: true, blastR: 102, cost: 25, desc: '发射拖尾陨星重弹，命中引发大范围轰炸与焦痕' },
+  hammer:           { name: '碎星重锤',     icon: '🔨', set: 'heavy', melee: true,  dmg: 33,  cd: 1.06, range: 114, cost: 19, knockMult: 2.4, slam: true, mode: 'blunt', arcColor: '#f6d379', desc: '重击震出暗金裂地冲击圈，强力击退并震伤成片敌人' },
+  spiked_shield:    { name: '黑曜棱刺盾',   icon: '🛡️', set: 'heavy', melee: true,  dmg: 19,  cd: 0.82, range: 102, cost: 17, knockMult: 2.4, armorScale: 2.4, slam: true, mode: 'blunt', arcColor: '#94a3b8', desc: '攻防一体盾击震波！每拥有 1 点【护甲】直接额外提升 +2.4 基础伤害' },
+  grenade_launcher: { name: '余烬榴弹炮',   icon: '💣', set: 'heavy', melee: false, dmg: 27,  cd: 1.08, range: 296, spd: 505, bounce: 1, isGrenade: true, blastR: 88, cost: 20, desc: '抛射弹跳余烬火雷，弹跳 1 次并在每次落点引发范围轰炸！' },
+  minigun:          { name: '钟楼六管机炮', icon: '⚙️', set: 'heavy', melee: false, dmg: 5.8, cd: 0.108,range: 280, spd: 780, pierce: 1, spread: 0.18, minTier: 2, cost: 25, desc: '倒悬钟楼重装六管火神炮，狂暴倾泻穿甲魂弹幕' },
+  rocket:           { name: '陨星重炮',     icon: '🚀', set: 'heavy', melee: false, dmg: 38,  cd: 1.38, range: 348, spd: 475, isRocket: true, blastR: 102, cost: 25, desc: '发射拖尾陨星重弹，命中引发大范围轰炸与焦痕' },
 
   // --- 🔥 四象元素套装 (6 把：炽火/极寒/紫电/蚀日共鸣) ---
-  magma_blade: { name: '劫火紫电刃', icon: '🌋', set: 'elemental', melee: true,  dmg: 22,  cd: 0.67, range: 150, cost: 19, critBonus: 0.14, burnSlash: true, mode: 'crescent', arcColor: '#fb923c', desc: '火雷双象魔刃！享【近战+元素】双重增伤，挥砍必挂炽火且暴击劈出紫电超载' },
-  icicle:      { name: '碎冕寒冰棱', icon: '🧊', set: 'elemental', melee: false, dmg: 19.5,cd: 0.69, range: 370, spd: 720, pierce: 2, critBonus: 0.14, critMult: 2.1, isIce: true, freezeHit: 0.24, cost: 18, desc: '艾丝特莉亚的极寒冰棱，必挂冰缓且 24% 概率直接冰冻定身敌人' },
-  laser:       { name: '魂灯贯日束', icon: '⚡', set: 'elemental', melee: false, dmg: 30,  cd: 1.05, range: 455, pierce: 4, isBeam: true, cost: 22, desc: '提灯迸发青白贯日光束，无视正面盾牌瞬间穿透 4 名目标' },
-  flamer:      { name: '红莲提灯火', icon: '🔥', set: 'elemental', melee: false, dmg: 5.2, cd: 0.145,range: 240, spd: 410, pierce: 4, spread: 0.26, isFlame: true, cost: 20, desc: '持续喷吐绯红魂焰火流，大范围引燃怪物触发持续灼烧' },
-  taser:       { name: '伽蓝紫电弧', icon: '🌩️', set: 'elemental', melee: false, dmg: 19.5,cd: 0.68, range: 315, chains: 4, isChain: true, cost: 21, desc: '释放跳跃紫电弧连续劈向 4 名敌人，极易与火/冰触发元素反应' },
-  plasma:      { name: '日蚀黑阳球', icon: '🔮', set: 'elemental', melee: false, dmg: 27,  cd: 1.15, range: 390, spd: 380, pierce: 5, isPlasma: true, blastR: 86, minTier: 2, cost: 25, desc: '发射高能日蚀暗耀法球，贯穿 5 敌并在终点引爆元素坍缩' },
+  magma_blade: { name: '劫火紫电刃', icon: '🌋', set: 'elemental', melee: true,  dmg: 22,  cd: 0.67, range: 120, cost: 19, critBonus: 0.14, burnSlash: true, mode: 'crescent', arcColor: '#fb923c', desc: '火雷双象魔刃！享【近战+元素】双重增伤，挥砍必挂炽火且暴击劈出紫电超载' },
+  icicle:      { name: '碎冕寒冰棱', icon: '🧊', set: 'elemental', melee: false, dmg: 19.5,cd: 0.69, range: 296, spd: 720, pierce: 2, critBonus: 0.14, critMult: 2.1, isIce: true, freezeHit: 0.24, cost: 18, desc: '艾丝特莉亚的极寒冰棱，必挂冰缓且 24% 概率直接冰冻定身敌人' },
+  laser:       { name: '魂灯贯日束', icon: '⚡', set: 'elemental', melee: false, dmg: 30,  cd: 1.05, range: 364, pierce: 4, isBeam: true, cost: 22, desc: '提灯迸发青白贯日光束，无视正面盾牌瞬间穿透 4 名目标' },
+  flamer:      { name: '红莲提灯火', icon: '🔥', set: 'elemental', melee: false, dmg: 5.2, cd: 0.145,range: 192, spd: 410, pierce: 4, spread: 0.26, isFlame: true, cost: 20, desc: '持续喷吐绯红魂焰火流，大范围引燃怪物触发持续灼烧' },
+  taser:       { name: '伽蓝紫电弧', icon: '🌩️', set: 'elemental', melee: false, dmg: 19.5,cd: 0.68, range: 252, chains: 4, isChain: true, cost: 21, desc: '释放跳跃紫电弧连续劈向 4 名敌人，极易与火/冰触发元素反应' },
+  plasma:      { name: '日蚀黑阳球', icon: '🔮', set: 'elemental', melee: false, dmg: 27,  cd: 1.15, range: 312, spd: 380, pierce: 5, isPlasma: true, blastR: 86, minTier: 2, cost: 25, desc: '发射高能日蚀暗耀法球，贯穿 5 敌并在终点引爆元素坍缩' },
 
   // --- ⚙️ 发条机巧套装 (5 把) ---
-  wrench:      { name: '黄金发条扳手', icon: '🔧', set: 'tech', melee: true,  dmg: 16.5, cd: 0.78, range: 118, cost: 16, mode: 'blunt', arcColor: '#f6d379', desc: '重击敲击，每持一把在战场上额外部署 1 座自动发条机炮塔' },
-  screwdriver: { name: '星晷磁暴针',   icon: '🪛', set: 'tech', melee: true,  dmg: 14.5, cd: 0.50, range: 114, cost: 15, critBonus: 0.12, spawnsMine: true, mode: 'stab', arcColor: '#56cfe1', desc: '极速星晷突刺，每把周期在战场自动布设高爆【发条感应地雷】！' },
-  nailgun:     { name: '发条连射钉铳', icon: '🔩', set: 'tech', melee: false, dmg: 9.8,  cd: 0.22, range: 335, spd: 760, pierce: 1, spread: 0.10, techScale: 0.55, isNail: true, cost: 16, desc: '钟楼高速齿轮钉铳！自带 1 穿透，额外享受 55%【工程伤害】联动增伤' },
-  drone_bay:   { name: '浮游魂灯枢',   icon: '🛸', set: 'tech', melee: false, dmg: 16.5, cd: 0.68, range: 360, spd: 700, bounce: 1, techScale: 0.50, deploysLaserTurret: true, cost: 21, desc: '发射弹射星芒弹，且每装备 1 具额外部署 1 座【浮游贯日激光塔】！' },
-  emp_cannon:  { name: '逆钟磁轨炮',   icon: '📡', set: 'tech', melee: false, dmg: 34,   cd: 1.15, range: 470, pierce: 4, isBeam: true, isEmpBeam: true, techScale: 0.65, minTier: 2, cost: 24, desc: '倒悬钟楼重型磁轨炮！瞬发贯穿光束并在首目标处引爆【时滞脉冲】' }
+  wrench:      { name: '黄金发条扳手', icon: '🔧', set: 'tech', melee: true,  dmg: 16.5, cd: 0.78, range: 94,  cost: 16, mode: 'blunt', arcColor: '#f6d379', desc: '重击敲击，每持一把在战场上额外部署 1 座自动发条机炮塔' },
+  screwdriver: { name: '星晷磁暴针',   icon: '🪛', set: 'tech', melee: true,  dmg: 14.5, cd: 0.50, range: 91,  cost: 15, critBonus: 0.12, spawnsMine: true, mode: 'stab', arcColor: '#56cfe1', desc: '极速星晷突刺，每把周期在战场自动布设高爆【发条感应地雷】！' },
+  nailgun:     { name: '发条连射钉铳', icon: '🔩', set: 'tech', melee: false, dmg: 9.8,  cd: 0.22, range: 268, spd: 760, pierce: 1, spread: 0.10, techScale: 0.55, isNail: true, cost: 16, desc: '钟楼高速齿轮钉铳！自带 1 穿透，额外享受 55%【工程伤害】联动增伤' },
+  drone_bay:   { name: '浮游魂灯枢',   icon: '🛸', set: 'tech', melee: false, dmg: 16.5, cd: 0.68, range: 288, spd: 700, bounce: 1, techScale: 0.50, deploysLaserTurret: true, cost: 21, desc: '发射弹射星芒弹，且每装备 1 具额外部署 1 座【浮游贯日激光塔】！' },
+  emp_cannon:  { name: '逆钟磁轨炮',   icon: '📡', set: 'tech', melee: false, dmg: 34,   cd: 1.15, range: 376, pierce: 4, isBeam: true, isEmpBeam: true, techScale: 0.65, minTier: 2, cost: 24, desc: '倒悬钟楼重型磁轨炮！瞬发贯穿光束并在首目标处引爆【时滞脉冲】' }
 };
 
 // 68 件守誓圣遗物与被动装备（融入烬塔核心剧情遗物，严格保留全部 id、cost、tier、maxCount 与数值函数）

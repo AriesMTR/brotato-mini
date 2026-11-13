@@ -295,7 +295,7 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
 // ============================================================================
 {
   const { sandbox: s } = createEnv(false, 1440, 900, 2);
-  assert.strictEqual(vm.runInContext("APP_VERSION", s), "v1.3.6", "APP_VERSION must be v1.3.6");
+  assert.strictEqual(vm.runInContext("APP_VERSION", s), "v1.3.7", "APP_VERSION must be v1.3.7");
   assert.strictEqual(vm.runInContext("MAX_WAVE", s), 16, "MAX_WAVE must be strictly 16 floors");
   assert.strictEqual(vm.runInContext("menuStage", s), "home", "Game must boot onto clean Main Title Screen (menuStage === 'home')");
 
@@ -735,7 +735,7 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
   assert.strictEqual(coreCheck.wCnt, 32, "Codex must render 32 weapons");
   assert.strictEqual(coreCheck.iCnt, 68, "Codex must render 68 items");
   assert.strictEqual(coreCheck.hCnt, 6, "Codex must render 6 Spire heroes");
-  assert.strictEqual(coreCheck.mCnt, 33, "Codex must render 33 Spire monsters & bosses");
+  assert.strictEqual(coreCheck.mCnt, 37, "Codex must render all 37 unique Spire monsters, commanders & bosses");
   assert.strictEqual(coreCheck.sCnt, 4, "Codex must render 4 Spire scenes");
   assert.strictEqual(coreCheck.diedCleanly, true, "Multi-hit lethal damage must transition to end state");
   assert.strictEqual(coreCheck.retryOk, true, "retryFailedWave() on Floor 8 must restore exact checkpoint and fixed Boss frost_queen");
@@ -788,4 +788,4 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
   }
 }
 
-console.log(`ALL 5 V1.3.6 VERIFICATION SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+console.log(`ALL 5 V1.3.7 VERIFICATION SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
