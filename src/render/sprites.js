@@ -751,8 +751,6 @@ function _pushGhostTrail(ent, now, frameIdx, flipSign, intervalMs, startAlpha) {
   if (!ent._ghostRing) {
     ent._ghostRing = [
       { x: 0, y: 0, f: 0, dir: 1, a: 0 },
-      { x: 0, y: 0, f: 0, dir: 1, a: 0 },
-      { x: 0, y: 0, f: 0, dir: 1, a: 0 },
       { x: 0, y: 0, f: 0, dir: 1, a: 0 }
     ];
     ent._ghostHead = 0;
@@ -766,7 +764,7 @@ function _pushGhostTrail(ent, now, frameIdx, flipSign, intervalMs, startAlpha) {
     slot.f = frameIdx;
     slot.dir = flipSign;
     slot.a = startAlpha || 0.36;
-    ent._ghostHead = (ent._ghostHead + 1) % 4;
+    ent._ghostHead = (ent._ghostHead + 1) % 2;
   }
 }
 
@@ -777,7 +775,7 @@ function _decayAndDrawGhostTrail(ent, dt, sheet, drawSize, yAnchorOffset) {
   for (let i = 0; i < ring.length; i++) {
     const g = ring[i];
     if (g.a <= 0.02) continue;
-    g.a = Math.max(0, g.a - dt * 1.85);
+    g.a = Math.max(0, g.a - dt * 2.5);
     if (g.a <= 0.02) continue;
     ctx.save();
     ctx.globalAlpha = g.a;
@@ -847,8 +845,8 @@ function drawEnemySprite(e) {
     const footOffset = r * 0.86;
     const visFlip = Math.abs(e._visFlip) < 0.24 ? (e._visFlip < 0 ? -0.24 : 0.24) : e._visFlip;
 
-    if (e.dashing || e.mythicPhase2) {
-      _pushGhostTrail(e, now, e._curFrameIdx, visFlip < 0 ? -1 : 1, e.dashing ? 34 : 78);
+    if (e.dashing) {
+      _pushGhostTrail(e, now, e._curFrameIdx, visFlip < 0 ? -1 : 1, 38);
     }
     _decayAndDrawGhostTrail(e, dt, SpireAssets.getHeroSheet(e.variant, false) || bossSheet, drawSize, footOffset);
 
@@ -945,13 +943,13 @@ function drawEnemySprite(e) {
     ctx.font = '800 11px -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#f6d379';
-    ctx.fillText('💥破绽易伤', e.x, e.y + r + 20);
+    ctx.fillText('破绽易伤', e.x, e.y + r + 20);
   }
   if (e.poisonT > 0 && e.poisonStacks >= 2 && (isBoss || isMini || e.elite)) {
     ctx.font = '800 11px -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#a3e635';
-    ctx.fillText(`☠️×${e.poisonStacks}`, e.x, e.y - r - 20);
+    ctx.fillText(`毒×${e.poisonStacks}`, e.x, e.y - r - 20);
   }
 
   if (!isBoss && !isMini && (e.type === 'brute' || e.type === 'juggernaut' || e.elite || e.hp < e.maxHp)) {
@@ -995,11 +993,10 @@ function drawPotatoHero() {
   const visFlip = Math.abs(p._visFlip) < 0.24 ? (p._visFlip < 0 ? -0.24 : 0.24) : p._visFlip;
 
   if (heroSheet && heroSheet.canvas) {
-    // 青焰瞬步 / 苍岚疾风 / 狂沙顺风 / 残羽魔女闪避态触发丝滑残影拖尾
+    // 仅在主动灵魂瞬步（inDash）期间绘制精简残影，移除后期高移速常驻精灵表重绘开销
     const inDash = (p.dashT || 0) > 0;
-    const fastRun = inDash || (p.dashHasteT || 0) > 0 || (p.moving && ((p.spdMul || 1) >= 1.18 || (typeof sandGustT !== 'undefined' && sandGustT > 0) || p.cls === 'ghost'));
-    if (fastRun) {
-      _pushGhostTrail(p, now, inDash ? 3 : p._curFrameIdx, visFlip < 0 ? -1 : 1, inDash ? 24 : 50, inDash ? 0.48 : 0.32);
+    if (inDash) {
+      _pushGhostTrail(p, now, 3, visFlip < 0 ? -1 : 1, 32, 0.42);
     }
     _decayAndDrawGhostTrail(p, dt, SpireAssets.getHeroSheet(p.cls, false) || heroSheet, drawSize, footAnchorY);
 
@@ -1104,7 +1101,7 @@ function drawPotatoHero() {
     ctx.fillStyle = '#fde68a';
     ctx.font = '900 15px -apple-system, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`⏱ ${sec}s`, 0, 4.5);
+    ctx.fillText(`${sec}s`, 0, 4.5);
     ctx.restore();
   }
 }

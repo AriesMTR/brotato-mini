@@ -895,15 +895,26 @@ function draw() {
         ctx.lineWidth = 2.6;
         ctx.beginPath(); ctx.arc(e.x, e.y, br, 0, Math.PI * 2); ctx.stroke();
       } else if (e.aimA !== undefined) {
-        // 晶刺狙击虫蓄力细红瞄准线（清晰利落不刺眼）
+        // 寒晶狙击蛛高辨识度三层红外锁定走廊（外层绯红警戒光带 + 高亮金红准星轴线 + 枪口蓄力环，一眼看清弹道！）
+        const aimMax = e.aimMaxT || 0.72;
+        const aimProg = Math.max(0.10, Math.min(1, 1 - Math.max(0, e.shotT || 0) / aimMax));
+        const aimLen = 420;
+        const ax2 = e.x + Math.cos(e.aimA) * aimLen, ay2 = e.y + Math.sin(e.aimA) * aimLen;
         ctx.save();
-        ctx.strokeStyle = 'rgba(255, 42, 85, 0.72)';
-        ctx.lineWidth = 1.6;
-        ctx.setLineDash([7, 5]);
-        ctx.beginPath();
-        ctx.moveTo(e.x, e.y);
-        ctx.lineTo(e.x + Math.cos(e.aimA) * 390, e.y + Math.sin(e.aimA) * 390);
-        ctx.stroke();
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = `rgba(255, 42, 85, ${0.15 + aimProg * 0.20})`;
+        ctx.lineWidth = 12;
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ax2, ay2); ctx.stroke();
+        ctx.strokeStyle = aimProg > 0.68 ? '#ffd166' : '#ff4d6d';
+        ctx.lineWidth = 2.6;
+        ctx.setLineDash([10, 6]);
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ax2, ay2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#ffd166';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.arc(e.x, e.y, Math.max(8, (e.r + 10) * (1.25 - aimProg * 0.35)), 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#ff2a55';
+        ctx.beginPath(); ctx.arc(ax2, ay2, 7.5, 0, Math.PI * 2); ctx.stroke();
         ctx.restore();
       } else if ((e.sigWindupT || 0) > 0) {
         // v2.5.0 四幕固定守誓首领标志性杀招几何预警法阵（0渐变0滤镜，几何辨识度极高）
@@ -1119,7 +1130,7 @@ function draw() {
       }
     }
 
-    // 地面扩散冲击圈与爆破火球（支持中空环形外环爆裂与实心震波）
+    // 地面扩散冲击圈与震波环（双层利落线框脉冲，零大面积半透明圆盘填充过绘）
     for (let i = 0; i < rings.length; i++) {
       const rg = rings[i];
       if (rg.x + rg.r + 12 < vL || rg.x - rg.r - 12 > vR || rg.y + rg.r + 12 < vT || rg.y - rg.r - 12 > vB) continue;
@@ -1132,18 +1143,16 @@ function draw() {
         ctx.lineWidth = band;
         ctx.beginPath(); ctx.arc(rg.x, rg.y, rg.innerR + band * 0.5, 0, Math.PI * 2); ctx.stroke();
       } else {
-        if (rg.fill && p < 0.65) {
-          ctx.globalAlpha = Math.max(0, (1 - p / 0.65) * 0.36);
-          ctx.fillStyle = rg.color;
-          ctx.beginPath(); ctx.arc(rg.x, rg.y, Math.max(0.5, curR * 0.88), 0, Math.PI * 2); ctx.fill();
-          ctx.globalAlpha = Math.max(0, (1 - p / 0.65) * 0.45);
-          ctx.fillStyle = '#fff3b0';
-          ctx.beginPath(); ctx.arc(rg.x, rg.y, Math.max(0.5, curR * 0.42), 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.globalAlpha = Math.max(0.02, (1 - p) * 0.9);
+        ctx.globalAlpha = Math.max(0.02, (1 - p) * 0.88);
         ctx.strokeStyle = rg.color;
-        ctx.lineWidth = Math.max(1, 6.5 * (1 - p) + 1.8);
+        ctx.lineWidth = Math.max(1, 5.8 * (1 - p) + 1.6);
         ctx.beginPath(); ctx.arc(rg.x, rg.y, curR, 0, Math.PI * 2); ctx.stroke();
+        if (p < 0.62 && curR > 18) {
+          ctx.globalAlpha = Math.max(0.02, (1 - p / 0.62) * 0.48);
+          ctx.strokeStyle = '#fff3b0';
+          ctx.lineWidth = Math.max(1, 2.2 * (1 - p));
+          ctx.beginPath(); ctx.arc(rg.x, rg.y, curR * 0.58, 0, Math.PI * 2); ctx.stroke();
+        }
       }
     }
     ctx.globalAlpha = 1;
@@ -1166,7 +1175,7 @@ function draw() {
       ctx.stroke();
     }
 
-    // 角色浅浅的收集（磁吸拾取）范围地面光圈（仅显示收集范围，不显示攻击射程圈）
+    // 角色浅浅的收集（磁吸拾取）范围地面光圈（仅显示轻量细线收集圈，零实心填充过绘，不显示攻击射程圈）
     if (state === 'wave' && player && player.hp > 0) {
       const pulseActive = (player.magnetPulseT || 0) > 0;
       const targetMagR = Math.max(28, (player.magnet || 130) + (pulseActive ? 135 : 0));
@@ -1175,13 +1184,10 @@ function draw() {
         : player._visMagR + (targetMagR - player._visMagR) * 0.20;
       const magR = player._visMagR;
       ctx.save();
-      ctx.fillStyle = pulseActive ? 'rgba(114, 239, 221, 0.032)' : 'rgba(148, 210, 226, 0.018)';
+      ctx.strokeStyle = pulseActive ? 'rgba(114, 239, 221, 0.26)' : 'rgba(148, 210, 226, 0.15)';
+      ctx.lineWidth = 1.25;
       ctx.beginPath();
       ctx.arc(player.x, player.y, magR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = pulseActive ? 'rgba(114, 239, 221, 0.24)' : 'rgba(148, 210, 226, 0.14)';
-      ctx.lineWidth = 1.4;
-      ctx.setLineDash([7, 7]);
       ctx.stroke();
       ctx.restore();
     }
@@ -1285,16 +1291,16 @@ function draw() {
       ctx.lineCap = 'round';
       if (sl.mode === 'spear') {
         ctx.fillStyle = sl.color;
-        ctx.beginPath(); ctx.moveTo(6, -8 * alpha); ctx.lineTo(sl.r + 8, 0); ctx.lineTo(6, 8 * alpha); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(6, -8 * alpha); ctx.lineTo(sl.r + 6, 0); ctx.lineTo(6, 8 * alpha); ctx.closePath(); ctx.fill();
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.moveTo(14, -3.2 * alpha); ctx.lineTo(sl.r + 4, 0); ctx.lineTo(14, 3.2 * alpha); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(14, -3.2 * alpha); ctx.lineTo(sl.r + 2, 0); ctx.lineTo(14, 3.2 * alpha); ctx.closePath(); ctx.fill();
       } else if (sl.mode === 'stab') {
         ctx.fillStyle = sl.color;
-        ctx.beginPath(); ctx.moveTo(-10, -6.5 * alpha); ctx.lineTo(sl.r * 0.92, 0); ctx.lineTo(-10, 6.5 * alpha); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-10, -7.5 * alpha); ctx.lineTo(sl.r * 0.94, 0); ctx.lineTo(-10, 7.5 * alpha); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.4 * alpha;
-        ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(sl.r * 0.86, 0); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(sl.r * 0.88, 0); ctx.stroke();
       } else if (sl.mode === 'claw') {
-        const rad = Math.max(14, sl.r * 0.72);
+        const rad = Math.max(14, sl.r * 0.84);
         for (let k = -1; k <= 1; k++) {
           const oy = k * 8.5;
           const rK = Math.max(8, rad - Math.abs(k) * 4);
@@ -1306,7 +1312,7 @@ function draw() {
           ctx.beginPath(); ctx.arc(-9, oy, rK, -0.46, 0.46); ctx.stroke();
         }
       } else if (sl.mode === 'blunt') {
-        const rad = Math.max(12, sl.r * 0.68);
+        const rad = Math.max(12, sl.r * 0.82);
         ctx.strokeStyle = sl.color;
         ctx.lineWidth = 9.5 * alpha;
         ctx.beginPath(); ctx.arc(-10, 0, rad, -0.72, 0.72); ctx.stroke();
@@ -1314,8 +1320,8 @@ function draw() {
         ctx.lineWidth = 2.6 * alpha;
         ctx.beginPath(); ctx.arc(-10, 0, rad + 3.5 * alpha, -0.60, 0.60); ctx.stroke();
       } else {
-        const span = sl.mode === 'crescent' ? 1.05 : 0.80;
-        const rad = Math.max(12, sl.r * (sl.mode === 'crescent' ? 0.76 : 0.68));
+        const span = sl.mode === 'crescent' ? 1.05 : 0.82;
+        const rad = Math.max(12, sl.r * (sl.mode === 'crescent' ? 0.86 : 0.82));
         const inR = Math.max(6, rad - 8 * alpha);
         const outR = Math.max(inR + 2, rad + 8 * alpha);
         ctx.fillStyle = sl.color;
@@ -1461,101 +1467,163 @@ function draw() {
       }
     }
 
-    // 敌方高辨识度清爽弹幕系统（统一规范：2.2px 深曜黑外描边 + 高饱和主色弹体 + 纯白高亮内芯，丝毫不乱且与己方青金弹幕一眼区分）
-    ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.2;
+    // 敌方超高辨识度弹幕系统（放大视觉尺寸 vr + 流光拖尾 + 外层高对比警示光环 + 2.8px 深曜黑描边 + 高饱和弹体 + 纯白炽核，彻底根除看不清的细针弹道！）
+    ctx.strokeStyle = '#05070e'; ctx.lineWidth = 2.8;
     for (let i = 0; i < eBullets.length; i++) {
       const b = eBullets[i];
-      if (b.x < vL || b.x > vR || b.y < vT || b.y > vB) continue;
+      if (b.x < vL - 28 || b.x > vR + 28 || b.y < vT - 28 || b.y > vB + 28) continue;
       const bCol = b.color || '#ff3b6b';
-      const br = Math.max(1.8, b.r || 5.2);
+      const br = Math.max(2.2, b.r || 6.0);
+      const vr = Math.max(6.8, br * 1.24);
       const shp = b.shape;
       if (shp === 'trident') {
-        // 醒目三叉戟弹幕：长柄 + 中央主锋 + 左右外扩双戟齿 + 白炽内芯
+        // 超醒目三叉戟弹幕：流光尾焰 + 粗黑外廓 + 高亮三戟锋 + 纯白矛尖
         const ang = Math.atan2(b.vy, b.vx);
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(ang);
-        ctx.strokeStyle = '#090d16'; ctx.lineWidth = 4.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.globalAlpha = 0.34;
+        ctx.strokeStyle = bCol; ctx.lineWidth = 5.2; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-vr * 2.9, 0); ctx.lineTo(vr * 0.8, 0); ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#05070e'; ctx.lineWidth = 5.0; ctx.lineJoin = 'round';
         ctx.beginPath();
-        ctx.moveTo(-br * 2.1, 0); ctx.lineTo(br * 2.25, 0);
-        ctx.moveTo(-br * 0.15, -br * 1.35); ctx.lineTo(br * 0.35, -br * 1.35); ctx.lineTo(br * 1.85, -br * 0.95);
-        ctx.moveTo(-br * 0.15, br * 1.35); ctx.lineTo(br * 0.35, br * 1.35); ctx.lineTo(br * 1.85, br * 0.95);
-        ctx.moveTo(br * 0.05, -br * 1.35); ctx.lineTo(br * 0.05, br * 1.35);
+        ctx.moveTo(-vr * 2.1, 0); ctx.lineTo(vr * 2.35, 0);
+        ctx.moveTo(-vr * 0.15, -vr * 1.38); ctx.lineTo(vr * 0.40, -vr * 1.38); ctx.lineTo(vr * 1.92, -vr * 0.96);
+        ctx.moveTo(-vr * 0.15, vr * 1.38); ctx.lineTo(vr * 0.40, vr * 1.38); ctx.lineTo(vr * 1.92, vr * 0.96);
+        ctx.moveTo(vr * 0.05, -vr * 1.38); ctx.lineTo(vr * 0.05, vr * 1.38);
         ctx.stroke();
-        ctx.strokeStyle = bCol; ctx.lineWidth = 2.3;
+        ctx.strokeStyle = bCol; ctx.lineWidth = 2.8;
         ctx.stroke();
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.moveTo(br * 2.45, 0); ctx.lineTo(br * 1.15, -br * 0.46); ctx.lineTo(br * 1.15, br * 0.46);
+        ctx.moveTo(vr * 2.55, 0); ctx.lineTo(vr * 1.12, -vr * 0.52); ctx.lineTo(vr * 1.12, vr * 0.52);
         ctx.closePath(); ctx.fill();
         ctx.restore();
       } else if (shp === 'crescent') {
-        // 凌厉弯月刀波弹幕：首领与统领专属弧形剑气
+        // 凌厉弯月刀波弹幕：外弧警戒辉光 + 曜黑描边 + 亮白刃口
         const ang = Math.atan2(b.vy, b.vx);
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(ang);
-        ctx.fillStyle = bCol; ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.0;
+        ctx.globalAlpha = 0.30;
+        ctx.strokeStyle = bCol; ctx.lineWidth = 4.6;
+        ctx.beginPath(); ctx.arc(-vr * 0.35, 0, vr * 1.72, -1.08, 1.08, false); ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = bCol; ctx.strokeStyle = '#05070e'; ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.arc(-br * 0.35, 0, br * 1.65, -1.08, 1.08, false);
-        ctx.arc(-br * 0.95, 0, br * 1.48, 0.92, -0.92, true);
+        ctx.arc(-vr * 0.35, 0, vr * 1.68, -1.10, 1.10, false);
+        ctx.arc(-vr * 0.96, 0, vr * 1.48, 0.94, -0.94, true);
         ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(-br * 0.38, 0, br * 1.36, -0.75, 0.75, false); ctx.stroke();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.9;
+        ctx.beginPath(); ctx.arc(-vr * 0.38, 0, vr * 1.38, -0.78, 0.78, false); ctx.stroke();
         ctx.restore();
       } else if (shp === 'disc') {
+        // 回旋十字金锯盘：外层高对比警戒圆环 + 四刃旋转金轮 + 纯白轴芯
+        const dvr = Math.max(8.2, br * 1.16);
         ctx.save();
-        ctx.translate(b.x, b.y); ctx.rotate(b.rot || 0);
-        ctx.fillStyle = bCol; ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.2;
+        ctx.translate(b.x, b.y);
+        ctx.globalAlpha = 0.32;
+        ctx.strokeStyle = bCol; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.arc(0, 0, dvr * 1.45, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.rotate(b.rot || 0);
+        ctx.fillStyle = bCol; ctx.strokeStyle = '#05070e'; ctx.lineWidth = 2.6;
         ctx.beginPath();
         for (let k = 0; k < 4; k++) {
           const a = k * Math.PI * 0.5;
-          ctx.lineTo(Math.cos(a) * (br * 1.38), Math.sin(a) * (br * 1.38));
-          ctx.lineTo(Math.cos(a + 0.45) * (br * 0.50), Math.sin(a + 0.45) * (br * 0.50));
+          ctx.lineTo(Math.cos(a) * (dvr * 1.40), Math.sin(a) * (dvr * 1.40));
+          ctx.lineTo(Math.cos(a + 0.45) * (dvr * 0.54), Math.sin(a + 0.45) * (dvr * 0.54));
         }
         ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.arc(0, 0, Math.max(1.4, br * 0.34), 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, 0, Math.max(2.2, dvr * 0.38), 0, Math.PI * 2); ctx.fill();
         ctx.restore();
-      } else if (shp === 'needle') {
+      } else if (shp === 'lance' || shp === 'needle') {
+        // 醒目重型流光菱矛弹（彻底替代旧版看不清的小细针：长流光彗尾 + 宽翼双层矛头 + 金白炽热矛芯）
         const ang = Math.atan2(b.vy, b.vx);
+        const lvr = Math.max(7.4, br * 1.28);
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(ang);
-        ctx.fillStyle = bCol; ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.0;
+        ctx.lineCap = 'round';
+        ctx.globalAlpha = 0.38;
+        ctx.strokeStyle = bCol; ctx.lineWidth = lvr * 1.05;
+        ctx.beginPath(); ctx.moveTo(-lvr * 3.8, 0); ctx.lineTo(-lvr * 0.3, 0); ctx.stroke();
+        ctx.globalAlpha = 0.82;
+        ctx.strokeStyle = '#ffd166'; ctx.lineWidth = Math.max(2.2, lvr * 0.36);
+        ctx.beginPath(); ctx.moveTo(-lvr * 2.9, 0); ctx.lineTo(0, 0); ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = bCol; ctx.strokeStyle = '#05070e'; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';
         ctx.beginPath();
-        ctx.moveTo(br * 2.15, 0); ctx.lineTo(-br * 1.35, -br * 0.68); ctx.lineTo(-br * 0.75, 0); ctx.lineTo(-br * 1.35, br * 0.68);
+        ctx.moveTo(lvr * 2.45, 0);
+        ctx.lineTo(-lvr * 0.55, -lvr * 1.06);
+        ctx.lineTo(-lvr * 1.45, -lvr * 0.52);
+        ctx.lineTo(-lvr * 0.92, 0);
+        ctx.lineTo(-lvr * 1.45, lvr * 0.52);
+        ctx.lineTo(-lvr * 0.55, lvr * 1.06);
         ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.moveTo(br * 1.35, 0); ctx.lineTo(-br * 0.35, -br * 0.25); ctx.lineTo(-br * 0.35, br * 0.25); ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(lvr * 1.72, 0);
+        ctx.lineTo(-lvr * 0.38, -lvr * 0.44);
+        ctx.lineTo(-lvr * 0.38, lvr * 0.44);
+        ctx.closePath(); ctx.fill();
         ctx.restore();
       } else if (shp === 'shard') {
         const ang = Math.atan2(b.vy, b.vx);
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(ang);
-        ctx.fillStyle = bCol; ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.0;
+        ctx.globalAlpha = 0.32;
+        ctx.strokeStyle = bCol; ctx.lineWidth = vr * 0.85; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-vr * 2.4, 0); ctx.lineTo(0, 0); ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = bCol; ctx.strokeStyle = '#05070e'; ctx.lineWidth = 2.6;
         ctx.beginPath();
-        ctx.moveTo(br * 1.65, 0); ctx.lineTo(0, -br * 0.98); ctx.lineTo(-br * 1.4, 0); ctx.lineTo(0, br * 0.98);
+        ctx.moveTo(vr * 1.78, 0); ctx.lineTo(0, -vr * 1.08); ctx.lineTo(-vr * 1.45, 0); ctx.lineTo(0, vr * 1.08);
         ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.arc(br * 0.15, 0, Math.max(1.2, br * 0.36), 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(vr * 0.15, 0, Math.max(2.0, vr * 0.42), 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else if (shp === 'orb') {
+        // 蚀忆母巢缓速脉冲星雷球：外层警戒环 + 自转四芒星核 + 亮白中心
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.globalAlpha = 0.34;
+        ctx.strokeStyle = bCol; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.arc(0, 0, vr * 1.38, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = bCol; ctx.strokeStyle = '#05070e'; ctx.lineWidth = 2.6;
+        ctx.beginPath(); ctx.arc(0, 0, vr * 1.02, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.rotate(b.rot || 0);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(vr * 0.78, 0); ctx.lineTo(0, -vr * 0.32); ctx.lineTo(-vr * 0.78, 0); ctx.lineTo(0, vr * 0.32);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(0, vr * 0.78); ctx.lineTo(-vr * 0.32, 0); ctx.lineTo(0, -vr * 0.78); ctx.lineTo(vr * 0.32, 0);
+        ctx.closePath(); ctx.fill();
         ctx.restore();
       } else if (shp === 'acid' || shp === 'fire') {
         const ang = Math.atan2(b.vy, b.vx);
         ctx.save();
         ctx.translate(b.x, b.y); ctx.rotate(ang);
-        ctx.globalAlpha = 0.28;
+        ctx.globalAlpha = 0.42;
         ctx.fillStyle = bCol;
-        ctx.beginPath(); ctx.moveTo(-br * 2.2, 0); ctx.lineTo(0, -br * 0.88); ctx.lineTo(0, br * 0.88); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-vr * 2.85, 0); ctx.lineTo(0, -vr * 0.96); ctx.lineTo(0, vr * 0.96); ctx.closePath(); ctx.fill();
         ctx.globalAlpha = 1;
-        ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.1;
-        ctx.beginPath(); ctx.arc(br * 0.2, 0, br * 0.98, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = bCol; ctx.strokeStyle = '#05070e'; ctx.lineWidth = 2.6;
+        ctx.beginPath(); ctx.arc(vr * 0.2, 0, vr * 1.02, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.arc(br * 0.28, 0, Math.max(1.3, br * 0.42), 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(vr * 0.28, 0, Math.max(2.0, vr * 0.46), 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       } else {
-        ctx.strokeStyle = '#090d16'; ctx.lineWidth = 2.2;
+        ctx.globalAlpha = 0.32;
+        ctx.strokeStyle = bCol; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.arc(b.x, b.y, vr * 1.38, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#05070e'; ctx.lineWidth = 2.7;
         ctx.fillStyle = bCol;
-        ctx.beginPath(); ctx.arc(b.x, b.y, br * 1.05, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(b.x, b.y, vr * 1.04, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(1.4, br * 0.44), 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(2.1, vr * 0.46), 0, Math.PI * 2); ctx.fill();
       }
     }
 
@@ -1604,6 +1672,7 @@ function draw() {
 
     ctx.textAlign = 'center';
     let lastFontSize = -1;
+    const denseTexts = texts.length > 18;
     for (let i = 0; i < texts.length; i++) {
       const t = texts[i];
       if (t.x < vL || t.x > vR || t.y < vT || t.y > vB) continue;
@@ -1614,7 +1683,7 @@ function draw() {
             ? (life > 0.76 ? 1 + Math.sin(((1 - life) / 0.24) * Math.PI) * 0.42 : 1)
             : (life > 0.8 ? 1 + (1 - life) * 1.7 : 1));
       ctx.globalAlpha = t.important ? Math.min(1, life / 0.22) : Math.min(1, life * 1.9);
-      const fSize = Math.max(9, Math.round(t.size * scale));
+      const fSize = (Math.max(10, Math.round(t.size * scale)) + 1) & ~1;
       if (fSize !== lastFontSize) {
         lastFontSize = fSize;
         ctx.font = `900 ${fSize}px -apple-system, sans-serif`;
@@ -1633,14 +1702,13 @@ function draw() {
         ctx.fill();
         ctx.stroke();
       }
-      if (isTouch) {
+      if (isTouch || (denseTexts && !t.important)) {
         ctx.fillStyle = '#120d18';
-        ctx.fillText(t.txt, t.x - 1.5, t.y + 1.5);
-        ctx.fillText(t.txt, t.x + 1.8, t.y + 1.8);
+        ctx.fillText(t.txt, t.x + 1.5, t.y + 1.5);
         ctx.fillStyle = t.color;
         ctx.fillText(t.txt, t.x, t.y);
       } else {
-        ctx.lineWidth = 3.8; ctx.strokeStyle = '#120d18';
+        ctx.lineWidth = 3.6; ctx.strokeStyle = '#120d18';
         ctx.strokeText(t.txt, t.x, t.y);
         ctx.fillStyle = t.color;
         ctx.fillText(t.txt, t.x, t.y);

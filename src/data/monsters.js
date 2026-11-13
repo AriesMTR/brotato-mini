@@ -97,33 +97,33 @@ const SPECIAL_RELICS = [
 // 《烬塔残响》分场景 Q 版怪物与首领圣典图鉴（全 37 种单位 1:1 绑定专属无重复高清透明贴图）
 const MONSTER_CODEX = [
   // 一层·雨夜长桥怪物组
-  { id: 'chaser',       cat: 'normal', sprite: 'assets/spire/mob_s1_ronin.png',      icon: '⚔️', name: '断魂浪人残偶',     badge: '🌧️ 一层·雨夜长桥',   wave: '第 1 层起',       stats: '❤️标准 · 📏中 · 👟跃步突斩 · 💥中',     desc: '披蓑戴笠、执残断黑刀阻拦登桥者的旧王城浪人木偶，逼近时会发起短距跃步突斩。' },
-  { id: 'swarmer',      cat: 'normal', sprite: 'assets/spire/mob_swarmer.png',       icon: '🏮', name: '绯红纸翼灯眼灵',   badge: '🌧️ 一层·雨夜长桥',   wave: '第 1 层起',       stats: '❤️极脆 · 📏小 · 👟极快成群 · 💥微',     desc: '张开折纸蝠翼趋向魂灯疾飞而来的独眼提灯纸灵，成群飘忽扑击，最适合弹射或范围扫荡。' },
-  { id: 'stalker',      cat: 'normal', sprite: 'assets/spire/mob_stalker.png',       icon: '✂️', name: '折纸双镰影侍',     badge: '🌧️ 一层·雨夜长桥',   wave: '第 2 层起',       stats: '❤️偏脆 · 📏小 · 👟高速折线 · 💥双镰斩', desc: '反握青芒短镰、呈 Z 字折线闪身突进的暗影忍偶，贴近瞬间挥出十字双镰快斩。' },
-  { id: 'magma_imp',    cat: 'scene',  sprite: 'assets/spire/mob_s1_umbrella.png',   icon: '🏮', name: '断魂赤纸伞妖',     badge: '🌧️ 一层专属精英怪', wave: '第 2 层起高频出没', stats: '❤️偏脆 · 📏小 · 👟高速飘忽 · 💥亡语火池', desc: '撑着红油纸伞在雨夜孤桥飘荡的火灵，被击碎时在原地留下一团 1.15 秒后引爆的余烬火池。' },
-  { id: 'shielder',     cat: 'normal', sprite: 'assets/spire/mob_shielder.png',      icon: '🛡️', name: '重铠符盾守桥卫',   badge: '🌧️ 一层·正面弧盾',   wave: '第 2 层起',       stats: '❤️高 · 📏大 · 👟持盾稳进 · 💥链锤',     desc: '正面架起青芒符文塔盾减免 45% 远程与正前伤害；烈焰、贯日光束与绕背近战可无视护盾。' },
+  { id: 'chaser',       cat: 'normal', sprite: 'assets/spire/mob_s1_ronin.png',      icon: '⚔️', name: '断魂浪人残偶',     badge: '🌧️ 一层·雨夜长桥',   wave: '第 1 层起',       stats: '❤️厚实 · 📏中 · 👟长距跃斩 · 💥中',     desc: '披蓑戴笠、执残断黑刀阻拦登桥者的旧王城浪人木偶，逼近时会发起凌厉跃步突斩。' },
+  { id: 'swarmer',      cat: 'normal', sprite: 'assets/spire/mob_swarmer.png',       icon: '🏮', name: '绯红纸翼灯眼灵',   badge: '🌧️ 一层·雨夜长桥',   wave: '第 1 层起',       stats: '❤️脆 · 📏小 · 👟极快成群 · 💥微',       desc: '张开折纸蝠翼趋向魂灯疾飞而来的独眼提灯纸灵，成群飘忽扑击，最适合弹射或范围扫荡。' },
+  { id: 'stalker',      cat: 'normal', sprite: 'assets/spire/mob_stalker.png',       icon: '✂️', name: '折纸双镰影侍',     badge: '🌧️ 一层·雨夜长桥',   wave: '第 1 层起',       stats: '❤️中韧 · 📏小 · 👟高速折线 · 💥双镰斩', desc: '反握青芒短镰、呈 Z 字折线闪身突进的暗影忍偶，贴近瞬间挥出十字双镰快斩。' },
+  { id: 'magma_imp',    cat: 'scene',  sprite: 'assets/spire/mob_s1_umbrella.png',   icon: '🏮', name: '断魂赤纸伞妖',     badge: '🌧️ 一层专属精英怪', wave: '第 2 层起高频出没', stats: '❤️中韧 · 📏小 · 👟高速飘忽 · 💥亡语火池', desc: '撑着红油纸伞在雨夜孤桥飘荡的火灵，被击碎时在原地留下一团 1.15 秒后引爆的余烬火池。' },
+  { id: 'shielder',     cat: 'normal', sprite: 'assets/spire/mob_shielder.png',      icon: '🛡️', name: '重铠符盾守桥卫',   badge: '🌧️ 一层·正面弧盾',   wave: '第 2 层起',       stats: '❤️血牛高甲 · 📏大 · 👟持盾稳进 · 💥链锤', desc: '正面架起青芒符文塔盾减免 55% 远程与正前伤害的重装血牛卫；烈焰、贯日光束与近战碎甲可克制。' },
 
   // 二层·永冻冰窟怪物组
-  { id: 'shooter',      cat: 'normal', sprite: 'assets/spire/mob_s2_prism.png',      icon: '❄️', name: '折光霜晶浮灵',     badge: '❄️ 二层·永冻冰窟',   wave: '第 2 层起',       stats: '❤️偏低 · 📏中 · 👟中距游弋 · 💥冰棱弹', desc: '冰封王城中悬浮的六棱寒晶灵体，保持中距点射高对比寒冰棱弹。' },
-  { id: 'charger',      cat: 'normal', sprite: 'assets/spire/mob_charger.png',       icon: '🧊', name: '眠冬寒枪破阵骑',   badge: '❄️ 二层·直线冲锋',   wave: '第 3 层起',       stats: '❤️较高 · 📏偏大 · 👟蓄力猛冲 · 💥贯突', desc: '平端巨型螺旋冰枪的重甲寒骑，亮起寒霜冲锋走廊后全额直线贯突，切勿停留在预警轴线上。' },
-  { id: 'sniper_bug',   cat: 'normal', sprite: 'assets/spire/mob_sniper_bug.png',    icon: '🎯', name: '寒晶织网狙击蛛',   badge: '❄️ 二层·远距狙击',   wave: '第 3 层起',       stats: '❤️偏脆 · 📏小 · 👟驻地架枪 · 💥高穿冰针', desc: '盘踞外围架设红外瞄准线短暂蓄力的冰晶机械蛛，射出超高速穿刺冰针，看到红线请及时横移！' },
-  { id: 'frost_wisp',   cat: 'scene',  sprite: 'assets/spire/mob_frost_wisp.png',    icon: '❄️', name: '眠冬冰冠亡灵',     badge: '❄️ 二层专属精英怪', wave: '第 5 层起高频出没', stats: '❤️偏低 · 📏小 · 👟浮空环晶 · 💥冰缓弹', desc: '头戴碎冰王冠的王城残魂，操控环身冰晶发射寒霜弹，命中未闪避时短暂降低角色 18% 移速。' },
+  { id: 'shooter',      cat: 'normal', sprite: 'assets/spire/mob_s2_prism.png',      icon: '❄️', name: '折光霜晶浮灵',     badge: '❄️ 二层·永冻冰窟',   wave: '第 1 层起',       stats: '❤️偏低 · 📏中 · 👟中距游弋 · 💥双轨弧钳弹', desc: '冰封王城中悬浮的六棱寒晶灵体，射出左右外扩包夹的双轨弧线冰棱弹（正中留空利好近战突进）。' },
+  { id: 'charger',      cat: 'normal', sprite: 'assets/spire/mob_charger.png',       icon: '🧊', name: '眠冬寒枪破阵骑',   badge: '❄️ 二层·重甲猛冲',   wave: '第 2 层起',       stats: '❤️高韧重骑 · 📏大 · 👟长距猛冲 · 💥贯突', desc: '平端巨型螺旋冰枪的高血量重甲冲锋骑，亮起寒霜冲锋走廊后全额贯突撞开杂兵，压迫感十足！' },
+  { id: 'sniper_bug',   cat: 'normal', sprite: 'assets/spire/mob_sniper_bug.png',    icon: '🎯', name: '寒晶织网狙击蛛',   badge: '❄️ 二层·远距狙击',   wave: '第 3 层起',       stats: '❤️偏脆 · 📏小 · 👟激光锁敌 · 💥加速贯日矛', desc: '外围架设高对比三层红外瞄准线蓄力的机械蛛，射出醒目的渐进加速猩红长矛弹，近战贴脸可打断其架枪！' },
+  { id: 'frost_wisp',   cat: 'scene',  sprite: 'assets/spire/mob_frost_wisp.png',    icon: '❄️', name: '眠冬冰冠亡灵',     badge: '❄️ 二层专属精英怪', wave: '第 3 层起高频出没', stats: '❤️偏低 · 📏小 · 👟浮空环晶 · 💥S波双螺旋戟', desc: '头戴碎冰王冠的王城残魂，射出 S 形正弦交织的双螺旋寒霜戟，命中未闪避时短暂降低角色移速。' },
 
   // 三层·倒悬钟楼怪物组
-  { id: 'bomber',       cat: 'normal', sprite: 'assets/spire/mob_bomber.png',        icon: '💣', name: '裂魂发条自爆球',   badge: '🕰️ 三层·倒悬钟楼',   wave: '第 3 层起',       stats: '❤️偏脆 · 📏中 · 👟疾奔引信 · 💥敌我同爆', desc: '头插黄金发条与火花引信的球形炸弹偶，贴近或被击碎时亮起 1.25 秒红圈自爆，亦能炸伤周围傀儡！' },
-  { id: 'spinner',      cat: 'normal', sprite: 'assets/spire/mob_spinner.png',       icon: '⚙️', name: '钟楼旋刃陀螺偶',   badge: '🕰️ 三层·飞轮封走位', wave: '第 4 层起',       stats: '❤️中等 · 📏中大 · 👟环绕走位 · 💥十字飞轮', desc: '腰嵌高速黄铜锯齿飞轮的钟面机关偶，横向游走并周期投掷旋转十字金刃封锁走位。' },
-  { id: 'mortar',       cat: 'normal', sprite: 'assets/spire/mob_mortar.png',        icon: '☄️', name: '发条星陨四足臼炮', badge: '🕰️ 三层·高抛红圈',   wave: '第 4 层起',       stats: '❤️中等 · 📏中大 · 👟四足驻射 · 💥红圈轰炸', desc: '背负大口径黄铜攻城臼炮的四足机关座，远程高抛地面红圈炮弹，看到脚下红圈迈出即可无伤。' },
-  { id: 'rad_scorpion', cat: 'scene',  sprite: 'assets/spire/mob_rad_scorpion.png',  icon: '⚡', name: '逆转发条猎蝎',     badge: '🕰️ 三层专属精英怪', wave: '第 9 层起高频出没', stats: '❤️较高 · 📏中大 · 👟钳甲巡弋 · 💥三联毒电', desc: '巡弋于倒悬齿轮间的黄铜发条机械巨蝎，高举萃毒紫电尾针蓄力扇形齐射 3 枚高能毒电弹。' },
-  { id: 'spore_mother', cat: 'scene',  sprite: 'assets/spire/mob_s5_reliquary.png',  icon: '🕯️', name: '蚀忆魂灯龛',       badge: '🕯️ 潮涌层专属母巢', wave: '第 3/7/11/15 层登场', stats: '❤️高 · 📏大型 · 👟浮空母巢 · 💥灵泉唤嗣', desc: '封存前 998 次轮回残魂的浮空金纹灯龛，播撒残响污染灵泉并周期孕育蚀忆子嗣。' },
+  { id: 'bomber',       cat: 'normal', sprite: 'assets/spire/mob_bomber.png',        icon: '💣', name: '裂魂发条自爆球',   badge: '🕰️ 三层·倒悬钟楼',   wave: '第 3 层起',       stats: '❤️中等 · 📏中 · 👟疾奔引信 · 💥敌我同爆', desc: '头插黄金发条与火花引信的球形炸弹偶，贴近或被击碎时亮起 1.25 秒红圈自爆，亦能炸伤周围傀儡！' },
+  { id: 'spinner',      cat: 'normal', sprite: 'assets/spire/mob_spinner.png',       icon: '⚙️', name: '钟楼旋刃陀螺偶',   badge: '🕰️ 三层·双翼回旋轮', wave: '第 4 层起',       stats: '❤️中等 · 📏中大 · 👟环绕走位 · 💥双弧回旋轮', desc: '腰嵌高速黄铜锯齿飞轮的钟面机关偶，向两侧投掷大弧度回旋十字金刃包抄侧翼（正中可直冲切入）。' },
+  { id: 'mortar',       cat: 'normal', sprite: 'assets/spire/mob_mortar.png',        icon: '☄️', name: '发条星陨四足臼炮', badge: '🕰️ 三层·步进排炮',   wave: '第 4 层起',       stats: '❤️中等 · 📏中大 · 👟四足驻射 · 💥双连步进炮', desc: '背负大口径攻城臼炮的四足机关座，高抛双连步进预判轰炸圈；拥有近身盲区，近战贴身可令其哑火！' },
+  { id: 'rad_scorpion', cat: 'scene',  sprite: 'assets/spire/mob_rad_scorpion.png',  icon: '⚡', name: '逆转发条猎蝎',     badge: '🕰️ 三层专属精英怪', wave: '第 2 层起出没',   stats: '❤️较高 · 📏中大 · 👟钳甲巡弋 · 💥雁形三叉戟', desc: '巡弋于倒悬齿轮间的黄铜发条机械巨蝎，高举萃毒尾针齐射主快翼慢的雁形楔阵三叉戟。' },
+  { id: 'spore_mother', cat: 'scene',  sprite: 'assets/spire/mob_s5_reliquary.png',  icon: '🕯️', name: '蚀忆魂灯龛',       badge: '🕯️ 潮涌层专属母巢', wave: '第 3/5 层起登场', stats: '❤️高 · 📏大型 · 👟浮空母巢 · 💥十字缓速星雷', desc: '封存前 998 次轮回残魂的浮空金纹灯龛，播撒十字旋转缓速脉冲星雷球封锁区域并孕育子嗣。' },
 
   // 终层·日蚀镜界怪物组
-  { id: 'splitter',     cat: 'normal', sprite: 'assets/spire/mob_splitter.png',      icon: '🌑', name: '黑水三核裂影怪',   badge: '🌑 终层·日蚀镜界',   wave: '第 3 层起',       stats: '❤️较高 · 📏大 · 👟蠕行逼近 · 💥亡语三分', desc: '体内悬浮三枚金面核心的黑水胶质蚀灵，被斩碎瞬间爆裂为 3 只超高速蚀水独眼子嗣。' },
-  { id: 'mini_slime',   cat: 'normal', sprite: 'assets/spire/mob_mini_slime.png',    icon: '👁️', name: '蚀水独眼子嗣',     badge: '🌑 终层·裂影衍生物', wave: '裂影怪/母巢衍生', stats: '❤️极脆 · 📏微 · 👟极速扑咬 · 💥微',     desc: '自黑水三核裂影怪或蚀忆魂灯龛中迸出的竖瞳黑水滴影，体型虽小但扑击迅捷。' },
-  { id: 'summoner',     cat: 'normal', sprite: 'assets/spire/mob_summoner.png',      icon: '🔮', name: '蚀日六翼唤灵师',   badge: '🌑 终层·后排唤灵',   wave: '第 5 层起',       stats: '❤️中等 · 📏中 · 👟后排吟唱 · 💥唤灵暗弹', desc: '披紫黑六翼兜帽悬浮后排的日蚀秘术偶，托举紫曜法球唤出纸灵群并点射暗影法球，建议优先斩首。' },
+  { id: 'splitter',     cat: 'normal', sprite: 'assets/spire/mob_splitter.png',      icon: '🌑', name: '黑水三核裂影怪',   badge: '🌑 终层·日蚀镜界',   wave: '第 1 层起',       stats: '❤️高血量 · 📏大 · 👟跳跃逼近 · 💥亡语三分', desc: '体内悬浮三枚金面核心的厚血黑水蚀灵，弹性跳跃逼近，被斩碎瞬间爆裂为 3 只高速蚀水子嗣。' },
+  { id: 'mini_slime',   cat: 'normal', sprite: 'assets/spire/mob_mini_slime.png',    icon: '👁️', name: '蚀水独眼子嗣',     badge: '🌑 终层·裂影衍生物', wave: '裂影怪/母巢衍生', stats: '❤️轻韧 · 📏微 · 👟极速扑咬 · 💥微',     desc: '自黑水三核裂影怪或蚀忆魂灯龛中迸出的竖瞳黑水滴影，体型虽小但扑击迅捷。' },
+  { id: 'summoner',     cat: 'normal', sprite: 'assets/spire/mob_summoner.png',      icon: '🔮', name: '蚀日六翼唤灵师',   badge: '🌑 终层·后排唤灵',   wave: '第 5 层起',       stats: '❤️中等 · 📏中 · 👟后排吟唱 · 💥交叉暗月镰', desc: '披紫黑六翼兜帽悬浮后排的日蚀秘术偶，唤出纸灵群并释放 X 形交叉弧线暗月镰波，建议优先斩首。' },
   { id: 'healer',       cat: 'normal', sprite: 'assets/spire/mob_healer.png',        icon: '💚', name: '圣所祈福翠灯偶',   badge: '🌑 终层·群体回血',   wave: '第 6 层起',       stats: '❤️中等 · 📏中 · 👟伴行护航 · 💥治疗脉冲', desc: '手提苍翠魂灯的金翎圣所偶，每 2.8 秒绽放生命脉冲修复周围守塔机关，混战中务必优先净化。' },
-  { id: 'brute',        cat: 'normal', sprite: 'assets/spire/mob_brute.png',         icon: '🗿', name: '镇塔黑曜重锤卫',   badge: '🌑 终层·震地重卫',   wave: '第 5 层起',       stats: '❤️极高 · 📏巨型 · 👟沉重压迫 · 💥重锤震波', desc: '肩扛紫曜符文巨锤的黑甲魔角重卫，贴近角色时会蓄力砸地轰出大范围震荡冲击波。' },
-  { id: 'juggernaut',   cat: 'normal', sprite: 'assets/spire/mob_juggernaut.png',    icon: '⛓️', name: '黑曜金锁镇狱像',   badge: '🌑 终层·超重堡垒',   wave: '第 6 层起',       stats: '❤️超巨额 · 📏超巨型 · 👟极慢霸体 · 💥毁灭', desc: '胸缠黄金封魔锁链、十字赤瞳燃烧的黑曜石移动堡垒，移速迟缓但血甲极厚，需集中火力融化。' },
-  { id: 'sand_worm',    cat: 'scene',  sprite: 'assets/spire/mob_sand_worm.png',     icon: '🕯️', name: '蚀影潜渊骨蛇',     badge: '🌑 终层专属精英怪', wave: '第 13 层起高频出没', stats: '❤️中等 · 📏中 · 👟破水突刺 · 💥穿行奇袭', desc: '潜行于黑水镜面之下的黑曜金肋骨蛇，周期破水亮起冲刺轴线向猎物发起高速满程突袭。' },
+  { id: 'brute',        cat: 'normal', sprite: 'assets/spire/mob_brute.png',         icon: '🗿', name: '镇塔黑曜重锤卫',   badge: '🌑 终层·狂暴血牛',   wave: '第 3 层起',       stats: '❤️巨额血牛 · 📏巨型 · 👟肩撞猛冲 · 💥重锤震波', desc: '肩扛紫曜巨锤的重甲血牛狂卫，中距发动狂暴肩撞猛冲贴脸，蓄力砸地轰出大范围震荡冲击波！' },
+  { id: 'juggernaut',   cat: 'normal', sprite: 'assets/spire/mob_juggernaut.png',    icon: '⛓️', name: '黑曜金锁镇狱像',   badge: '🌑 终层·泰坦血牛',   wave: '第 5 层起',       stats: '❤️泰坦超厚血 · 📏超巨型 · 👟霸体推进 · 💥碎晶震地', desc: '胸缠黄金封魔锁链的黑曜石泰坦血牛堡垒，拥有超巨额生命与极高抗击退霸体，重踏迸射六方晶簇！' },
+  { id: 'sand_worm',    cat: 'scene',  sprite: 'assets/spire/mob_sand_worm.png',     icon: '🕯️', name: '蚀影潜渊骨蛇',     badge: '🌑 终层·奇袭冲刺',   wave: '第 3 层起出没',   stats: '❤️厚实 · 📏中 · 👟高频突刺 · 💥穿行奇袭', desc: '潜行于黑水镜面之下的高韧金肋骨蛇，高频亮起冲刺走廊向猎物发起满程高速突袭。' },
 
   // 7 大守层先锋统领 & 6 位守誓主宰 Boss
   { id: 'mb_vanguard',  cat: 'boss',   sprite: 'assets/spire/mb_vanguard.png',          icon: '🏮', name: '雨夜守桥重铠武者',       badge: '一层先锋统领',   wave: '无尽深渊统领试炼', stats: '❤️高额统领级 · 🎁必掉遗物匣',     desc: MINI_BOSS_DEFS.vanguard.desc },

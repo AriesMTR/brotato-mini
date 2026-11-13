@@ -735,9 +735,9 @@ function renderShop() {
       const rngBonus = tpl.rangeScale ? Math.max(0, totalRange) * tpl.rangeScale : 0;
       const hpBonus = tpl.hpScale ? Math.max(0, player.maxHp) * tpl.hpScale : 0;
       const armBonus = tpl.armorScale ? Math.max(0, getTotalArmor()) * tpl.armorScale : 0;
-      const stickBonus = o.id === 'stick' ? Math.max(0, (getSetBonuses().sticks || 0)) * 3.0 : 0;
+      const stickBonus = o.id === 'stick' ? Math.max(0, (getSetBonuses().sticks || 0)) * 4.0 : 0;
       const dmg = Math.round(((tpl.dmg + aspdBonus + rngBonus + hpBonus + armBonus) * (1 + (o.tier - 1) * 0.55) + stickBonus) * (getEffectiveDmgMul() + (tpl.melee ? player.meleeBonus : 0)) * scale);
-      const effRange = Math.max(tpl.melee ? 74 : 54, tpl.range + (tpl.melee ? Math.round(totalRange * 0.78 + (player.meleeSweepBonus || 0) * 18) : totalRange) + (o.tier - 1) * (tpl.melee ? 16 : 13));
+      const effRange = Math.max(tpl.melee ? 78 : 54, tpl.range + (tpl.melee ? Math.round(totalRange * 0.88 + (player.meleeSweepBonus || 0) * 22) : totalRange) + (o.tier - 1) * (tpl.melee ? 18 : 13));
       const effCd = (tpl.cd / Math.max(0.18, getEffectiveAtkSpd() * (1 + (o.tier - 1) * 0.08))).toFixed(2);
       const ok = player.mats >= o.cost && canBuyWeapon(o.id, o.tier);
       const hasMergePair = o.tier < 5 && player.weapons.some(w => w.id === o.id && w.tier === o.tier);

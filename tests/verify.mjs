@@ -295,13 +295,14 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
 // ============================================================================
 {
   const { sandbox: s } = createEnv(false, 1440, 900, 2);
-  assert.strictEqual(vm.runInContext("APP_VERSION", s), "v1.4.0", "APP_VERSION must be v1.4.0");
+  assert.strictEqual(vm.runInContext("APP_VERSION", s), "v1.4.1", "APP_VERSION must be v1.4.1");
   assert.strictEqual(vm.runInContext("MAX_WEAPON_TIER", s), 5, "MAX_WEAPON_TIER must be 5");
   assert.strictEqual(vm.runInContext("MAX_WAVE", s), 16, "MAX_WAVE must be strictly 16 floors");
   assert.strictEqual(vm.runInContext("menuStage", s), "home", "Game must boot onto clean Main Title Screen (menuStage === 'home')");
 
-  // Verify v1.4.0: 32 weapons x 2 evolutions = 64 unique evolutions, T4+T4 -> T5 merge + 2-choice evolution modal,
-  // HD baked sprites across all 32 weapons, mid-late 2.0x HP & DMG wave curve, and desktop Retina floorBakeScale >= 2.0
+  // Verify v1.4.1: 32 weapons x 2 evolutions = 64 unique evolutions, T4+T4 -> T5 merge + 2-choice evolution modal,
+  // HD baked sprites across all 32 weapons, softened W1-W3 pressure with preserved 16-wave total pressure & 2.0x late cap,
+  // MONSTER_SPD_MUL = 0.80, RANGED_ENEMY_COUNT_MUL = 0.80, stick range >= 130, and desktop Retina floorBakeScale >= 1.60
   const v140Audit = vm.runInContext(`(() => {
     const wIds = Object.keys(WEAPONS);
     if (wIds.length !== 32) return { ok: false, reason: 'Expected 32 weapons, got ' + wIds.length };
@@ -317,8 +318,18 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
       }
     }
     if (evoIds.size !== 64) return { ok: false, reason: 'Expected 64 unique evolutions, got ' + evoIds.size };
-    if (getMidLateWaveHpMul(1) !== 1 || Math.abs(getMidLateWaveHpMul(16) - 2.0) > 1e-6) return { ok: false, reason: 'Bad midLateHpMul curve' };
-    if (getMidLateWaveDmgMul(1) !== 1 || Math.abs(getMidLateWaveDmgMul(16) - 2.0) > 1e-6) return { ok: false, reason: 'Bad midLateDmgMul curve' };
+    if (!(getMidLateWaveHpMul(1) < 1 && getMidLateWaveHpMul(3) < 1 && getMidLateWaveHpMul(4) > 1.1 && Math.abs(getMidLateWaveHpMul(16) - 2.0) <= 1e-6)) {
+      return { ok: false, reason: 'Bad midLateHpMul curve' };
+    }
+    if (!(getMidLateWaveDmgMul(1) < 1 && getMidLateWaveDmgMul(3) < 1 && getMidLateWaveDmgMul(4) > 1.1 && Math.abs(getMidLateWaveDmgMul(16) - 2.0) <= 1e-6)) {
+      return { ok: false, reason: 'Bad midLateDmgMul curve' };
+    }
+    let hpCurveSum = 0;
+    for (let wv = 1; wv <= 16; wv++) hpCurveSum += getMidLateWaveHpMul(wv);
+    if (Math.abs(hpCurveSum - 24.30) > 0.35) return { ok: false, reason: 'Total 16-wave pressure drifted: ' + hpCurveSum };
+    if (MONSTER_SPD_MUL !== 0.80 || RANGED_ENEMY_COUNT_MUL !== 0.80 || WEAPONS.stick.range < 130) {
+      return { ok: false, reason: 'Bad v1.4.1 balance constants' };
+    }
 
     // Test T4 + T4 -> T5 merge & 2-choice evolution modal
     startGame('allrounder');
@@ -660,13 +671,16 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
     for (const stepDt of [0.10, 2.40, 2.80]) { _advanceClock(stepDt * 1000); update(stepDt); draw(); }
     bossCutscene = null;
 
-    // Trigger Phase 2 in Endless Mode -> must 100% guarantee immediate mythic_phase2 portrait banner!
+    // Trigger Phase 2 in Endless Mode -> must 100% guarantee immediate mythic_phase2 portrait banner + +50% HP + +30% DMG + ZERO extra time inflation!
     endlessMode = true;
     player.waveMythicAwakened = false;
+    const preP2WaveTime = waveTime;
     const p2Boss = createEnemy(player.x + 150, player.y, 'boss', 'frost_queen');
+    const p1Hp = p2Boss.maxHp, p1Dmg = p2Boss.dmg;
     p2Boss.canPhase2 = true;
     hurtEnemy(p2Boss, p2Boss.maxHp + 99999, true);
-    const p2Guaranteed = !!(bossCutscene && bossCutscene.mode === 'mythic_phase2' && bossCutscene.variant === 'frost_queen' && bossCutscene.maxT >= 5.8);
+    const p2StatsOk = (p2Boss.maxHp === Math.max(450, Math.round(p1Hp * 1.50)) && p2Boss.hp === p2Boss.maxHp && p2Boss.dmg === Math.round(p1Dmg * 1.30) && waveTime === preP2WaveTime);
+    const p2Guaranteed = !!(p2StatsOk && bossCutscene && bossCutscene.mode === 'mythic_phase2' && bossCutscene.variant === 'frost_queen' && bossCutscene.maxT >= 5.8);
     for (const stepDt of [0.12, 2.50, 2.75]) { _advanceClock(stepDt * 1000); update(stepDt); draw(); }
     bossCutscene = null;
 
@@ -889,4 +903,4 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running") {
   }
 }
 
-console.log(`ALL 5 V1.4.0 VERIFICATION SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
+console.log(`ALL 5 V1.4.3 VERIFICATION SUITES PASSED! Modular files: ${cssFiles.length} CSS + ${jsFiles.length} JS | Total JS: ${(code.length / 1024).toFixed(1)} KB`);
