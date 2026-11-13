@@ -330,8 +330,18 @@ export function runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap }) {
       const jialanPhasePreserved = floor !== 12 || (jialanSelfDamagePanel && phaseEvents.every(event =>
         event.artPath === 'assets/spire/v2/jialan-atlas.png'));
       hurtEnemy(boss, boss.maxHp + 99999, true);
-      const finalCinematic = SpireDirector.isBlockingGameplay();
-      const rewardWaitsForFarewell = !boss._rewarded && player.kills === before.kills;
+      let finalCinematic, rewardHandledCleanly;
+      if (floor < 16) {
+        // Early defeat on Floors 4/8/12 drops Boss rewards & crate immediately and keeps wave open to farm mobs!
+        const waveContinues = state === 'wave' && !!spireFloorFlow.bossDefeated && !!boss._rewarded &&
+          drops.some(d => d.kind === 'crate' && d.isBoss);
+        finishWave();
+        finalCinematic = waveContinues && SpireDirector.isBlockingGameplay();
+        rewardHandledCleanly = waveContinues;
+      } else {
+        finalCinematic = SpireDirector.isBlockingGameplay();
+        rewardHandledCleanly = !boss._rewarded && player.kills === before.kills;
+      }
       const farewellEvents = __drainDirector();
       const jialanGiftAfterDefeat = floor !== 12 || (
         farewellEvents.some(event => event.eventId.startsWith('boss.jialan.boss_defeated') && event.artPath === 'assets/spire/v3/jialan-clock.png') &&
@@ -340,7 +350,7 @@ export function runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap }) {
       hurtEnemy(boss, 999999, true); killEnemyRewards(boss);
       const idempotent = player.mats === after.mats && player.kills === after.kills && pendingCrates === after.crates;
       results.push({ floor, guaranteed, firstPhase, phaseCinematic, noLegacyPhaseBanner, phaseVisuals, jialanPhasePreserved, jialanGiftAfterDefeat,
-        finalCinematic, rewardWaitsForFarewell,
+        finalCinematic, rewardHandledCleanly,
         rewarded: !!boss._rewarded, idempotent,
         memento: !key || !!getSpireStoryProgress().mementos[key],
         finalEnding: floor !== 16 || (getSpireStoryProgress().ending === 'B' && state === 'end') });

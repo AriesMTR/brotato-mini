@@ -454,6 +454,12 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running", preferences 
       __drainDirector();
       if (boss.storyStage !== 2 || boss.hp <= 0) throw new Error('Boss did not enter phase two');
       hurtEnemy(boss, boss.maxHp + 99999, true);
+      if (wave < MAX_WAVE) {
+        if (state !== 'wave' || !spireFloorFlow.bossDefeated) {
+          throw new Error('Early story boss defeat on floor ' + wave + ' must keep wave active to farm mobs');
+        }
+        finishWave();
+      }
       __drainDirector();
       return boss;
     }
@@ -489,19 +495,33 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running", preferences 
       }
     }
     if (evoIds.size !== 64) return { ok: false, reason: 'Expected 64 unique evolutions, got ' + evoIds.size };
-    if (!(getMidLateWaveHpMul(1) < 0.80 && getMidLateWaveHpMul(4) < 1.0 && getMidLateWaveHpMul(8) > 1.3 && Math.abs(getMidLateWaveHpMul(16) - 2.0) <= 1e-6)) {
+    if (!(getMidLateWaveHpMul(1) < 0.80 && getMidLateWaveHpMul(4) < 1.0 && getMidLateWaveHpMul(8) > 1.3 && getMidLateWaveHpMul(10) >= 1.90 && Math.abs(getMidLateWaveHpMul(16) - 3.0) <= 1e-6)) {
       return { ok: false, reason: 'Bad midLateHpMul curve' };
     }
-    if (!(getMidLateWaveDmgMul(1) < 0.80 && getMidLateWaveDmgMul(4) < 1.0 && getMidLateWaveDmgMul(8) > 1.3 && Math.abs(getMidLateWaveDmgMul(16) - 2.0) <= 1e-6)) {
+    if (!(getMidLateWaveDmgMul(1) < 0.80 && getMidLateWaveDmgMul(4) < 1.0 && getMidLateWaveDmgMul(8) > 1.3 && getMidLateWaveDmgMul(10) >= 1.70 && Math.abs(getMidLateWaveDmgMul(16) - 2.45) <= 1e-6)) {
       return { ok: false, reason: 'Bad midLateDmgMul curve' };
     }
-    if (MONSTER_SPD_MUL !== 0.80 || RANGED_ENEMY_COUNT_MUL !== 0.80 || WEAPONS.stick.range < 130 || WEAPONS.stick.dmg < 18 || WEAPONS.katana.dmg < 30) {
-      return { ok: false, reason: 'Bad v2.1.2 balance constants' };
+    if (MONSTER_HP_BASE_MUL !== 1.80 || BOSS_HP_MUL !== 4.80 || MONSTER_SPD_MUL !== 0.80 || RANGED_ENEMY_COUNT_MUL !== 0.80 || WEAPONS.stick.range < 130 || WEAPONS.stick.dmg < 18 || WEAPONS.katana.dmg < 30) {
+      return { ok: false, reason: 'Bad v2.1.3 balance constants' };
+    }
+    const sheath = ITEMS.find(it => it.id === 'fox_parry_sheath');
+    if (!sheath || sheath.tier !== 4 || sheath.maxCount !== 1) {
+      return { ok: false, reason: 'Missing T4 unique melee deflect relic fox_parry_sheath' };
     }
 
-    // Test T4 + T4 -> T5 merge & 2-choice evolution modal
+    // Test T4 + T4 -> T5 merge & 2-choice evolution modal + multi-form elongated/oblique terrain blocks
     startGame('allrounder', { mode: 'endless' });
     __drainDirector();
+    const seenForms = new Set();
+    for (let sRun = 0; sRun < 6; sRun++) {
+      spawnArenaTerrains();
+      if (terrains.length < 4) return { ok: false, reason: 'Expected >=4 random terrain blocks, got ' + terrains.length };
+      for (const tr of terrains) {
+        if (tr.form) seenForms.add(tr.form);
+        drawSingleTerrain(tr, true);
+      }
+    }
+    if (seenForms.size < 3) return { ok: false, reason: 'Expected diverse elongated/oblique terrain forms, got ' + [...seenForms].join(',') };
     openShop(true);
     player.weapons = [makeWeapon('katana', 4), makeWeapon('katana', 4)];
     mergeSlot(0);
@@ -1083,7 +1103,7 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     hurtPlayer(10);
     const consecutiveHitRegistered = player.hp < hpAfterBossNuke;
 
-    // 2) Codex all 5 tabs render cleanly with 6 heroes, 4 Spire scenes, 32 weapons, 74 items
+    // 2) Codex all 5 tabs render cleanly with 6 heroes, 4 Spire scenes, 32 weapons, 75 items
     openCodex('weapons'); const wCnt = document.getElementById('codexGrid').children.length;
     setCodexTab('items'); const iCnt = document.getElementById('codexGrid').children.length;
     setCodexTab('heroes'); const hCnt = document.getElementById('codexGrid').children.length;
@@ -1145,7 +1165,7 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
   assert.strictEqual(coreCheck.invulnAfterHit, 0, "Player must have ZERO invulnerability frames after taking damage");
   assert.strictEqual(coreCheck.consecutiveHitRegistered, true, "Back-to-back hits must immediately register damage without i-frame immunity");
   assert.strictEqual(coreCheck.wCnt, 32, "Codex must render 32 weapons");
-  assert.strictEqual(coreCheck.iCnt, 74, "Codex must render 74 items");
+  assert.strictEqual(coreCheck.iCnt, 75, "Codex must render 75 items");
   assert.strictEqual(coreCheck.hCnt, 6, "Codex must render 6 Spire heroes");
   assert.strictEqual(coreCheck.mCnt, 37, "Codex must render all 37 unique Spire monsters, commanders & bosses");
   assert.strictEqual(coreCheck.sCnt, 4, "Codex must render 4 Spire scenes");

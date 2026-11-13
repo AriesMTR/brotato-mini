@@ -321,11 +321,18 @@ function triggerSoulDash() {
   const dashCrowded = enemies.length > 14;
 
   if (cls === 'brawler') {
-    // 烬羽 · 断刃一闪：向前劈出大弧度绯红居合刀波，高暴击斩穿路径敌群并劈碎近身弹幕
+    // 烬羽 · 断刃一闪：向前劈出大弧度绯红居合刀波，高暴击斩穿路径敌群并切碎沿途敌弹
     const slashA = Math.atan2(dy, dx);
     const sx = ox + dx * 62, sy = oy + dy * 62;
     if (slashes.length < 36) {
       slashes.push({ x: sx, y: sy, angle: slashA, r: 138, color: '#fb7185', mode: 'crescent', t: 0.22, maxT: 0.22 });
+    }
+    for (let bi = eBullets.length - 1; bi >= 0; bi--) {
+      const eb = eBullets[bi];
+      if (eb && Math.hypot(eb.x - sx, eb.y - sy) <= 112 + (eb.r || 5)) {
+        addSparks(eb.x, eb.y, slashA, '#fb7185', 2);
+        eBullets.splice(bi, 1);
+      }
     }
     const sDmg = baseDmg * 1.42 * (1 + (player.meleeBonus || 0));
     for (let i = enemies.length - 1; i >= 0; i--) {
@@ -575,8 +582,9 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
   if (opts.isMelee && player && player.meleeSunder) e.sunderT = 3.2;
   // 2) 首领大招后的【破绽暴露】窗口期承受额外高额伤害（近战 +25%，远程 +15%）
   if (e.exposeT > 0) rawDmg *= (opts.isMelee ? 1.25 : 1.15);
-  // 3) 【剧毒】叠层腐蚀易伤：每层使目标承受伤害 +3%
+  // 3) 【剧毒】叠层腐蚀易伤：每层使目标承受伤害 +3%（若仅踩泥沼地形则易伤减半为 +1.5%）
   if (e.poisonT > 0 && e.poisonStacks > 0) rawDmg *= (1 + e.poisonStacks * 0.03);
+  else if ((e.swampDotT || 0) > 0) rawDmg *= 1.015;
   // 3b) 【液氮冷却罐】霜蚀增伤：对冰缓/冰冻敌人直接造成额外伤害（不绑定暴击）
   if (player && (player.chillDmgBonus || 0) > 0 && ((e.chillT || 0) > 0 || (e.freezeT || 0) > 0)) {
     rawDmg *= (1 + player.chillDmgBonus);
@@ -825,12 +833,12 @@ function awardEnemyRewards(e) {
   }
   addBurst(e.x, e.y, e.elite ? '#ffd166' : e.color, isBigBoss ? 24 : (enemies.length > 26 ? 3 : 5), isBigBoss ? 240 : 145);
 
-  // 狂化精英亡语：向四周迸射 6 枚高辨识度醒目金耀菱矛弹（132px/s 留足走位空隙，清晰可见防阴人）
+  // 狂化精英亡语：向四周迸射 6 枚精致流光金梭弹（132px/s 留足走位空隙，清晰柔美不突兀）
   if (e.elite) {
     const baseA = Math.random() * Math.PI * 2;
     for (let k = 0; k < 6 && eBullets.length < 170; k++) {
       const ba = baseA + (k / 6) * Math.PI * 2;
-      eBullets.push({ x: e.x, y: e.y, px: e.x, py: e.y, vx: Math.cos(ba) * 132, vy: Math.sin(ba) * 132, dmg: Math.max(3, Math.round(e.dmg * 0.72)), r: 6.0, color: '#ffd166', shape: 'lance' });
+      eBullets.push({ x: e.x, y: e.y, px: e.x, py: e.y, vx: Math.cos(ba) * 132, vy: Math.sin(ba) * 132, dmg: Math.max(3, Math.round(e.dmg * 0.72)), r: 5.6, hitR: 5.0, color: '#fbbf24', shape: 'lance' });
     }
   }
 
@@ -968,8 +976,8 @@ function awardEnemyRewards(e) {
     }
   }
   if (e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss') {
-    // 主线的清场、对白和结算由 resolveSpireBossDefeat 统一串联。
-    if (!endlessMode && e.type === 'boss' && wave <= MAX_WAVE && wave % 4 === 0) return;
+    // 主线终幕（第 16 层）的清场、对白和结局由 resolveSpireBossDefeat 直接串联。
+    if (!endlessMode && e.type === 'boss' && wave === MAX_WAVE) return;
     const otherBoss = enemies.some(o => o !== e && (o.type === 'boss' || o.type === 'special_boss' || o.type === 'mini_boss') && o.hp > 0);
     if (!otherBoss && !spawns.some(s => s.type === 'boss' || s.type === 'special_boss' || s.type === 'mini_boss')) {
       if (e.type === 'boss' || e.type === 'special_boss' || overtime) {
@@ -978,10 +986,12 @@ function awardEnemyRewards(e) {
       }
       if (player) player.invuln = 0;
       if (overtime) {
+        // 倒计时已归零进入超时死战后击杀首领：立即通关，不拖延时间
         overtime = false;
-        waveTime = Math.min(waveTime, 0.65);
-      } else if (e.type === 'boss') {
-        waveTime = Math.min(waveTime, 0.65);
+        waveTime = 0;
+      } else if (e.type === 'boss' && waveTime > 1.2) {
+        // 倒计时结束前提前击破首领：保留剩余波次时间继续刷小怪收割晶石，绝不强制提前结束导致亏钱！
+        announce('◆ 首领已击破！剩余时间继续清剿小怪收割封魂晶石！', '#72efdd', 3.4);
       }
     }
   }

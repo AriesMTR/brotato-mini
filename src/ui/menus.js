@@ -682,7 +682,7 @@ function startGame(cls, opts) {
     pierceBonus: 0, bounceBonus: 0, bounceAmpDmg: 0, shopDiscount: 0, freeRerolls: 0, bonusTrees: 0,
     enemySlow: 0, thorns: 0, cyberball: 0, critHeal: 0, critMeleeHeal: false, ailmentLeech: 0, rangeToDmg: false, hpToDmg: 0, armorToDmg: 0, hasAnvil: false, healBonus: 0,
     burnChance: 0, chillChance: 0, chillDmgBonus: 0, freezeChance: 0, freezeDeathNova: false, poisonChance: 0, maxPoisonStacks: 8, plagueSpread: false, elemSynergy: false, reactionBlast: false,
-    meleeBossGuard: 0, meleeSweepBonus: 0, meleeShockwave: false, meleeSunder: false, strideQuake: false, _strideDist: 0, blastChance: 0, explosionScale: 1, napalmBlast: false, bloodNova: false,
+    meleeBossGuard: 0, meleeSweepBonus: 0, meleeShockwave: false, meleeBulletCutChance: 0, meleeSunder: false, strideQuake: false, _strideDist: 0, blastChance: 0, explosionScale: 1, napalmBlast: false, bloodNova: false,
     interest: 0, teslaCount: 0, teslaCd: 1.0, healDropBonus: 0, chillSlowT: 0, inSpore: false,
     dashCdMul: 1, dashFreezeNova: false, dashSurge: false, dashSurgeT: 0, shieldPulseNova: false, executeLowHp: 0,
     invulnBonus: 0, fastShield: false, soulBolt: false, noSlow: false, bossCratesQueued: 0, mythicCratesQueued: 0, recentCrateIds: [],

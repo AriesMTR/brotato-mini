@@ -80,15 +80,27 @@ function stopSpireCombat(flow, result) {
 
 function resolveSpireBossDefeat(enemy) {
   const flow = spireFloorFlow;
-  if (!player || player.hp <= 0 || !stopSpireCombat(flow, 'boss-defeated')) return;
+  if (!player || player.hp <= 0 || !isCurrentSpireFlow(flow) || flow.result !== 'active') return;
   // 一阶绝不能从这里通过：护栏也覆盖调试/外部伤害入口。
   if (enemy.storyPhaseBoss && enemy.storyStage !== 2) {
-    flow.result = 'active';
-    state = 'wave';
     enemy._storyDefeatQueued = false;
     triggerBossMythicPhase2(enemy);
     return;
   }
+  // 第 4 / 8 / 12 层主线首领若在波次倒计时结束前被提前击败：
+  // 立即爆出首领晶石与秘宝箱，清空残留首领弹幕，保留剩余波次时间继续刷小怪攒钱，待倒计时归零再进告别演出与商店！
+  if (wave < MAX_WAVE && !overtime && waveTime > 0.6) {
+    flow.bossDefeated = true;
+    flow.defeatedBossVariant = enemy.variant;
+    eBullets.length = 0;
+    hazards.length = 0;
+    bossCutscene = null;
+    if (typeof pendingBossCutscene !== 'undefined') pendingBossCutscene = null;
+    player.invuln = 0;
+    awardEnemyRewards(enemy);
+    return;
+  }
+  if (!stopSpireCombat(flow, 'boss-defeated')) return;
   flow.bossDefeated = true;
   enemies.forEach(other => { if (other !== enemy) other.hp = 0; });
   player.invuln = 0;
@@ -254,7 +266,9 @@ function checkPendingWeaponEvolutions(onAllResolved) {
   const subEl = document.getElementById('evoSub');
   const box = document.getElementById('evoChoices');
   if (titleEl) titleEl.textContent = `【${tpl.name}】晋升五阶神话 · 二选一终极进化`;
-  if (subEl) subEl.textContent = '择定唯一神话觉醒方向，永久重塑兵装圣徽外观与专属战斗机制';
+  if (subEl) subEl.textContent = tpl.melee
+    ? '择定唯一神话觉醒方向，永久重塑兵装圣徽并额外觉醒 40% 概率斩碎敌弹！'
+    : '择定唯一神话觉醒方向，永久重塑兵装圣徽外观与专属战斗机制';
   if (box) {
     box.innerHTML = '';
     const sLabel = SET_DEFS[tpl.set] ? SET_DEFS[tpl.set].label.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '') : '';
@@ -331,16 +345,28 @@ function finishWave() {
   if (!player || player.hp <= 0 || state !== 'wave') return;
   const flow = spireFloorFlow;
   if (!isCurrentSpireFlow(flow) || flow.result !== 'active' || flow.rewardsGranted || flow.awaitingChoice) return;
-  // 首领层必须由第二阶段的最终击败结束，不能通过计时归零绕过战斗。
-  if (!endlessMode && wave % 4 === 0) return;
+  // 首领层必须先完成首领第二阶段讨伐，绝不能靠计时归零绕过首领；击败首领后刷完剩余小怪计时归零即可正常结算！
+  if (!endlessMode && wave % 4 === 0 && !flow.bossDefeated) return;
   if (!stopSpireCombat(flow, 'floor-cleared')) return;
+  if (!endlessMode && wave < MAX_WAVE && wave % 4 === 0 && flow.bossDefeated) {
+    const memento = ({ 4: 'jinyu', 8: 'astria', 12: 'jialan' })[wave];
+    if (memento) grantSpireMemento(memento);
+  }
   const done = () => {
     if (!isCurrentSpireFlow(flow) || flow.result !== 'floor-cleared') return;
     settleSpireFloor(flow);
   };
-  if (!endlessMode && typeof SpireDirector !== 'undefined' && typeof SpireDirector.onFloorCleared === 'function') {
-    SpireDirector.onFloorCleared(wave, done);
-  } else done();
+  if (!endlessMode && typeof SpireDirector !== 'undefined') {
+    if (wave < MAX_WAVE && wave % 4 === 0 && flow.bossDefeated && typeof SpireDirector.onBossDefeated === 'function') {
+      SpireDirector.onBossDefeated(wave, flow.defeatedBossVariant || null, done);
+      return;
+    }
+    if (typeof SpireDirector.onFloorCleared === 'function') {
+      SpireDirector.onFloorCleared(wave, done);
+      return;
+    }
+  }
+  done();
 }
 
 function settleWaveRewards() {
