@@ -108,9 +108,12 @@ function syncArenaAndZoom(forceBake = false) {
   const landscapePhone = uiMode === 'mobile-landscape';
   const targetW = portraitPhone ? 1180 : (landscapePhone ? 1920 : 2200);
   const targetH = portraitPhone ? 1960 : (landscapePhone ? 1220 : 1500);
-  const nextScale = (uiMode !== 'desktop' || isTouch) ? 0.78 : 1.0;
+  const mobilePerf = uiMode !== 'desktop';
+  const nextBakeScale = typeof computeFloorBakeScale === 'function'
+    ? computeFloorBakeScale(targetW, targetH, mobilePerf, dpr || 1)
+    : (mobilePerf ? 1.20 : 1.64);
   const activeSceneId = (curScene && curScene.id) ? curScene.id : 'foundry';
-  const wantKey = `${targetW}x${targetH}_${nextScale}_${activeSceneId}_${sceneSeed}`;
+  const wantKey = `${targetW}x${targetH}_${nextBakeScale}_${activeSceneId}_${sceneSeed}`;
 
   if (forceBake || WORLD.w !== targetW || WORLD.h !== targetH || bakedSceneKey !== wantKey) {
     const prevW = Math.max(1, WORLD.w || targetW), prevH = Math.max(1, WORLD.h || targetH);
@@ -164,9 +167,9 @@ function resize() {
   viewW = window.innerWidth || 390;
   viewH = window.innerHeight || 844;
   syncUIMode();
-  const mobilePerf = uiMode !== 'desktop' || isTouch;
-  // Retina 高清渲染：桌面端完整解锁 2.0x DPR 锐利立绘与动作精灵，移动端提升至 1.50x
-  dpr = Math.min(window.devicePixelRatio || 1, mobilePerf ? 1.50 : 2.0);
+  const mobilePerf = uiMode !== 'desktop';
+  // Retina 超清渲染：桌面端不再因触控屏误判降采样，最高解锁 2.25x DPR；移动端提升至 1.65x
+  dpr = Math.min(window.devicePixelRatio || 1, mobilePerf ? 1.65 : 2.25);
   const cw = Math.max(1, Math.round(viewW * dpr));
   const ch = Math.max(1, Math.round(viewH * dpr));
   if (cv.width !== cw || cv.height !== ch) {
@@ -186,6 +189,6 @@ function resize() {
 window.addEventListener('resize', resize);
 window.addEventListener('wheel', e => {
   userZoomed = true;
-  camZoom = Math.max(0.38, Math.min(1.55, camZoom - e.deltaY * 0.0005));
+  camZoom = Math.max(0.38, Math.min(1.75, camZoom - e.deltaY * 0.0005));
   if (bootReady) clampCam();
 }, { passive: true });

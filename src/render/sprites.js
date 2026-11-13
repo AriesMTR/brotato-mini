@@ -8,195 +8,610 @@ function _syncNow() {
   return _frameNow || performance.now();
 }
 
-// 32 把守誓兵装精细矢量造型绘制
+// 32 把守誓兵装高精矢量原画离线烘焙管线（192×192 超采样金属渐变 + 墨线描边 + 血槽/铭文/瞄具 + 5阶神话进化圣徽，彻底告别像素/色块感）
+const _weaponSpriteCache = new Map();
+const _weaponDataUrlCache = new Map();
+
+function _wpnGrad(g, x0, y0, x1, y1, c0, c1, c2) {
+  const grd = g.createLinearGradient(x0, y0, x1, y1);
+  grd.addColorStop(0, c0);
+  if (c2) {
+    grd.addColorStop(0.5, c1);
+    grd.addColorStop(1, c2);
+  } else {
+    grd.addColorStop(1, c1);
+  }
+  return grd;
+}
+
+function _wpnSpark(g, x, y, r, col) {
+  g.fillStyle = col;
+  g.beginPath();
+  g.moveTo(x, y - r);
+  g.lineTo(x + r * 0.28, y - r * 0.28);
+  g.lineTo(x + r, y);
+  g.lineTo(x + r * 0.28, y + r * 0.28);
+  g.lineTo(x, y + r);
+  g.lineTo(x - r * 0.28, y + r * 0.28);
+  g.lineTo(x - r, y);
+  g.lineTo(x - r * 0.28, y - r * 0.28);
+  g.closePath();
+  g.fill();
+}
+
+function _wpnWrapGrip(g, x, y, w, h, baseDark, baseLight, bandCol) {
+  g.fillStyle = _wpnGrad(g, x, y, x, y + h, baseLight, baseDark);
+  g.beginPath(); g.roundRect(x, y, w, h, Math.min(3, h * 0.42)); g.fill(); g.stroke();
+  g.strokeStyle = bandCol || 'rgba(246,211,121,0.55)';
+  g.lineWidth = 1.05;
+  const step = Math.max(3.2, w / 4.2);
+  for (let gx = x + 2.2; gx < x + w - 1.8; gx += step) {
+    g.beginPath(); g.moveTo(gx, y + 0.8); g.lineTo(gx + 1.8, y + h - 0.8); g.stroke();
+  }
+  g.strokeStyle = '#090710';
+  g.lineWidth = 1.65;
+}
+
+function _resolveEvoColor(id, tier, evoId) {
+  if (evoId && typeof WEAPONS !== 'undefined' && WEAPONS[id] && Array.isArray(WEAPONS[id].evos)) {
+    for (let i = 0; i < WEAPONS[id].evos.length; i++) {
+      if (WEAPONS[id].evos[i].id === evoId) return WEAPONS[id].evos[i].color || '#ff5c8a';
+    }
+  }
+  if (tier >= 5) return '#ff5c8a';
+  return (typeof TIER_COLORS !== 'undefined' && TIER_COLORS[tier]) ? TIER_COLORS[tier] : '#cbd5e1';
+}
+
+function _drawMythicCrest(g, accent, isEvo) {
+  g.save();
+  // 外层黑曜圣环与双翼残响纹章（纯线性渐变与多边形，0 radialGradient / 0 shadowBlur）
+  g.globalAlpha = isEvo ? 0.26 : 0.18;
+  g.fillStyle = accent;
+  g.beginPath(); g.ellipse(3, 0, 30, 17, 0, 0, Math.PI * 2); g.fill();
+  g.globalAlpha = isEvo ? 0.72 : 0.48;
+  g.strokeStyle = accent;
+  g.lineWidth = 1.25;
+  g.beginPath(); g.arc(2, 0, 21, -Math.PI * 0.78, Math.PI * 0.78); g.stroke();
+  g.strokeStyle = '#fff3c4';
+  g.lineWidth = 0.8;
+  g.beginPath(); g.arc(2, 0, 17.5, -Math.PI * 0.55, Math.PI * 0.55); g.stroke();
+  if (isEvo) {
+    g.fillStyle = _wpnGrad(g, -18, -16, 12, 16, '#fff8dc', accent, '#3b0764');
+    for (const sy of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(-6, sy * 4);
+      g.quadraticCurveTo(-18, sy * 15, -27, sy * 11);
+      g.quadraticCurveTo(-17, sy * 8, -12, sy * 2.5);
+      g.closePath();
+      g.fill();
+    }
+    _wpnSpark(g, 24, -11, 4.2, '#fff9db');
+    _wpnSpark(g, -16, -12, 3.2, accent);
+  }
+  g.restore();
+}
+
+function _paintWeaponArt(g, id, tier, evoId) {
+  const accent = _resolveEvoColor(id, tier, evoId);
+  const hiTier = tier >= 3;
+  const isMythic = tier >= 5 || !!evoId;
+  const trimGold = isMythic ? '#fff0b3' : (tier >= 4 ? '#f6d379' : (tier === 3 ? '#d8b4fe' : '#94a3b8'));
+  const bladeHi = isMythic ? '#ffffff' : '#f8fafc';
+  const bladeMid = tier >= 2 ? accent : '#cbd5e1';
+  const bladeDark = '#334155';
+
+  if (isMythic) {
+    _drawMythicCrest(g, accent, !!evoId);
+  } else if (tier >= 2) {
+    g.save();
+    g.globalAlpha = 0.12 + tier * 0.04;
+    g.fillStyle = accent;
+    g.beginPath(); g.ellipse(4, 0, 23, 11.5, 0, 0, Math.PI * 2); g.fill();
+    if (tier === 4) {
+      g.globalAlpha = 0.45;
+      g.strokeStyle = '#f6d379';
+      g.lineWidth = 1.0;
+      g.beginPath(); g.arc(3, 0, 18, -1.2, 1.2); g.stroke();
+    }
+    g.restore();
+  }
+
+  g.lineJoin = 'round';
+  g.lineCap = 'round';
+  g.lineWidth = 1.65;
+  g.strokeStyle = '#090710';
+
+  if (id === 'stick') {
+    // 守夜灵木法杖：盘虬古木杖身 + 金箍束环 + 悬浮青焰魂晶
+    g.fillStyle = _wpnGrad(g, -20, -5, 18, 6, '#b07d52', '#6f4528', '#3d2314');
+    g.beginPath();
+    g.moveTo(-22, -2.6); g.quadraticCurveTo(-4, -4.4, 14, -3.2);
+    g.lineTo(19, -5.8); g.lineTo(20, -1.5); g.lineTo(15, 2.8);
+    g.quadraticCurveTo(-3, 4.2, -22, 2.8); g.closePath();
+    g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(255,235,200,0.35)'; g.lineWidth = 0.9;
+    g.beginPath(); g.moveTo(-18, -1.2); g.quadraticCurveTo(-2, -2.5, 13, -1.4); g.stroke();
+    g.strokeStyle = '#090710'; g.lineWidth = 1.5;
+    g.fillStyle = trimGold;
+    g.fillRect(-5, -3.8, 4.5, 7.6); g.strokeRect(-5, -3.8, 4.5, 7.6);
+    const gemCol = isMythic ? accent : '#72efdd';
+    g.fillStyle = _wpnGrad(g, 15, -8, 27, 5, '#ffffff', gemCol, '#0f766e');
+    g.beginPath(); g.moveTo(16, 0); g.lineTo(21.5, -6.8); g.lineTo(28.5, 0); g.lineTo(21.5, 6.8); g.closePath();
+    g.fill(); g.stroke();
+    _wpnSpark(g, 22, -2, 3.2, '#ffffff');
+  } else if (id === 'rock') {
+    // 棱面符文陨星核：多切面黑曜晶石 + 内嵌发光裂隙铭文
+    const coreCol = tier >= 2 ? accent : '#38bdf8';
+    g.fillStyle = _wpnGrad(g, -14, -13, 16, 13, '#94a3b8', '#475569', '#1e293b');
+    g.beginPath();
+    g.moveTo(-13, -5); g.lineTo(-3, -13.5); g.lineTo(11, -11);
+    g.lineTo(18, -1.5); g.lineTo(12, 11.5); g.lineTo(-4, 13); g.lineTo(-15, 4.5);
+    g.closePath(); g.fill(); g.stroke();
+    // 棱面受光切面
+    g.fillStyle = 'rgba(248,250,252,0.28)';
+    g.beginPath(); g.moveTo(-11, -4.5); g.lineTo(-3, -12); g.lineTo(8, -9.5); g.lineTo(1, -1); g.closePath(); g.fill();
+    // 裂隙能量脉络
+    g.strokeStyle = coreCol; g.lineWidth = 1.8;
+    g.beginPath(); g.moveTo(-7, -2); g.lineTo(1, -4); g.lineTo(9, 2); g.moveTo(1, -4); g.lineTo(-1, 6); g.stroke();
+    _wpnSpark(g, 2, -3, 3.5, '#ffffff');
+  } else if (id === 'spear') {
+    // 红缨破阵龙枪：乌木金属长杆 + 绯红流苏枪缨 + 双血槽菱形银枪尖
+    g.fillStyle = _wpnGrad(g, -26, -3, -26, 3, '#a47148', '#582f0e');
+    g.beginPath(); g.roundRect(-27, -2.3, 38, 4.6, 2); g.fill(); g.stroke();
+    g.fillStyle = trimGold;
+    g.fillRect(8, -3.6, 5, 7.2); g.strokeRect(8, -3.6, 5, 7.2);
+    // 飘逸红缨
+    g.fillStyle = isMythic ? accent : '#e11d48';
+    g.beginPath();
+    g.moveTo(10, -3.2); g.quadraticCurveTo(3, -10.5, -3, -8.2); g.quadraticCurveTo(4, -5, 9, -2.5);
+    g.moveTo(10, 3.2); g.quadraticCurveTo(3, 10.5, -2, 8.0); g.quadraticCurveTo(4, 5, 9, 2.5);
+    g.fill(); g.stroke();
+    // 双切面枪刃
+    g.fillStyle = _wpnGrad(g, 13, -7, 34, 7, bladeHi, bladeMid, bladeDark);
+    g.beginPath();
+    g.moveTo(13, 0); g.lineTo(17, -6.5); g.lineTo(34, 0); g.lineTo(17, 6.5); g.closePath();
+    g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.82)'; g.lineWidth = 1.0;
+    g.beginPath(); g.moveTo(15, 0); g.lineTo(30, 0); g.stroke();
+  } else if (id === 'slingshot') {
+    // 猎魔复合弹弓：精雕胡桃木护手 + 鎏金分叉臂 + 紧绷晶弦与弹丸
+    _wpnWrapGrip(g, -18, -3.2, 14, 6.4, '#4a2c11', '#9c6644', trimGold);
+    g.fillStyle = _wpnGrad(g, -5, -12, 14, 12, trimGold, '#7f4f24', '#3b210c');
+    g.beginPath();
+    g.moveTo(-5, -3.2); g.quadraticCurveTo(4, -4, 13, -12); g.lineTo(16, -9.2);
+    g.quadraticCurveTo(7, -1.5, 2, 0);
+    g.quadraticCurveTo(7, 1.5, 16, 9.2); g.lineTo(13, 12);
+    g.quadraticCurveTo(4, 4, -5, 3.2); g.closePath();
+    g.fill(); g.stroke();
+    g.strokeStyle = isMythic ? accent : '#72efdd'; g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(14.5, -10.2); g.lineTo(-1, 0); g.lineTo(14.5, 10.2); g.stroke();
+    g.strokeStyle = '#090710'; g.lineWidth = 1.4;
+    g.fillStyle = _wpnGrad(g, -4, -3, 3, 3, '#ffffff', accent);
+    g.beginPath(); g.arc(0.5, 0, 3.4, 0, Math.PI * 2); g.fill(); g.stroke();
+  } else if (id === 'blowgun') {
+    // 淬毒翠竹吹箭筒：节竹金箍长管 + 羽饰瞄准环 + 幽绿剧毒吹针
+    g.fillStyle = _wpnGrad(g, -22, -3.5, 20, 3.5, '#34d399', '#059669', '#064e3b');
+    g.beginPath(); g.roundRect(-23, -3.2, 42, 6.4, 3); g.fill(); g.stroke();
+    for (const bx of [-12, 0, 11]) {
+      g.fillStyle = trimGold;
+      g.fillRect(bx, -3.9, 2.8, 7.8); g.strokeRect(bx, -3.9, 2.8, 7.8);
+    }
+    // 毒芒针尖
+    const pCol = isMythic ? accent : '#a7f3d0';
+    g.fillStyle = pCol;
+    g.beginPath(); g.moveTo(19, -2.0); g.lineTo(31, 0); g.lineTo(19, 2.0); g.closePath(); g.fill(); g.stroke();
+    _wpnSpark(g, 28, 0, 2.8, '#ecfdf5');
+  } else if (id === 'knife') {
+    // 暗影刺客短匕：宝石尾锤 + 缠柄护手 + 曲刃反光开血槽匕身
+    _wpnWrapGrip(g, -18, -2.8, 11, 5.6, '#1e293b', '#475569', trimGold);
+    g.fillStyle = trimGold;
+    g.beginPath(); g.arc(-19.5, 0, 2.8, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(-7, -7.8); g.lineTo(-3.5, -5.5); g.lineTo(-3.5, 5.5); g.lineTo(-7, 7.8); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = _wpnGrad(g, -3, -6, 26, 6, bladeHi, bladeMid, '#1e293b');
+    g.beginPath();
+    g.moveTo(-3.5, -4.8); g.lineTo(13, -5.2); g.quadraticCurveTo(22, -3.2, 27, 0.5);
+    g.quadraticCurveTo(17, 5.8, -3.5, 4.6); g.closePath();
+    g.fill(); g.stroke();
+    g.strokeStyle = isMythic ? accent : '#f43f5e'; g.lineWidth = 1.15;
+    g.beginPath(); g.moveTo(0, -0.5); g.lineTo(16, -0.2); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 0.9;
+    g.beginPath(); g.moveTo(-2, -3.6); g.lineTo(22, -0.5); g.stroke();
+  } else if (id === 'claws') {
+    // 猩红猎魔钩爪：暗金护拳甲 + 三道新月弧光利刃
+    g.fillStyle = _wpnGrad(g, -16, -10, -3, 10, '#4c1d95', '#1e1b4b');
+    g.beginPath(); g.roundRect(-16, -9.5, 11, 19, 4); g.fill(); g.stroke();
+    g.fillStyle = trimGold;
+    for (const ky of [-5.5, 0, 5.5]) {
+      g.beginPath(); g.arc(-5.5, ky, 2.1, 0, Math.PI * 2); g.fill(); g.stroke();
+    }
+    const clawGrad = _wpnGrad(g, -4, -9, 26, 9, '#ffffff', tier >= 2 ? accent : '#fb7185', '#881337');
+    for (const cy of [-6.2, 0, 6.2]) {
+      g.fillStyle = clawGrad;
+      g.strokeStyle = '#090710'; g.lineWidth = 1.5;
+      g.beginPath();
+      g.moveTo(-4, cy - 2.1);
+      g.quadraticCurveTo(12, cy - 4.4, 26 - Math.abs(cy) * 0.45, cy + 0.6);
+      g.quadraticCurveTo(11, cy + 0.8, -4, cy + 1.9);
+      g.closePath();
+      g.fill(); g.stroke();
+    }
+  } else if (id === 'katana') {
+    // 绯樱居合太刀：菱纹缠柄 + 镂空金锷 + 沸腾刃纹弧形长刀
+    _wpnWrapGrip(g, -26, -2.6, 14, 5.2, '#0f172a', '#334155', '#f43f5e');
+    g.fillStyle = trimGold;
+    g.beginPath(); g.roundRect(-12.5, -7.2, 3.6, 14.4, 1.5); g.fill(); g.stroke();
+    g.fillStyle = _wpnGrad(g, -9, -5, 34, 4, '#ffffff', tier >= 2 ? accent : '#fda4af', '#475569');
+    g.beginPath();
+    g.moveTo(-9, -3.2);
+    g.quadraticCurveTo(13, -5.2, 35, -1.6);
+    g.lineTo(31.5, 2.8);
+    g.quadraticCurveTo(12, 1.8, -9, 2.6);
+    g.closePath();
+    g.fill(); g.stroke();
+    // 居合沸腾刃纹 (Hamon)
+    g.strokeStyle = 'rgba(255,255,255,0.86)'; g.lineWidth = 0.95;
+    g.beginPath(); g.moveTo(-7, 0.4); g.quadraticCurveTo(4, -1.5, 14, 0.3); g.quadraticCurveTo(23, -1.2, 31, 0.6); g.stroke();
+  } else if (id === 'crossbow') {
+    // 猎魔机械连弩：精钢滑轨枪托 + 双翼反曲钢弓 + 蓄势发光弩箭
+    g.fillStyle = _wpnGrad(g, -20, -4, 16, 5, '#9c6644', '#582f0e');
+    g.beginPath(); g.roundRect(-21, -3.2, 33, 6.4, 2.2); g.fill(); g.stroke();
+    // 反曲双翼弓臂
+    g.strokeStyle = '#090710'; g.lineWidth = 4.6;
+    g.beginPath(); g.moveTo(6, -2); g.quadraticCurveTo(13, -13, 2, -17); g.moveTo(6, 2); g.quadraticCurveTo(13, 13, 2, 17); g.stroke();
+    g.strokeStyle = tier >= 2 ? accent : '#e2e8f0'; g.lineWidth = 2.4;
+    g.beginPath(); g.moveTo(6, -2); g.quadraticCurveTo(13, -13, 2, -17); g.moveTo(6, 2); g.quadraticCurveTo(13, 13, 2, 17); g.stroke();
+    // 弓弦与上膛弩矢
+    g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = 1.1;
+    g.beginPath(); g.moveTo(2, -16.5); g.lineTo(-9, 0); g.lineTo(2, 16.5); g.stroke();
+    g.strokeStyle = '#090710'; g.lineWidth = 1.4;
+    g.fillStyle = isMythic ? accent : '#72efdd';
+    g.beginPath(); g.moveTo(15, -3.5); g.lineTo(27, 0); g.lineTo(15, 3.5); g.lineTo(17.5, 0); g.closePath(); g.fill(); g.stroke();
+  } else if (id === 'shuriken') {
+    // 四方风魔手里剑：中心镂空咒印环 + 四枚弧形切风钢刃
+    const shCol = tier >= 2 ? accent : '#72efdd';
+    g.fillStyle = _wpnGrad(g, -16, -16, 16, 16, '#ffffff', shCol, '#1e293b');
+    g.beginPath();
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI * 0.5;
+      const aMid = a + 0.42;
+      const ox = Math.cos(a) * 16.5, oy = Math.sin(a) * 16.5;
+      const ix = Math.cos(aMid) * 5.6, iy = Math.sin(aMid) * 5.6;
+      if (k === 0) g.moveTo(ox, oy); else g.lineTo(ox, oy);
+      g.quadraticCurveTo(Math.cos(a + 0.18) * 10.5, Math.sin(a + 0.18) * 10.5, ix, iy);
+    }
+    g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#090710';
+    g.beginPath(); g.arc(0, 0, 3.8, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = trimGold; g.lineWidth = 1.3;
+    g.beginPath(); g.arc(0, 0, 4.2, 0, Math.PI * 2); g.stroke();
+  } else if (id === 'sniper') {
+    // 苍穹反器材狙击步枪：镂空战术枪托 + 超长浮置凹槽枪管 + 双镜片高倍光学镜 + 制退器
+    g.fillStyle = _wpnGrad(g, -26, -3, -8, 8, '#7f4f24', '#3b210c');
+    g.beginPath();
+    g.moveTo(-26, -3.5); g.lineTo(-9, -3.5); g.lineTo(-6, 4.5); g.lineTo(-12, 4.5); g.lineTo(-15, 1.5); g.lineTo(-26, 3.5);
+    g.closePath(); g.fill(); g.stroke();
+    // 机匣与超长枪管
+    g.fillStyle = _wpnGrad(g, -10, -5, 30, 4, bladeHi, bladeMid, '#1e293b');
+    g.beginPath(); g.roundRect(-10, -4.6, 20, 6.8, 1.8); g.fill(); g.stroke();
+    g.fillRect(10, -3.0, 21, 3.6); g.strokeRect(10, -3.0, 21, 3.6);
+    // 枪口制退器
+    g.fillStyle = trimGold;
+    g.beginPath(); g.roundRect(30, -4.4, 5.5, 6.4, 1.2); g.fill(); g.stroke();
+    // 高倍瞄准镜
+    g.fillStyle = '#1e293b';
+    g.beginPath(); g.roundRect(-5, -10.5, 16, 4.6, 1.8); g.fill(); g.stroke();
+    g.fillStyle = isMythic ? accent : '#72efdd';
+    g.fillRect(9, -10, 2.2, 3.6); g.fillRect(-4.6, -10, 1.8, 3.6);
+  } else if (id === 'pistol') {
+    // 守誓制式战术手枪：防滑斜纹握把 + 双色切削套筒 + 荧光准星
+    _wpnWrapGrip(g, -12, 1, 7.5, 10.5, '#1e293b', '#475569', trimGold);
+    g.strokeStyle = '#334155'; g.lineWidth = 1.3;
+    g.beginPath(); g.strokeRect(-4.8, 1.5, 5.2, 4.2);
+    g.strokeStyle = '#090710'; g.lineWidth = 1.65;
+    g.fillStyle = _wpnGrad(g, -14, -6.5, 18, 2, bladeHi, bladeMid, '#1e293b');
+    g.beginPath(); g.roundRect(-14, -6.2, 31, 7.8, 2.2); g.fill(); g.stroke();
+    // 抛壳窗与散热斜槽
+    g.fillStyle = '#0f172a'; g.fillRect(-2, -4.8, 6.5, 2.6);
+    g.strokeStyle = 'rgba(15,23,42,0.75)'; g.lineWidth = 1.1;
+    for (const sx of [-11, -9, -7]) { g.beginPath(); g.moveTo(sx, -5.0); g.lineTo(sx - 1, -0.5); g.stroke(); }
+    g.fillStyle = isMythic ? accent : '#72efdd';
+    g.fillRect(14, -7.8, 2.4, 1.8);
+  } else if (id === 'revolver') {
+    // 审判者左轮手枪：雕花胡桃木弯柄 + 六发黄金转轮弹巢 + 长肋条重型枪管
+    _wpnWrapGrip(g, -17, 0.5, 8.5, 11, '#431407', '#9a3412', trimGold);
+    g.fillStyle = _wpnGrad(g, -9, -6, 26, 3, '#fff8dc', tier >= 2 ? accent : '#f6d379', '#78350f');
+    g.beginPath(); g.roundRect(-9, -5.8, 34, 6.4, 1.8); g.fill(); g.stroke();
+    // 转轮弹巢
+    g.fillStyle = _wpnGrad(g, -8, -4.5, 2, 4.5, '#fef08a', '#b45309');
+    g.beginPath(); g.roundRect(-7.5, -4.6, 9.5, 7.4, 2); g.fill(); g.stroke();
+    g.fillStyle = '#1c1917';
+    for (const cy of [-2.4, 0.8]) { g.fillRect(-5.8, cy, 6, 1.5); }
+    _wpnSpark(g, 24, -2.8, 2.8, '#ffffff');
+  } else if (id === 'smg') {
+    // 疾风战术冲锋枪：加长弧形弹匣 + 紧凑折叠托机匣 + 全息红点镜 + 消焰枪口
+    g.fillStyle = '#1e293b';
+    g.beginPath();
+    g.moveTo(1, 2); g.quadraticCurveTo(3, 10, 6.5, 14.5); g.lineTo(11, 13.2); g.quadraticCurveTo(7.5, 8.5, 6, 2);
+    g.closePath(); g.fill(); g.stroke();
+    _wpnWrapGrip(g, -11, 2, 6.5, 9, '#0f172a', '#334155', trimGold);
+    g.fillStyle = _wpnGrad(g, -16, -6.5, 20, 3, bladeHi, bladeMid, '#1e293b');
+    g.beginPath(); g.roundRect(-16, -6.2, 34, 8.6, 2.5); g.fill(); g.stroke();
+    g.fillStyle = '#0f172a';
+    for (const vx of [4, 8, 12]) g.fillRect(vx, -3.8, 2.2, 2.8);
+    // 全息瞄具与枪口
+    g.fillStyle = isMythic ? accent : '#fb7185';
+    g.beginPath(); g.roundRect(-6, -10.2, 7.5, 4, 1.2); g.fill(); g.stroke();
+    g.fillStyle = '#334155';
+    g.fillRect(18, -4.2, 6.5, 4.4); g.strokeRect(18, -4.2, 6.5, 4.4);
+  } else if (id === 'shotgun') {
+    // 雷霆泵动式重霰弹：核桃木枪托 + 上下双联重管 + 金色护木滑块
+    g.fillStyle = _wpnGrad(g, -24, -3, -8, 7, '#9c6644', '#431407');
+    g.beginPath();
+    g.moveTo(-24, -2); g.lineTo(-9, -4); g.lineTo(-7, 3.5); g.lineTo(-23, 6.5); g.closePath();
+    g.fill(); g.stroke();
+    g.fillStyle = _wpnGrad(g, -9, -6.5, 25, 3, bladeHi, bladeMid, '#1e293b');
+    g.beginPath(); g.roundRect(-9, -6.0, 33, 5.2, 1.6); g.fill(); g.stroke();
+    g.fillStyle = '#334155';
+    g.beginPath(); g.roundRect(-4, -0.8, 24, 3.8, 1.4); g.fill(); g.stroke();
+    // 泵动护木
+    g.fillStyle = _wpnGrad(g, 2, -1.5, 15, 4.5, trimGold, '#92400e');
+    g.beginPath(); g.roundRect(2, -1.4, 13, 5.2, 1.8); g.fill(); g.stroke();
+  } else if (id === 'shredder') {
+    // 爆裂碎甲发射器：厚重装甲机匣 + 炽热熔炉核心窗 + 锯齿破片膛口
+    g.fillStyle = _wpnGrad(g, -18, -7, 20, 7, '#64748b', '#1e293b');
+    g.beginPath(); g.roundRect(-18, -7, 36, 13, 3); g.fill(); g.stroke();
+    const coreC = isMythic ? accent : '#fb923c';
+    g.fillStyle = _wpnGrad(g, -4, -4, 12, 4, '#fff7ed', coreC, '#9a3412');
+    g.beginPath(); g.roundRect(-4, -4.2, 15, 7.2, 2); g.fill(); g.stroke();
+    g.fillStyle = trimGold;
+    g.beginPath();
+    g.moveTo(18, -7.5); g.lineTo(25, -5); g.lineTo(21, -2); g.lineTo(25, 0); g.lineTo(21, 2); g.lineTo(25, 5); g.lineTo(18, 7.5);
+    g.closePath(); g.fill(); g.stroke();
+  } else if (id === 'hammer') {
+    // 碎星重装战锤：镌金长柄 + 双面斜面破甲锤头 + 核心符文晶石
+    _wpnWrapGrip(g, -26, -2.6, 34, 5.2, '#431407', '#9c6644', trimGold);
+    g.fillStyle = _wpnGrad(g, 4, -15, 22, 15, bladeHi, bladeMid, '#1e293b');
+    g.beginPath();
+    g.moveTo(5, -13.5); g.lineTo(20, -15.5); g.lineTo(23.5, -9); g.lineTo(23.5, 9); g.lineTo(20, 15.5); g.lineTo(5, 13.5); g.lineTo(3, 0);
+    g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = trimGold;
+    g.fillRect(10, -14.2, 5.5, 28.4); g.strokeRect(10, -14.2, 5.5, 28.4);
+    _wpnSpark(g, 12.8, 0, 4.2, isMythic ? '#ffffff' : accent);
+  } else if (id === 'spiked_shield') {
+    // 荆棘壁垒鸢盾：哥特弧面重甲盾 + 鎏金十字脊 + 三枚破阵钢刺
+    g.fillStyle = _wpnGrad(g, -12, -15, 18, 15, bladeHi, bladeMid, '#1e293b');
+    g.beginPath();
+    g.moveTo(-9, -14.5); g.quadraticCurveTo(9, -14, 19, 0); g.quadraticCurveTo(9, 14, -9, 14.5);
+    g.quadraticCurveTo(-5, 0, -9, -14.5);
+    g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle = trimGold; g.lineWidth = 2.2;
+    g.beginPath(); g.moveTo(-5, 0); g.lineTo(15, 0); g.moveTo(3, -11); g.lineTo(3, 11); g.stroke();
+    g.strokeStyle = '#090710'; g.lineWidth = 1.4;
+    g.fillStyle = trimGold;
+    for (const sy of [-9, 0, 9]) {
+      const sx = sy === 0 ? 18 : 13;
+      g.beginPath(); g.moveTo(sx, sy - 2.6); g.lineTo(sx + 7.5, sy); g.lineTo(sx, sy + 2.6); g.closePath(); g.fill(); g.stroke();
+    }
+  } else if (id === 'grenade_launcher') {
+    // 六连发转轮榴弹炮：重型大口径炮管 + 橙焰转轮弹鼓 + 战术提把
+    _wpnWrapGrip(g, -20, 1, 8, 9.5, '#1e293b', '#475569', trimGold);
+    g.fillStyle = _wpnGrad(g, -18, -6.5, 26, 5, '#94a3b8', '#334155');
+    g.beginPath(); g.roundRect(-18, -6.2, 42, 9.2, 2.5); g.fill(); g.stroke();
+    const drumC = isMythic ? accent : '#f97316';
+    g.fillStyle = _wpnGrad(g, -6, -8, 10, 8, '#ffedd5', drumC, '#9a3412');
+    g.beginPath(); g.roundRect(-5.5, -7.8, 14, 13.6, 3.5); g.fill(); g.stroke();
+    g.strokeStyle = '#090710'; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(-5, -1); g.lineTo(8, -1); g.moveTo(-5, 3); g.lineTo(8, 3); g.stroke();
+  } else if (id === 'minigun') {
+    // 毁灭六管加特林：重装电机机匣 + 四根平行旋转钢制枪管 + 双金箍束环
+    g.fillStyle = _wpnGrad(g, -22, -9, -2, 9, '#475569', '#0f172a');
+    g.beginPath(); g.roundRect(-22, -8.5, 18, 17, 3.5); g.fill(); g.stroke();
+    for (const by of [-6, -2, 2, 6]) {
+      g.fillStyle = _wpnGrad(g, -4, by - 1.4, 26, by + 1.4, bladeHi, bladeMid, '#334155');
+      g.fillRect(-4, by - 1.35, 30, 2.7); g.strokeRect(-4, by - 1.35, 30, 2.7);
+    }
+    g.fillStyle = trimGold;
+    for (const rx of [9, 20]) {
+      g.fillRect(rx, -7.8, 3.4, 15.6); g.strokeRect(rx, -7.8, 3.4, 15.6);
+    }
+  } else if (id === 'rocket') {
+    // 咆哮重型火箭筒：军绿/黑曜发射筒 + 尾焰喷口护罩 + 探出绯红弹头
+    g.fillStyle = _wpnGrad(g, -25, -7.5, 20, 7.5, bladeMid, '#334155', '#0f172a');
+    g.beginPath(); g.roundRect(-24, -6.8, 40, 13.6, 3); g.fill(); g.stroke();
+    g.fillStyle = trimGold;
+    g.fillRect(-26, -8.2, 4.5, 16.4); g.strokeRect(-26, -8.2, 4.5, 16.4);
+    g.fillRect(12, -7.8, 4, 15.6); g.strokeRect(12, -7.8, 4, 15.6);
+    const whCol = isMythic ? accent : '#f43f5e';
+    g.fillStyle = _wpnGrad(g, 16, -6, 31, 6, '#ffe4e6', whCol, '#881337');
+    g.beginPath(); g.moveTo(16, -5.8); g.quadraticCurveTo(25, -5.2, 32, 0); g.quadraticCurveTo(25, 5.2, 16, 5.8); g.closePath();
+    g.fill(); g.stroke();
+  } else if (id === 'magma_blade') {
+    // 熔岩裂地巨剑：黑曜锯齿宽刃 + 炽白岩浆核心裂纹 + 恶魔角护手
+    _wpnWrapGrip(g, -25, -3, 12, 6, '#1c1917', '#44403c', trimGold);
+    g.fillStyle = trimGold;
+    g.beginPath(); g.moveTo(-13, -10); g.lineTo(-8, -5); g.lineTo(-8, 5); g.lineTo(-13, 10); g.lineTo(-10, 0); g.closePath(); g.fill(); g.stroke();
+    const magC = isMythic ? accent : '#fb5607';
+    g.fillStyle = _wpnGrad(g, -8, -9, 34, 9, '#292524', magC, '#fff7ed');
+    g.beginPath();
+    g.moveTo(-8, -6.8); g.lineTo(8, -8.8); g.lineTo(6, -6.2); g.lineTo(22, -8.2); g.lineTo(35, 0);
+    g.lineTo(21, 8.2); g.lineTo(-8, 6.8); g.closePath();
+    g.fill(); g.stroke();
+    g.strokeStyle = '#fef08a'; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(-5, 0); g.lineTo(6, -1.8); g.lineTo(16, 1.5); g.lineTo(28, 0); g.stroke();
+  } else if (id === 'icicle') {
+    // 极寒冰魄棱枪：多面折射永恒冰晶 + 星霜护手翼
+    const iceC = isMythic ? accent : '#72efdd';
+    g.fillStyle = _wpnGrad(g, -18, -9, 32, 9, '#ffffff', iceC, '#0284c7');
+    g.beginPath();
+    g.moveTo(-18, 0); g.lineTo(-7, -8.8); g.lineTo(-2, -4.5); g.lineTo(33, 0);
+    g.lineTo(-2, 4.5); g.lineTo(-7, 8.8); g.closePath();
+    g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.88)'; g.lineWidth = 1.1;
+    g.beginPath(); g.moveTo(-12, 0); g.lineTo(28, 0); g.moveTo(-6, -6); g.lineTo(10, 0); g.stroke();
+    _wpnSpark(g, 8, -2, 3.4, '#ffffff');
+  } else if (id === 'laser') {
+    // 棱镜聚焦激光枪：靛蓝科幻枪身 + 透明充能导光腔 + 聚焦晶状体膛口
+    _wpnWrapGrip(g, -16, 1.5, 7, 9, '#1e1b4b', '#312e81', trimGold);
+    g.fillStyle = _wpnGrad(g, -18, -7, 22, 6, '#6366f1', '#1e1b4b');
+    g.beginPath(); g.roundRect(-18, -6.8, 36, 11.2, 3); g.fill(); g.stroke();
+    const lCol = isMythic ? accent : '#72efdd';
+    g.fillStyle = _wpnGrad(g, -10, -3.5, 16, 2.5, '#ffffff', lCol);
+    g.beginPath(); g.roundRect(-10, -3.4, 24, 4.6, 2); g.fill();
+    g.fillStyle = lCol;
+    g.beginPath(); g.moveTo(18, -5.2); g.lineTo(27, 0); g.lineTo(18, 5.2); g.closePath(); g.fill(); g.stroke();
+  } else if (id === 'flamer') {
+    // 炼狱龙息喷火器：下挂高压红燃料罐 + 散热孔防烫罩 + 点火引燃嘴
+    g.fillStyle = _wpnGrad(g, -16, 2, -1, 12, '#fb7185', '#9f1239');
+    g.beginPath(); g.roundRect(-16, 2.2, 15, 8.8, 4); g.fill(); g.stroke();
+    g.fillStyle = _wpnGrad(g, -18, -6.5, 22, 4, bladeHi, bladeMid, '#1e293b');
+    g.beginPath(); g.roundRect(-18, -6.2, 38, 8.8, 2.5); g.fill(); g.stroke();
+    g.fillStyle = '#0f172a';
+    for (const hx of [2, 7, 12]) { g.beginPath(); g.arc(hx, -1.8, 1.4, 0, Math.PI * 2); g.fill(); }
+    const flC = isMythic ? accent : '#fb923c';
+    g.fillStyle = _wpnGrad(g, 20, -4, 30, 4, '#fef08a', flC);
+    g.beginPath(); g.moveTo(20, -3.2); g.quadraticCurveTo(28, -4, 30, 0); g.quadraticCurveTo(27, 4, 20, 3.2); g.closePath(); g.fill(); g.stroke();
+  } else if (id === 'taser') {
+    // 雷神电弧脉冲器：紫晶电容腔 + 双极金属放电叉 + 跃动闪电链
+    g.fillStyle = _wpnGrad(g, -16, -6.5, 14, 6.5, '#7e22ce', '#2e1065');
+    g.beginPath(); g.roundRect(-16, -6.5, 28, 13, 3.5); g.fill(); g.stroke();
+    g.fillStyle = trimGold;
+    g.fillRect(12, -5.8, 9, 2.8); g.strokeRect(12, -5.8, 9, 2.8);
+    g.fillRect(12, 3.0, 9, 2.8); g.strokeRect(12, 3.0, 9, 2.8);
+    g.strokeStyle = isMythic ? accent : '#72efdd'; g.lineWidth = 1.8;
+    g.beginPath(); g.moveTo(20, -4.4); g.lineTo(25, -1.5); g.lineTo(21, 1.2); g.lineTo(25, 4.4); g.stroke();
+  } else if (id === 'plasma') {
+    // 虚空等离子重炮：分体悬浮导轨翼 + 中央超新星等离子球
+    g.fillStyle = _wpnGrad(g, -18, -8, 16, 8, '#581c87', '#1e1b4b');
+    g.beginPath();
+    g.moveTo(-18, -6); g.lineTo(16, -8.5); g.lineTo(14, -3.5); g.lineTo(-6, -3);
+    g.lineTo(-6, 3); g.lineTo(14, 3.5); g.lineTo(16, 8.5); g.lineTo(-18, 6); g.closePath();
+    g.fill(); g.stroke();
+    const plC = isMythic ? accent : '#c084fc';
+    g.fillStyle = _wpnGrad(g, 8, -6, 23, 6, '#ffffff', plC, '#4c1d95');
+    g.beginPath(); g.arc(16, 0, 6.2, 0, Math.PI * 2); g.fill(); g.stroke();
+    _wpnSpark(g, 14.5, -2, 3.2, '#ffffff');
+  } else if (id === 'wrench') {
+    // 枢机齿轮重扳手：黄铜液压握柄 + 精密咬合开口钳头 + 齿轮铆钉
+    _wpnWrapGrip(g, -22, -3.5, 26, 7, '#78350f', tier >= 2 ? accent : '#f6d379', '#fef08a');
+    g.fillStyle = _wpnGrad(g, 4, -10, 25, 10, '#fffbeb', tier >= 2 ? accent : '#f59e0b', '#78350f');
+    g.beginPath();
+    g.arc(15, 0, 9.8, 0.58, Math.PI * 2 - 0.58);
+    g.lineTo(11, -3.8); g.lineTo(11, 3.8); g.closePath();
+    g.fill(); g.stroke();
+    g.fillStyle = '#1e293b';
+    g.beginPath(); g.arc(6, 0, 2.3, 0, Math.PI * 2); g.fill();
+  } else if (id === 'screwdriver') {
+    // 爆破工程改锥：琥珀绝缘棱纹手柄 + 铬钒合金长杆 + 磁化一字刃尖
+    g.fillStyle = _wpnGrad(g, -22, -5.5, -4, 5.5, '#fde047', '#d97706', '#78350f');
+    g.beginPath(); g.roundRect(-22, -5.4, 18, 10.8, 4); g.fill(); g.stroke();
+    g.fillStyle = '#1e293b';
+    g.fillRect(-18, -3.4, 10, 2); g.fillRect(-18, 1.4, 10, 2);
+    g.fillStyle = _wpnGrad(g, -4, -2.5, 26, 2.5, '#ffffff', bladeMid, '#475569');
+    g.beginPath(); g.moveTo(-4, -2.2); g.lineTo(21, -2.0); g.lineTo(27, -3.2); g.lineTo(27, 3.2); g.lineTo(21, 2.0); g.lineTo(-4, 2.2); g.closePath();
+    g.fill(); g.stroke();
+  } else if (id === 'nailgun') {
+    // 高压气动射钉枪：工程黄工业机身 + 倾斜排钉弹匣 + 安全顶针枪嘴
+    g.fillStyle = '#334155';
+    g.beginPath(); g.moveTo(0, 3); g.lineTo(6, 13.5); g.lineTo(12, 12); g.lineTo(7, 3); g.closePath(); g.fill(); g.stroke();
+    _wpnWrapGrip(g, -15, 2.5, 7, 9.5, '#1e293b', '#475569', trimGold);
+    g.fillStyle = _wpnGrad(g, -17, -7, 18, 5, '#fef08a', tier >= 2 ? accent : '#eab308', '#854d0e');
+    g.beginPath(); g.roundRect(-17, -6.8, 33, 10.5, 3); g.fill(); g.stroke();
+    g.fillStyle = '#cbd5e1';
+    g.fillRect(16, -3.5, 8, 4.2); g.strokeRect(16, -3.5, 8, 4.2);
+  } else if (id === 'drone_bay') {
+    // 浮游蜂巢母舰舱：双翼战术挂架 + 六角能量核心 + 环绕发光无人机光点
+    g.fillStyle = _wpnGrad(g, -16, -12, 18, 12, '#475569', '#0f172a');
+    g.beginPath();
+    g.moveTo(-15, -11); g.lineTo(11, -11); g.lineTo(21, -3.5); g.lineTo(12, -2);
+    g.lineTo(12, 2); g.lineTo(21, 3.5); g.lineTo(11, 11); g.lineTo(-15, 11); g.lineTo(-11, 0);
+    g.closePath(); g.fill(); g.stroke();
+    const drC = isMythic ? accent : '#72efdd';
+    g.fillStyle = _wpnGrad(g, -4, -6, 10, 6, '#ffffff', drC, '#0e7490');
+    g.beginPath(); g.arc(3, 0, 5.6, 0, Math.PI * 2); g.fill(); g.stroke();
+    _wpnSpark(g, 24, 0, 4.0, drC);
+  } else if (id === 'emp_cannon') {
+    // 天基电磁轨道炮：上下对称磁轨导臂 + 蓝白充能等离子狭缝
+    g.fillStyle = _wpnGrad(g, -20, -9, 6, 9, '#312e81', '#0f172a');
+    g.beginPath(); g.roundRect(-20, -8.5, 22, 17, 3.5); g.fill(); g.stroke();
+    const empC = isMythic ? accent : '#72efdd';
+    g.fillStyle = _wpnGrad(g, 0, -2, 28, 2, '#ffffff', empC);
+    g.fillRect(0, -2.2, 27, 4.4);
+    for (const ry of [-7.5, 3.2]) {
+      g.fillStyle = _wpnGrad(g, 2, ry, 28, ry + 4.3, bladeHi, bladeMid, '#1e293b');
+      g.beginPath(); g.roundRect(2, ry, 26, 4.3, 1.4); g.fill(); g.stroke();
+    }
+    _wpnSpark(g, 28, 0, 3.8, '#ffffff');
+  } else {
+    g.fillStyle = _wpnGrad(g, -14, -5, 22, 5, bladeHi, bladeMid, '#1e293b');
+    g.beginPath(); g.roundRect(-14, -4.5, 34, 9, 3); g.fill(); g.stroke();
+  }
+}
+
+function getBakedWeaponSprite(id, tier = 1, evoId = '') {
+  const safeTier = Math.max(1, Math.min(5, tier | 0));
+  const key = `${id}|${safeTier}|${evoId || ''}`;
+  let cvCached = _weaponSpriteCache.get(key);
+  if (cvCached) return cvCached;
+  if (typeof document === 'undefined') return null;
+
+  const off = document.createElement('canvas');
+  off.width = 192;
+  off.height = 192;
+  const g = off.getContext('2d');
+  if (g) {
+    g.save();
+    g.translate(96, 96);
+    g.scale(2.55, 2.55);
+    _paintWeaponArt(g, id, safeTier, evoId || '');
+    g.restore();
+  }
+  if (_weaponSpriteCache.size >= 110) {
+    const oldestKey = _weaponSpriteCache.keys().next().value;
+    _weaponSpriteCache.delete(oldestKey);
+  }
+  _weaponSpriteCache.set(key, off);
+  return off;
+}
+
+function getWeaponArtDataUrl(id, tier = 1, evoId = '') {
+  const safeTier = Math.max(1, Math.min(5, tier | 0));
+  const key = `${id}|${safeTier}|${evoId || ''}`;
+  if (_weaponDataUrlCache.has(key)) return _weaponDataUrlCache.get(key);
+  const off = getBakedWeaponSprite(id, safeTier, evoId || '');
+  let url = '';
+  if (off && typeof off.toDataURL === 'function') {
+    try { url = off.toDataURL(); } catch (e) { url = ''; }
+  }
+  if (url && url.indexOf('data:image/') === 0) {
+    if (_weaponDataUrlCache.size >= 110) {
+      const oldestKey = _weaponDataUrlCache.keys().next().value;
+      _weaponDataUrlCache.delete(oldestKey);
+    }
+    _weaponDataUrlCache.set(key, url);
+  }
+  return url;
+}
+
+function renderWeaponEmblemHtml(id, tier = 1, evoId = '', fallbackIcon = '⚔️') {
+  const url = getWeaponArtDataUrl(id, tier, evoId);
+  if (url && url.indexOf('data:image/') === 0) {
+    return `<img src="${url}" alt="" class="wpn-art-ico" decoding="async">`;
+  }
+  return fallbackIcon || '⚔️';
+}
+
 function drawWeaponSprite(w) {
-  const id = w.id, tc = TIER_COLORS[w.tier];
+  const id = w.id;
   const now = _syncNow();
   ctx.save();
   ctx.translate(w.wx, w.wy);
   ctx.rotate(w.angle);
   if (Math.cos(w.angle) < 0) ctx.scale(1, -1);
+  if (id === 'shuriken') ctx.rotate(now * 0.0085);
 
-  if (w.tier >= 2) {
-    ctx.globalAlpha = 0.16 + w.tier * 0.05;
-    ctx.fillStyle = tc;
-    ctx.beginPath(); ctx.ellipse(6, 0, 20, 10, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-  ctx.lineWidth = 2.0;
-  ctx.strokeStyle = '#14101a';
-
-  if (id === 'stick') {
-    ctx.fillStyle = '#9c6644';
-    ctx.beginPath(); ctx.roundRect(-6, -4, 30, 8, 4); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#72efdd';
-    ctx.beginPath(); ctx.ellipse(16, -7, 5, 3, -0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  } else if (id === 'rock') {
-    ctx.fillStyle = w.tier > 1 ? tc : '#94a3b8';
-    ctx.beginPath();
-    ctx.moveTo(-8, -7); ctx.lineTo(5, -10); ctx.lineTo(17, -5);
-    ctx.lineTo(15, 7); ctx.lineTo(2, 10); ctx.lineTo(-9, 5);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (id === 'spear') {
-    ctx.fillStyle = '#7f5539';
-    ctx.fillRect(-14, -2.5, 34, 5); ctx.strokeRect(-14, -2.5, 34, 5);
-    ctx.fillStyle = '#e11d48';
-    ctx.fillRect(14, -4, 5, 8);
-    ctx.fillStyle = w.tier > 1 ? tc : '#f8fafc';
-    ctx.beginPath(); ctx.moveTo(19, -5.5); ctx.lineTo(34, 0); ctx.lineTo(19, 5.5); ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (id === 'slingshot') {
-    ctx.strokeStyle = '#14101a'; ctx.lineWidth = 4.4; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(2, 0); ctx.lineTo(11, -8); ctx.moveTo(2, 0); ctx.lineTo(11, 8); ctx.stroke();
-    ctx.strokeStyle = '#9c6644'; ctx.lineWidth = 2.4;
-    ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(2, 0); ctx.lineTo(11, -8); ctx.moveTo(2, 0); ctx.lineTo(11, 8); ctx.stroke();
-  } else if (id === 'wrench') {
-    ctx.fillStyle = w.tier > 1 ? tc : '#f6d379';
-    ctx.beginPath(); ctx.roundRect(-8, -3.5, 24, 7, 3); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(18, 0, 7, 0.65, Math.PI * 2 - 0.65); ctx.lineTo(14, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (id === 'knife') {
-    ctx.fillStyle = '#475569';
-    ctx.fillRect(-8, -3, 8, 6); ctx.strokeRect(-8, -3, 8, 6);
-    ctx.fillStyle = w.tier > 1 ? tc : '#e2e8f0';
-    ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(22, 0); ctx.lineTo(0, 5); ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (id === 'claws') {
-    ctx.fillStyle = '#3b2848';
-    ctx.beginPath(); ctx.roundRect(-7, -7, 8, 14, 3); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = w.tier > 1 ? tc : '#fda4af';
-    for (const cy of [-5, 0, 5]) {
-      ctx.beginPath(); ctx.moveTo(1, cy - 2); ctx.quadraticCurveTo(13, cy - 3, 21, cy); ctx.lineTo(1, cy + 2); ctx.closePath(); ctx.fill(); ctx.stroke();
-    }
-  } else if (id === 'katana') {
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(-13, -2.8, 11, 5.6); ctx.strokeRect(-13, -2.8, 11, 5.6);
-    ctx.fillStyle = '#f6d379';
-    ctx.fillRect(-2, -6, 3, 12);
-    ctx.fillStyle = w.tier > 1 ? tc : '#fda4af';
-    ctx.beginPath(); ctx.moveTo(1, -3.5); ctx.quadraticCurveTo(18, -5, 33, -1); ctx.lineTo(29, 3.2); ctx.lineTo(1, 2.5); ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (id === 'crossbow') {
-    ctx.fillStyle = '#7f4f24';
-    ctx.fillRect(-10, -2.5, 25, 5); ctx.strokeRect(-10, -2.5, 25, 5);
-    ctx.strokeStyle = w.tier > 1 ? tc : '#cbd5e1'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(7, 0, 12, -1.18, 1.18); ctx.stroke();
-  } else if (id === 'hammer') {
-    ctx.fillStyle = '#7f4f24';
-    ctx.fillRect(-10, -2.8, 26, 5.6); ctx.strokeRect(-10, -2.8, 26, 5.6);
-    ctx.fillStyle = w.tier > 1 ? tc : '#64748b';
-    ctx.beginPath(); ctx.roundRect(12, -11, 13, 22, 3); ctx.fill(); ctx.stroke();
-  } else if (id === 'pistol') {
-    ctx.fillStyle = '#334155';
-    ctx.beginPath(); ctx.roundRect(-5, 1, 7, 9, 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = w.tier > 1 ? tc : '#94a3b8';
-    ctx.beginPath(); ctx.roundRect(-6, -5, 20, 8, 2); ctx.fill(); ctx.stroke();
-  } else if (id === 'smg') {
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(2, 2, 5, 10); ctx.strokeRect(2, 2, 5, 10);
-    ctx.fillStyle = w.tier > 1 ? tc : '#64748b';
-    ctx.beginPath(); ctx.roundRect(-8, -5, 24, 8, 2); ctx.fill(); ctx.stroke();
-  } else if (id === 'shotgun') {
-    ctx.fillStyle = '#7f4f24';
-    ctx.beginPath(); ctx.roundRect(-11, -3, 12, 8, 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = w.tier > 1 ? tc : '#64748b';
-    ctx.fillRect(0, -5, 22, 7); ctx.strokeRect(0, -5, 22, 7);
-  } else if (id === 'minigun') {
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath(); ctx.roundRect(-12, -6.5, 14, 13, 3); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = w.tier > 1 ? tc : '#94a3b8';
-    ctx.fillRect(2, -5.5, 22, 3); ctx.fillRect(2, -1.5, 22, 3); ctx.fillRect(2, 2.5, 22, 3);
-    ctx.fillStyle = '#f6d379';
-    ctx.fillRect(16, -6.5, 3.5, 13);
-  } else if (id === 'sniper') {
-    ctx.fillStyle = '#582f0e';
-    ctx.beginPath(); ctx.roundRect(-14, -3, 14, 7, 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = w.tier > 1 ? tc : '#475569';
-    ctx.fillRect(-1, -4, 31, 5.5); ctx.strokeRect(-1, -4, 31, 5.5);
-    ctx.fillStyle = '#72efdd';
-    ctx.beginPath(); ctx.roundRect(2, -9, 12, 4.5, 2); ctx.fill(); ctx.stroke();
-  } else if (id === 'shuriken') {
-    ctx.rotate(now * 0.008);
-    ctx.fillStyle = w.tier > 1 ? tc : '#72efdd';
-    ctx.beginPath();
-    for (let k = 0; k < 4; k++) {
-      const a = k * Math.PI * 0.5;
-      ctx.lineTo(Math.cos(a) * 12, Math.sin(a) * 12);
-      ctx.lineTo(Math.cos(a + 0.4) * 4.5, Math.sin(a + 0.4) * 4.5);
-    }
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (id === 'icicle') {
-    ctx.fillStyle = '#72efdd';
-    ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(0, -6.5); ctx.lineTo(24, 0); ctx.lineTo(0, 6.5); ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (id === 'laser') {
-    ctx.fillStyle = '#312e81';
-    ctx.beginPath(); ctx.roundRect(-9, -6, 26, 11, 3); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#72efdd';
-    ctx.fillRect(-2, -3, 15, 5);
-  } else if (id === 'flamer') {
-    ctx.fillStyle = '#e11d48';
-    ctx.beginPath(); ctx.roundRect(-10, 1, 11, 8, 3); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = w.tier > 1 ? tc : '#64748b';
-    ctx.beginPath(); ctx.roundRect(-8, -5.5, 25, 8, 2); ctx.fill(); ctx.stroke();
-  } else if (id === 'taser') {
-    ctx.fillStyle = '#3b0764';
-    ctx.beginPath(); ctx.roundRect(-8, -5.5, 20, 10, 3); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = '#72efdd'; ctx.lineWidth = 2.4;
-    ctx.beginPath(); ctx.moveTo(12, -4); ctx.lineTo(19, -5); ctx.moveTo(12, 3); ctx.lineTo(19, 4); ctx.stroke();
-  } else if (id === 'plasma') {
-    ctx.fillStyle = '#3b0764';
-    ctx.beginPath(); ctx.roundRect(-10, -6.5, 24, 13, 4); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#c084fc';
-    ctx.beginPath(); ctx.arc(15, 0, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  } else if (id === 'rocket') {
-    ctx.fillStyle = w.tier > 1 ? tc : '#475569';
-    ctx.beginPath(); ctx.roundRect(-14, -6.5, 32, 12, 3); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#fb7185';
-    ctx.beginPath(); ctx.moveTo(18, -5); ctx.lineTo(25, -0.5); ctx.lineTo(18, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (id === 'blowgun') {
-    ctx.fillStyle = '#10b981';
-    ctx.beginPath(); ctx.roundRect(-12, -3, 34, 6, 3); ctx.fill(); ctx.stroke();
-  } else if (id === 'revolver') {
-    ctx.fillStyle = '#582f0e';
-    ctx.beginPath(); ctx.roundRect(-9, 1, 8, 9, 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = w.tier > 1 ? tc : '#f6d379';
-    ctx.fillRect(-3, -4.5, 24, 5.5); ctx.strokeRect(-3, -4.5, 24, 5.5);
-  } else if (id === 'shredder') {
-    ctx.fillStyle = '#334155';
-    ctx.beginPath(); ctx.roundRect(-10, -5.5, 24, 10, 2); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#fb923c';
-    ctx.fillRect(2, -3.5, 11, 5);
-  } else if (id === 'spiked_shield') {
-    ctx.fillStyle = w.tier > 1 ? tc : '#475569';
-    ctx.beginPath();
-    ctx.moveTo(-4, -12); ctx.lineTo(12, -9); ctx.lineTo(17, 0); ctx.lineTo(12, 9); ctx.lineTo(-4, 12);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (id === 'grenade_launcher') {
-    ctx.fillStyle = '#475569';
-    ctx.beginPath(); ctx.roundRect(-12, -5, 28, 10, 3); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#f97316';
-    ctx.beginPath(); ctx.arc(3, 0, 6.2, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  } else if (id === 'magma_blade') {
-    ctx.fillStyle = '#fb5607';
-    ctx.beginPath();
-    ctx.moveTo(-2, -6); ctx.lineTo(22, -7.5); ctx.lineTo(33, 0); ctx.lineTo(20, 7); ctx.lineTo(-2, 5.5);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-  } else if (id === 'screwdriver') {
-    ctx.fillStyle = '#f59e0b';
-    ctx.beginPath(); ctx.roundRect(-10, -4.5, 12, 9, 3); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = w.tier > 1 ? tc : '#cbd5e1';
-    ctx.fillRect(2, -2, 19, 4); ctx.strokeRect(2, -2, 19, 4);
-  } else if (id === 'nailgun') {
-    ctx.fillStyle = '#eab308';
-    ctx.beginPath(); ctx.roundRect(-9, -6, 22, 10, 3); ctx.fill(); ctx.stroke();
-  } else if (id === 'drone_bay') {
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.moveTo(-8, -9); ctx.lineTo(10, -9); ctx.lineTo(17, 0); ctx.lineTo(10, 9); ctx.lineTo(-8, 9);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#72efdd';
-    ctx.beginPath(); ctx.arc(4, 0, 4.5, 0, Math.PI * 2); ctx.fill();
-  } else if (id === 'emp_cannon') {
-    ctx.fillStyle = '#1e1b4b';
-    ctx.beginPath(); ctx.roundRect(-12, -7, 24, 14, 3); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#72efdd';
-    ctx.fillRect(10, -6.5, 16, 4); ctx.fillRect(10, 2.5, 16, 4);
+  const baked = getBakedWeaponSprite(id, w.tier || 1, w.evo || '');
+  if (baked) {
+    ctx.drawImage(baked, -37.5, -37.5, 75, 75);
   }
   ctx.restore();
 }
@@ -555,7 +970,7 @@ function drawPotatoHero() {
   const it = p.items || {};
   const now = _syncNow();
 
-  // 1. 地面接触阴影与脚底轻量站位底椭圆（移除易干扰视线的攻击射程圈与磁吸大圆环）
+  // 1. 地面接触阴影与脚底轻量站位底椭圆（移除攻击射程圈；收集范围由地面层淡光圈呈现）
   ctx.fillStyle = 'rgba(0,0,0,0.48)';
   ctx.beginPath(); ctx.ellipse(p.x, p.y + 22, 20, 7.5, 0, 0, Math.PI * 2); ctx.fill();
 

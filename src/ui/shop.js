@@ -1,5 +1,116 @@
-// 波次结算流转、战利品宝箱、基因强化与军火商店交互
+// 波次结算流转、战利品宝箱、基因强化、五阶神话二选一进化与军火商店交互
+const WEAPON_TIER_COST_MUL = [0, 1, 1.9, 3.0, 4.4, 6.4];
+let _evoResumeCb = null;
+
+function _wpnEmblem(id, tier, evoId, fallbackIcon) {
+  if (typeof renderWeaponEmblemHtml === 'function') {
+    return renderWeaponEmblemHtml(id, tier, evoId || '', fallbackIcon);
+  }
+  return fallbackIcon || '⚔️';
+}
+
+function getPendingEvoWeapon() {
+  if (!player || !Array.isArray(player.weapons)) return null;
+  for (let i = 0; i < player.weapons.length; i++) {
+    const w = player.weapons[i];
+    const tpl = w && WEAPONS[w.id];
+    if (w && w.tier >= 5 && !w.evo && tpl && Array.isArray(tpl.evos) && tpl.evos.length >= 2) {
+      return w;
+    }
+  }
+  return null;
+}
+
+function applyWeaponEvolution(w, evoIdx) {
+  if (!w) return null;
+  const tpl = WEAPONS[w.id];
+  if (!tpl || !Array.isArray(tpl.evos) || !tpl.evos.length) return null;
+  const opt = tpl.evos[evoIdx] || tpl.evos[0];
+  w.tier = 5;
+  w.evo = opt.id;
+  w.evoName = opt.name;
+  w.evoColor = opt.color || '#ff5c8a';
+  w.evoTag = opt.tag || '神话进化';
+  if (player) player._sbCache = null;
+  syncSetHp();
+  logInfo('EVO', `兵装五阶神话进化：${tpl.name} -> 【${opt.name}】(${opt.tag})`);
+  return opt;
+}
+
+function checkPendingWeaponEvolutions(onAllResolved) {
+  if (typeof onAllResolved === 'function') _evoResumeCb = onAllResolved;
+  const targetW = getPendingEvoWeapon();
+  const modal = typeof document !== 'undefined' ? document.getElementById('evoModal') : null;
+  if (!targetW) {
+    if (modal) modal.classList.add('hidden');
+    const cb = _evoResumeCb;
+    _evoResumeCb = null;
+    if (typeof cb === 'function') cb();
+    return false;
+  }
+  if (!modal) {
+    // 无弹窗节点兜底自动觉醒第一分支，防止任何环境下流程阻塞
+    applyWeaponEvolution(targetW, 0);
+    return checkPendingWeaponEvolutions();
+  }
+
+  const tpl = WEAPONS[targetW.id];
+  const titleEl = document.getElementById('evoTitle');
+  const subEl = document.getElementById('evoSub');
+  const box = document.getElementById('evoChoices');
+  if (titleEl) titleEl.textContent = `【${tpl.name}】晋升五阶神话 · 二选一终极进化`;
+  if (subEl) subEl.textContent = '择定唯一神话觉醒方向，永久重塑兵装圣徽外观与专属战斗机制';
+  if (box) {
+    box.innerHTML = '';
+    const sLabel = SET_DEFS[tpl.set] ? SET_DEFS[tpl.set].label.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '') : '';
+    tpl.evos.slice(0, 2).forEach((opt, idx) => {
+      const card = document.createElement('div');
+      card.className = 'card t5 evo-choice-card';
+      card.style.borderColor = opt.color || '#ff5c8a';
+      if (card.style && typeof card.style.setProperty === 'function') {
+        card.style.setProperty('--evo-accent', opt.color || '#ff5c8a');
+      }
+      const artHtml = _wpnEmblem(targetW.id, 5, opt.id, tpl.icon);
+      card.innerHTML = `
+        <div class="evo-branch-ribbon">BRANCH ${idx === 0 ? 'I' : 'II'} · 二选一神话分支</div>
+        <div class="evo-art-stage">
+          <div class="item-emblem t5 evo-emblem" style="border-color:${opt.color || '#ff5c8a'}">${artHtml}</div>
+          <div class="evo-meta">
+            <div class="evo-name" style="color:${opt.color || '#ffd6e5'}">${opt.name}</div>
+            <div class="card-badges">
+              <span class="tag t5">${opt.tag || '神话进化'}</span>
+              ${sLabel ? `<span class="tag">${sLabel}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-desc evo-desc">${opt.desc}</div>
+          <div class="card-actions">
+            <button type="button" class="btn btn-go evo-pick-btn">◆ 觉醒「${opt.name}」</button>
+          </div>
+        </div>`;
+      const pick = () => {
+        applyWeaponEvolution(targetW, idx);
+        beep(880, 0.14, 'triangle', 0.08);
+        if (state === 'shop') renderShop();
+        checkPendingWeaponEvolutions();
+      };
+      const btn = card.querySelector('.evo-pick-btn');
+      if (btn) btn.onclick = e => { if (e && e.stopPropagation) e.stopPropagation(); pick(); };
+      if (uiMode !== 'desktop') card.onclick = pick;
+      box.appendChild(card);
+    });
+  }
+  modal.classList.remove('hidden');
+  modal.scrollTop = 0;
+  return true;
+}
+
 function advancePostWave() {
+  if (getPendingEvoWeapon()) {
+    checkPendingWeaponEvolutions(() => advancePostWave());
+    return;
+  }
   const cm = document.getElementById('crateMenu');
   const lm = document.getElementById('levelMenu');
   if (pendingCrates > 0) {
@@ -22,13 +133,14 @@ function finishWave() {
   for (let i = 0; i < drops.length; i++) {
     if (drops[i].kind === 'mat') leftoverMats += (drops[i].val || 1);
   }
-  const matRate = typeof getWaveMatRate === 'function' ? getWaveMatRate(wave) : (0.96 / (1 + Math.min(5, Math.max(0, wave - 1)) * 0.12 + Math.max(0, wave - 6) * 0.05));
-  // 自动回收地上 50% 未拾取晶石 + 适度通关津贴 + 【收获】成长分红 + 【理财冠】利息
+  const crystalMul = typeof CRYSTAL_YIELD_MUL === 'number' ? CRYSTAL_YIELD_MUL : 0.70;
+  const matRate = typeof getWaveMatRate === 'function' ? getWaveMatRate(wave) : (0.92 * crystalMul / (1 + Math.min(5, Math.max(0, wave - 1)) * 0.14 + Math.max(0, wave - 6) * 0.075));
+  // 自动回收地上 50% 未拾取晶石 + 适度通关津贴 + 【收获】成长分红 + 【理财冠】利息（整体晶石产出下调 30%）
   const leftover = Math.round(leftoverMats * matRate * 0.50);
-  const interestCap = 24 + wave * 9;
+  const interestCap = Math.round((24 + wave * 9) * crystalMul);
   const interestGain = player.interest > 0 ? Math.min(interestCap, Math.round(player.mats * player.interest)) : 0;
-  const clearBonus = 4 + Math.floor(wave * 1.5);
-  const harvestGain = Math.max(0, Math.round(player.harvestFlat || 0));
+  const clearBonus = Math.max(2, Math.round((4 + Math.floor(wave * 1.5)) * crystalMul));
+  const harvestGain = Math.max(0, Math.round((player.harvestFlat || 0) * crystalMul));
   player.mats += leftover + clearBonus + interestGain + harvestGain;
   if (harvestGain > 0) {
     player.xp += Math.round(harvestGain * 0.70);
@@ -49,12 +161,12 @@ function finishWave() {
   advancePostWave();
 }
 
-// 严格受控的战利品与商店品质概率曲线（幸运收益递减软上限，杜绝后期满屏传说刷屏）
+// 严格受控的战利品与商店品质概率曲线（兼顾五阶神话兵装合成节奏与幸运递减软上限）
 function rollShopTier(waveNum, luck) {
   const luckF = Math.min(1, Math.max(0, luck || 0) / 90);
-  const p4 = waveNum < 6 ? 0 : Math.min(0.08, 0.010 + (waveNum - 6) * 0.0065 + luckF * 0.025);
-  const p3 = waveNum < 3 ? 0 : Math.min(0.25, 0.035 + (waveNum - 3) * 0.018 + luckF * 0.045);
-  const p2 = waveNum < 2 ? 0 : Math.min(0.42, 0.18 + (waveNum - 2) * 0.032 + luckF * 0.04);
+  const p4 = waveNum < 5 ? 0 : Math.min(0.13, 0.012 + (waveNum - 5) * 0.0095 + luckF * 0.032);
+  const p3 = waveNum < 3 ? 0 : Math.min(0.30, 0.042 + (waveNum - 3) * 0.021 + luckF * 0.050);
+  const p2 = waveNum < 2 ? 0 : Math.min(0.44, 0.19 + (waveNum - 2) * 0.032 + luckF * 0.04);
   const u = Math.random();
   if (u < p4) return 4;
   if (u < p4 + p3) return 3;
@@ -64,8 +176,8 @@ function rollShopTier(waveNum, luck) {
 
 function rollCrateTier(waveNum, luck, isBossCrate = false) {
   const luckF = Math.min(1, Math.max(0, luck || 0) / 90);
-  const p4 = waveNum < 5 ? 0 : Math.min(isBossCrate ? 0.14 : 0.10, (isBossCrate ? 0.035 : 0.012) + (waveNum - 5) * 0.0075 + luckF * 0.028);
-  const p3 = waveNum < 3 ? 0 : Math.min(isBossCrate ? 0.34 : 0.28, (isBossCrate ? 0.14 : 0.055) + (waveNum - 3) * 0.020 + luckF * 0.055);
+  const p4 = waveNum < 5 ? 0 : Math.min(isBossCrate ? 0.22 : 0.15, (isBossCrate ? 0.048 : 0.016) + (waveNum - 5) * 0.010 + luckF * 0.035);
+  const p3 = waveNum < 3 ? 0 : Math.min(isBossCrate ? 0.38 : 0.31, (isBossCrate ? 0.16 : 0.065) + (waveNum - 3) * 0.022 + luckF * 0.055);
   const p2 = waveNum < 2 ? (isBossCrate ? 0.45 : 0.22) : Math.min(0.46, 0.28 + (waveNum - 2) * 0.024);
   const u = Math.random();
   if (u < p4) return 4;
@@ -87,8 +199,10 @@ function getPlayerBuildAffinities() {
   if (!player) return tags;
   if (player.cls === 'engineer' || (player.bonusTurrets || 0) > 0 || (player.laserTurrets || 0) > 0 || (player.mineLayers || 0) > 0 || (player.techBonus || 0) > 0) tags.add('tech');
   if (player.cls === 'brawler' || (player.meleeBonus || 0) >= 0.12) tags.add('melee');
+  if (player.cls === 'ranger' || (player.rangedBonus || 0) >= 0.10 || (player.bounceBonus || 0) > 0 || (player.pierceBonus || 0) > 0) tags.add('ranged');
+  if (player.cls === 'ghost' || (player.dodge || 0) >= 0.14 || player.dashSurge) tags.add('dodge');
   if (player.cls === 'vampire' || (player.lifesteal || 0) >= 0.08) tags.add('vampire');
-  if (player.cls === 'bull' || (player.armor || 0) >= 4 || (player.maxHp || 30) >= 48) tags.add('tank');
+  if (player.cls === 'bull' || (player.armor || 0) >= 4 || (player.maxHp || 30) >= 48 || (player.maxShield || 0) >= 8) tags.add('tank');
   if ((player.elemBonus || 0) >= 0.10 || (player.burnChance || 0) + (player.chillChance || 0) + (player.poisonChance || 0) >= 0.18) tags.add('elemental');
   if ((player.blastChance || 0) > 0 || (player.explosionScale || 1) > 1.05) tags.add('explosive');
   for (const w of (player.weapons || [])) {
@@ -163,26 +277,32 @@ function buildCrateWeaponChoice(isBossCrate) {
   if (!wKeys.length) return null;
 
   let pickedId = wKeys[Math.floor(Math.random() * wKeys.length)];
-  if (player.weapons.length && Math.random() < 0.45) {
+  if (player.weapons.length && Math.random() < 0.52) {
     const mergeCands = wKeys.filter(k => {
       const effT = Math.max(wTier, WEAPONS[k].minTier || 1);
-      return player.weapons.some(w => w.id === k && w.tier === effT && w.tier < 4);
+      return player.weapons.some(w => w.id === k && w.tier === effT && w.tier < 5);
     });
-    if (mergeCands.length && Math.random() < 0.65) {
+    if (mergeCands.length && Math.random() < 0.70) {
       pickedId = mergeCands[Math.floor(Math.random() * mergeCands.length)];
     } else {
-      const owned = player.weapons[Math.floor(Math.random() * player.weapons.length)].id;
+      const upgradableOwned = player.weapons.filter(w => w.tier < 5);
+      const refW = upgradableOwned.length
+        ? upgradableOwned[Math.floor(Math.random() * upgradableOwned.length)]
+        : player.weapons[Math.floor(Math.random() * player.weapons.length)];
+      const owned = refW.id;
       const ownedTpl = WEAPONS[owned];
       const sameSet = ownedTpl ? wKeys.filter(k => WEAPONS[k] && WEAPONS[k].set === ownedTpl.set) : [];
-      if (sameSet.length) pickedId = sameSet[Math.floor(Math.random() * sameSet.length)];
+      if (wKeys.includes(owned) && Math.random() < 0.55) pickedId = owned;
+      else if (sameSet.length) pickedId = sameSet[Math.floor(Math.random() * sameSet.length)];
     }
   }
 
   const tpl = WEAPONS[pickedId];
   const effTier = Math.min(4, Math.max(wTier, tpl.minTier || 1));
-  const tierMul = [0, 1, 1.9, 3.0, 4.4][effTier];
-  const recycleVal = Math.max(8, Math.round(tpl.cost * tierMul * getShopScale() * 0.48));
-  const canMergeNow = player.weapons.some(w => w.id === pickedId && w.tier === effTier && w.tier < 4);
+  const tierMul = WEAPON_TIER_COST_MUL[effTier] || 4.4;
+  const crystalMul = typeof CRYSTAL_YIELD_MUL === 'number' ? CRYSTAL_YIELD_MUL : 0.70;
+  const recycleVal = Math.max(6, Math.round(tpl.cost * tierMul * getShopScale() * 0.48 * crystalMul));
+  const canMergeNow = player.weapons.some(w => w.id === pickedId && w.tier === effTier && w.tier < 5);
   return { kind: 'weapon', id: pickedId, tpl, tier: effTier, recycleVal, canMergeNow };
 }
 
@@ -201,6 +321,7 @@ function showCrateMenu() {
   }
 
   const luck = player.luck || 0;
+  const crystalMul = typeof CRYSTAL_YIELD_MUL === 'number' ? CRYSTAL_YIELD_MUL : 0.70;
   const excludeIds = new Set();
   const choices = [];
 
@@ -214,7 +335,7 @@ function showCrateMenu() {
       kind: 'item',
       item: item1,
       tier: item1.tier,
-      recycleVal: Math.max(8, Math.round(item1.cost * getShopScale() * 0.52))
+      recycleVal: Math.max(6, Math.round(item1.cost * getShopScale() * 0.52 * crystalMul))
     });
   }
 
@@ -230,7 +351,7 @@ function showCrateMenu() {
         kind: 'item',
         item: item2,
         tier: 4,
-        recycleVal: Math.max(18, Math.round(item2.cost * getShopScale() * 0.55))
+        recycleVal: Math.max(12, Math.round(item2.cost * getShopScale() * 0.55 * crystalMul))
       };
     } else {
       secondChoice = {
@@ -241,7 +362,7 @@ function showCrateMenu() {
           apply: p => { p.dmgMul += 0.22; p.critDmg = (p.critDmg || 0) + 0.45; p.hp = p.maxHp; }
         },
         tier: 4,
-        recycleVal: Math.max(24, Math.round(42 * getShopScale()))
+        recycleVal: Math.max(16, Math.round(42 * getShopScale() * crystalMul))
       };
     }
   } else if (player.maxSlots > 0 && modeR < 0.42) {
@@ -252,7 +373,7 @@ function showCrateMenu() {
       kind: 'supply',
       supply: sup,
       tier: sup.tier || 2,
-      recycleVal: Math.max(10, Math.round((sup.cost || 28) * getShopScale() * 0.50))
+      recycleVal: Math.max(7, Math.round((sup.cost || 28) * getShopScale() * 0.50 * crystalMul))
     };
   }
   if (!secondChoice) {
@@ -265,7 +386,7 @@ function showCrateMenu() {
         kind: 'item',
         item: item2,
         tier: item2.tier,
-        recycleVal: Math.max(8, Math.round(item2.cost * getShopScale() * 0.52))
+        recycleVal: Math.max(6, Math.round(item2.cost * getShopScale() * 0.52 * crystalMul))
       };
     }
   }
@@ -279,7 +400,7 @@ function showCrateMenu() {
       kind: 'supply',
       supply: fbSup,
       tier: fbSup.tier || 3,
-      recycleVal: Math.max(14, Math.round((fbSup.cost || 32) * getShopScale() * 0.55))
+      recycleVal: Math.max(10, Math.round((fbSup.cost || 32) * getShopScale() * 0.55 * crystalMul))
     });
   }
 
@@ -313,11 +434,11 @@ function showCrateMenu() {
     } else if (c.kind === 'weapon') {
       const tpl = c.tpl;
       const setLabel = ((SET_DEFS[tpl.set] && SET_DEFS[tpl.set].label) || '').replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '');
-      icon = tpl.icon;
+      icon = _wpnEmblem(c.id, c.tier, '', tpl.icon);
       title = `${tpl.name} · 阶${c.tier}`;
       badgesHtml += `<span class="tag t${c.tier}">${TIER_NAMES[c.tier]}兵装</span>`;
       if (setLabel) badgesHtml += `<span class="tag">${setLabel}</span>`;
-      if (c.canMergeNow) badgesHtml += `<span class="tag tag-merge">可共鸣升阶</span>`;
+      if (c.canMergeNow) badgesHtml += c.tier === 4 ? `<span class="tag t5">可觉醒5阶神话</span>` : `<span class="tag tag-merge">可共鸣升阶</span>`;
       descHtml = `<div class="card-desc">${tpl.desc}</div>`;
     } else if (c.kind === 'supply') {
       const sup = c.supply;
@@ -426,18 +547,23 @@ function rollOffers() {
     if (isWeapon) {
       const validW = wKeys.filter(k => (WEAPONS[k].minTier || 1) <= tier);
       if (!validW.length) continue;
-      // 若已有某套装武器，轻微提升同系或同把刷出率便于合成与凑羁绊
+      // 若已有某套装武器，提升同把或同系刷出率，保障中后期顺畅合成五阶神话兵装
       let id = validW[Math.floor(Math.random() * validW.length)];
-      if (player.weapons.length && Math.random() < 0.28) {
-        const owned = player.weapons[Math.floor(Math.random() * player.weapons.length)].id;
-        const ownedTpl = WEAPONS[owned];
-        const sameSet = ownedTpl ? validW.filter(k => WEAPONS[k] && WEAPONS[k].set === ownedTpl.set) : [];
-        if (validW.includes(owned) && Math.random() < 0.5) id = owned;
-        else if (sameSet.length) id = sameSet[Math.floor(Math.random() * sameSet.length)];
+      if (player.weapons.length && Math.random() < 0.40) {
+        const upgradable = player.weapons.filter(w => w.tier < 5 && validW.includes(w.id));
+        if (upgradable.length && Math.random() < 0.58) {
+          id = upgradable[Math.floor(Math.random() * upgradable.length)].id;
+        } else {
+          const owned = player.weapons[Math.floor(Math.random() * player.weapons.length)].id;
+          const ownedTpl = WEAPONS[owned];
+          const sameSet = ownedTpl ? validW.filter(k => WEAPONS[k] && WEAPONS[k].set === ownedTpl.set) : [];
+          if (validW.includes(owned) && Math.random() < 0.52) id = owned;
+          else if (sameSet.length) id = sameSet[Math.floor(Math.random() * sameSet.length)];
+        }
       }
       const tpl = WEAPONS[id];
       const effTier = Math.max(tier, tpl.minTier || 1);
-      const tierMul = [0, 1, 1.9, 3.0, 4.4][effTier];
+      const tierMul = WEAPON_TIER_COST_MUL[effTier] || 4.4;
       const cost = Math.max(2, Math.round(tpl.cost * tierMul * shopScale * discountMul));
       locked.push({ kind: 'weapon', id, tier: effTier, cost, locked: false });
     } else {
@@ -464,10 +590,11 @@ function openShop(fresh) {
     rerollCost = freeRerollsLeft > 0 ? 0 : rerollBase;
     anvilUpgradedMsg = '';
     if (player.hasAnvil && player.weapons.length > 0) {
-      const upgradable = player.weapons.filter(w => w.tier < 4);
+      const upgradable = player.weapons.filter(w => w.tier < 5);
       if (upgradable.length > 0) {
         const uw = upgradable[Math.floor(Math.random() * upgradable.length)];
         uw.tier++;
+        if (player) player._sbCache = null;
         syncSetHp();
         const uwName = (WEAPONS[uw.id] && WEAPONS[uw.id].name) || uw.id;
         anvilUpgradedMsg = ` · ⚒️ 神砧免费升阶【${uwName} Lv${uw.tier}】!`;
@@ -484,34 +611,39 @@ function openShop(fresh) {
   sm.classList.remove('hidden');
   sm.scrollTop = 0;
   renderShop();
+  checkPendingWeaponEvolutions();
 }
 
 function canBuyWeapon(id, tier) {
   if (player.maxSlots <= 0) return false;
   if (player.weapons.length < player.maxSlots) return true;
-  return player.weapons.some(w => w.id === id && w.tier === tier && w.tier < 4);
+  return player.weapons.some(w => w.id === id && w.tier === tier && w.tier < 5);
 }
 
 function addOrMergeWeapon(id, tier) {
-  const matchIdx = player.weapons.findIndex(w => w.id === id && w.tier === tier && w.tier < 4);
+  const safeT = Math.min(5, Math.max(1, tier | 0));
+  const matchIdx = safeT < 5 ? player.weapons.findIndex(w => w.id === id && w.tier === safeT && w.tier < 5) : -1;
   if (matchIdx !== -1 && player.weapons.length >= player.maxSlots) {
     player.weapons.splice(matchIdx, 1);
-    addOrMergeWeapon(id, tier + 1);
+    addOrMergeWeapon(id, safeT + 1);
     return;
   }
-  player.weapons.push(makeWeapon(id, tier));
+  player.weapons.push(makeWeapon(id, safeT));
+  if (player) player._sbCache = null;
   syncSetHp();
 }
 
 function mergeSlot(idx) {
   const w = player.weapons[idx];
-  if (!w || w.tier >= 4) return false;
+  if (!w || w.tier >= 5) return false;
   const other = player.weapons.findIndex((x, i) => i !== idx && x.id === w.id && x.tier === w.tier);
   if (other === -1) return false;
   w.tier++;
   player.weapons.splice(other, 1);
+  if (player) player._sbCache = null;
   syncSetHp();
-  beep(760, 0.1, 'triangle');
+  beep(w.tier >= 5 ? 860 : 760, 0.11, 'triangle');
+  checkPendingWeaponEvolutions();
   return true;
 }
 
@@ -608,18 +740,19 @@ function renderShop() {
       const effRange = Math.max(tpl.melee ? 74 : 54, tpl.range + (tpl.melee ? Math.round(totalRange * 0.78 + (player.meleeSweepBonus || 0) * 18) : totalRange) + (o.tier - 1) * (tpl.melee ? 16 : 13));
       const effCd = (tpl.cd / Math.max(0.18, getEffectiveAtkSpd() * (1 + (o.tier - 1) * 0.08))).toFixed(2);
       const ok = player.mats >= o.cost && canBuyWeapon(o.id, o.tier);
-      const hasMergePair = o.tier < 4 && player.weapons.some(w => w.id === o.id && w.tier === o.tier);
+      const hasMergePair = o.tier < 5 && player.weapons.some(w => w.id === o.id && w.tier === o.tier);
+      const willAwakenT5 = hasMergePair && o.tier === 4;
       const pelletsTxt = tpl.pellets ? `×${tpl.pellets}` : '';
       el.innerHTML = `
         <div class="card-main">
           <div class="card-head">
-            <div class="item-emblem t${o.tier}">${tpl.icon}</div>
+            <div class="item-emblem t${o.tier}">${_wpnEmblem(o.id, o.tier, '', tpl.icon)}</div>
             <div class="card-meta">
               <div class="card-title">${tpl.name}</div>
               <div class="card-badges">
                 <span class="tag t${o.tier}">${TIER_NAMES[o.tier]}兵装</span>
                 <span class="tag">${sLabel}</span>
-                ${hasMergePair ? '<span class="tag tag-merge">可升阶</span>' : ''}
+                ${willAwakenT5 ? '<span class="tag t5">合成觉醒5阶!</span>' : (hasMergePair ? '<span class="tag tag-merge">可升阶</span>' : '')}
               </div>
             </div>
           </div>
@@ -636,7 +769,7 @@ function renderShop() {
           <button class="lock-pin lock${o.locked ? ' is-locked' : ''}" title="${o.locked ? '点击解锁商品' : '锁定保留至下一层'}"><span>${o.locked ? '已锁定' : '保留'}</span></button>
           <div class="card-actions">
             <button class="btn buy${hasMergePair ? ' merge-ready' : ''}" ${ok ? '' : 'disabled'}>
-              <span>${hasMergePair ? (uiMode !== 'desktop' ? '共鸣升阶' : '购入升阶') : '购入'}</span>
+              <span>${willAwakenT5 ? '觉醒五阶' : (hasMergePair ? (uiMode !== 'desktop' ? '共鸣升阶' : '购入升阶') : '购入')}</span>
               <span class="buy-price">◇ ${o.cost}</span>
             </button>
           </div>
@@ -649,6 +782,7 @@ function renderShop() {
         shopOffers[i] = null;
         beep(520, 0.07, 'triangle');
         renderShop();
+        checkPendingWeaponEvolutions();
       };
     } else {
       const it = o.item;
@@ -709,23 +843,38 @@ function renderShop() {
     document.getElementById('slotHint').textContent = '🐂 蛮牛铁卫特性：不可携带武器，堆叠生命、护甲、护盾与元素装备即可强化碰撞烈焰震荡波！';
   } else {
     const sellTipText = isTouch ? '双击单把可熔炼回收' : '点击单把可熔炼回收';
-    document.getElementById('slotHint').innerHTML = `随身守誓兵装席 (<b>${player.weapons.length}</b>/${player.maxSlots})  ·  同名同阶点击共鸣升阶，${sellTipText}`;
+    document.getElementById('slotHint').innerHTML = `随身守誓兵装席 (<b>${player.weapons.length}</b>/${player.maxSlots})  ·  最高<b>5阶神话二选一进化</b>，同名同阶点击升阶，${sellTipText}`;
     player.weapons.forEach((w, idx) => {
       const tpl = WEAPONS[w.id];
       if (!tpl) return;
-      const hasPair = w.tier < 4 && player.weapons.some((x, j) => j !== idx && x.id === w.id && x.tier === w.tier);
-      const tierMul = [0, 1, 1.9, 3.0, 4.4][w.tier];
+      const hasPair = w.tier < 5 && player.weapons.some((x, j) => j !== idx && x.id === w.id && x.tier === w.tier);
+      const needsEvo = w.tier >= 5 && !w.evo && Array.isArray(tpl.evos) && tpl.evos.length >= 2;
+      const tierMul = WEAPON_TIER_COST_MUL[w.tier] || 6.4;
       const refund = Math.max(4, Math.round(tpl.cost * tierMul * getShopScale() * 0.35));
-      const confirming = !hasPair && confirmSellIdx === idx && player.weapons.length > 1;
+      const confirming = !hasPair && !needsEvo && confirmSellIdx === idx && player.weapons.length > 1;
       const d = document.createElement('div');
       d.className = `slot t${w.tier}${confirming ? ' confirming' : ''}`;
-      const mobSub = hasPair ? '点此升阶' : (player.weapons.length > 1 ? `回收 +◇${refund}` : '主兵装');
-      d.innerHTML = `${hasPair ? '<span class="merge-badge">升阶</span>' : ''}
-        <div class="slot-icon">${tpl.icon}</div>
-        <div class="slot-name" style="color:${TIER_COLORS[w.tier]}">${tpl.name} · 阶${w.tier}</div>
+      const isEvoDone = w.tier >= 5 && !!w.evoName;
+      const dispName = isEvoDone ? w.evoName : `${tpl.name} · 阶${w.tier}`;
+      const nameColor = isEvoDone ? (w.evoColor || TIER_COLORS[5]) : TIER_COLORS[w.tier];
+      const badgeHtml = needsEvo
+        ? '<span class="merge-badge evo-badge">觉醒!</span>'
+        : (hasPair
+          ? `<span class="merge-badge${w.tier === 4 ? ' evo-badge' : ''}">${w.tier === 4 ? '升5阶' : '升阶'}</span>`
+          : (isEvoDone ? '<span class="merge-badge evo-badge">★神话</span>' : ''));
+      const mobSub = needsEvo ? '点此二选一进化' : (hasPair ? (w.tier === 4 ? '点此觉醒5阶' : '点此升阶') : (player.weapons.length > 1 ? `回收 +◇${refund}` : '主兵装'));
+      const tipTxt = needsEvo ? '点击择定进化' : (hasPair ? (w.tier === 4 ? '点击觉醒5阶神话' : '点击升阶') : (confirming ? '确认回收 +◇' + refund : '回收 +◇' + refund));
+      d.innerHTML = `${badgeHtml}
+        <div class="slot-icon">${_wpnEmblem(w.id, w.tier, w.evo || '', tpl.icon)}</div>
+        <div class="slot-name" style="color:${nameColor}" title="${dispName}">${dispName}</div>
         <div class="slot-sub m-only">${mobSub}</div>
-        <div class="sell-tip">${hasPair ? '点击升阶' : (confirming ? '确认回收 +◇' + refund : '回收 +◇' + refund)}</div>`;
+        <div class="sell-tip">${tipTxt}</div>`;
       d.onclick = () => {
+        if (needsEvo) {
+          confirmSellIdx = -1;
+          checkPendingWeaponEvolutions();
+          return;
+        }
         if (hasPair) {
           confirmSellIdx = -1;
           mergeSlot(idx);
@@ -737,7 +886,9 @@ function renderShop() {
             return;
           }
           confirmSellIdx = -1;
-          player.mats += refund; player.weapons.splice(idx, 1); syncSetHp(); beep(320, 0.06);
+          player.mats += refund; player.weapons.splice(idx, 1);
+          if (player) player._sbCache = null;
+          syncSetHp(); beep(320, 0.06);
           logInfo('SHOP', `回收武器 ${tpl.name} Lv.${w.tier} (+${refund}💎)`);
         }
         renderShop();
@@ -776,11 +927,23 @@ function rerollShop() {
   rollOffers(); beep(440, 0.05); renderShop();
 }
 
-function nextWave() { wave++; beginWave(); }
+function nextWave() {
+  if (getPendingEvoWeapon()) {
+    checkPendingWeaponEvolutions(() => { wave++; beginWave(); });
+    return;
+  }
+  const evoM = document.getElementById('evoModal');
+  if (evoM) evoM.classList.add('hidden');
+  wave++;
+  beginWave();
+}
 
 function endGame(win) {
   state = 'end';
   resetJoy();
+  _evoResumeCb = null;
+  const evoM = document.getElementById('evoModal');
+  if (evoM) evoM.classList.add('hidden');
   if (!win) {
     bossCutscene = null;
     if (typeof pendingBossCutscene !== 'undefined') pendingBossCutscene = null;
