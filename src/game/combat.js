@@ -529,7 +529,7 @@ function triggerBossMythicPhase2(e) {
     const p2Title = (e.bossTitle || '神话首领').replace(/^⚡\s*/, '');
     const p2Sub = '宿命死战 · 二阶段专属隐藏立绘与专属终式解封！';
     const p2Tag = '不加冗余时间 · 解锁二阶段专属终极杀招 · 击败必爆【传说圣遗物匣】与永久赐福！';
-    const p2Dur = (typeof BOSS_CUTSCENE_TOTAL_SEC === 'number') ? BOSS_CUTSCENE_TOTAL_SEC : 5.85;
+    const p2Dur = (typeof BOSS_CUTSCENE_TOTAL_SEC === 'number') ? BOSS_CUTSCENE_TOTAL_SEC : 4.85;
     const dirBlocking = (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.isBlockingGameplay === 'function' && SpireDirector.isBlockingGameplay());
     if (dirBlocking && typeof queueBossCutscene === 'function') {
       queueBossCutscene('mythic_phase2', e.variant, p2Title, p2Sub, p2Tag, '#ff2a55', '#ffd166', p2Dur);
@@ -844,12 +844,12 @@ function awardEnemyRewards(e) {
   }
   addBurst(e.x, e.y, e.elite ? '#ffd166' : e.color, isBigBoss ? 24 : (enemies.length > 26 ? 3 : 5), isBigBoss ? 240 : 145);
 
-  // 狂化精英亡语：向四周迸射 4 枚精致流光金梭弹（减少细梭弹幕密度 ~33%，留足近战走位空隙）
+  // 狂化精英亡语：精英怪刷新数目降低 20%，亡语黄色小箭头（金梭弹）伤害与尺寸相应提升 +10%
   if (e.elite) {
     const baseA = Math.random() * Math.PI * 2;
     for (let k = 0; k < 4 && eBullets.length < 170; k++) {
       const ba = baseA + (k / 4) * Math.PI * 2;
-      eBullets.push({ x: e.x, y: e.y, px: e.x, py: e.y, vx: Math.cos(ba) * 132, vy: Math.sin(ba) * 132, dmg: Math.max(3, Math.round(e.dmg * 0.72)), r: 5.6, hitR: 5.0, color: '#fbbf24', shape: 'lance' });
+      eBullets.push({ x: e.x, y: e.y, px: e.x, py: e.y, vx: Math.cos(ba) * 132, vy: Math.sin(ba) * 132, dmg: Math.max(3, Math.round(e.dmg * 0.72 * 1.10)), r: 6.28, hitR: 5.50, color: '#fbbf24', shape: 'lance' });
     }
   }
 

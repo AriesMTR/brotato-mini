@@ -945,7 +945,7 @@ function spawnSpecialRelic(forceId = null) {
 // 全屏首领登场（一阶段 33% 概率）与神话二阶段觉醒（二阶段 33% 概率觉醒且 100% 必出立绘）破框横幅触发器
 const RARE_PORTRAIT_RATE = 0.33;
 const PHASE2_AWAKEN_RATE = 0.33;
-const BOSS_CUTSCENE_SHOW_SEC = 5.0;
+const BOSS_CUTSCENE_SHOW_SEC = 4.0;
 const BOSS_CUTSCENE_FADE_SEC = 0.85;
 const BOSS_CUTSCENE_TOTAL_SEC = BOSS_CUTSCENE_SHOW_SEC + BOSS_CUTSCENE_FADE_SEC;
 let pendingBossCutscene = null;
@@ -1357,6 +1357,8 @@ function spawnWarning(x, y, type, variant = '') {
 const RANGED_ENEMY_TYPES = new Set(['shooter', 'sniper_bug', 'mortar', 'spinner', 'rad_scorpion', 'frost_wisp', 'spore_mother', 'summoner']);
 const NEEDLE_RANGED_TYPES = new Set(['frost_wisp', 'shooter', 'rad_scorpion', 'sniper_bug']);
 const NEEDLE_RANGED_MUL = 0.70;
+const YELLOW_ARROW_MOB_MUL = 0.80;
+const ELITE_MOB_COUNT_MUL = 0.80;
 const TANK_MELEE_TYPES = new Set(['shielder', 'brute', 'juggernaut', 'iron_guard', 'charger', 'splitter']);
 const BASIC_FODDER_MELEE_TYPES = new Set(['chaser', 'stalker', 'swarmer', 'magma_imp']);
 const EARLY_TANK_MELEE_MUL = 0.85;
@@ -1380,7 +1382,10 @@ function pickWaveEnemyType(wv) {
 
   const isExclRanged = !!(curScene.exclMob && RANGED_ENEMY_TYPES.has(curScene.exclMob));
   const isExclNeedle = !!(curScene.exclMob && NEEDLE_RANGED_TYPES.has(curScene.exclMob));
-  const exclProb = (isExclRanged ? (0.14 * rangedCountMul) : 0.20) * (isExclNeedle ? NEEDLE_RANGED_MUL : 1.0);
+  const isExclWorm = curScene.exclMob === 'sand_worm';
+  const exclProb = (isExclRanged ? (0.14 * rangedCountMul) : 0.20)
+    * (isExclNeedle ? NEEDLE_RANGED_MUL : 1.0)
+    * (isExclWorm ? YELLOW_ARROW_MOB_MUL : 1.0);
   if (sceneMobEnabled && curScene.exclMob && Math.random() < exclProb) {
     if (!isExclRanged || allowRanged) {
       return curScene.exclMob;
@@ -1437,16 +1442,23 @@ function pickWaveEnemyType(wv) {
     rangedTable.push(['spore_mother', 4.3]);
   }
 
-  // 白芯针梭类远程怪（眠冬冰冠亡灵 / 折光霜晶浮灵 / 逆转发条猎蝎 / 寒晶狙击蛛）数量减少 30%，空出权重 1:1 等额补充至常规近战怪（怪物总量 100% 不变）
-  let freedNeedleW = 0;
+  // 白芯针梭类远程怪数量减少 30% + 黄色小箭头怪（潜渊骨蛇 sand_worm）数量减少 20%，空出权重 1:1 等额补充至常规近战怪（怪物总量 100% 不变）
+  let freedToAgileW = 0;
   for (let i = 0; i < rangedTable.length; i++) {
     if (NEEDLE_RANGED_TYPES.has(rangedTable[i][0])) {
       const cut = rangedTable[i][1] * (1 - NEEDLE_RANGED_MUL);
       rangedTable[i][1] -= cut;
-      freedNeedleW += cut;
+      freedToAgileW += cut;
     }
   }
-  if (freedNeedleW > 0) {
+  for (let i = 0; i < meleeTable.length; i++) {
+    if (meleeTable[i][0] === 'sand_worm') {
+      const cut = meleeTable[i][1] * (1 - YELLOW_ARROW_MOB_MUL);
+      meleeTable[i][1] -= cut;
+      freedToAgileW += cut;
+    }
+  }
+  if (freedToAgileW > 0) {
     let agileMeleeW = 0;
     for (let i = 0; i < meleeTable.length; i++) {
       const mType = meleeTable[i][0];
@@ -1458,7 +1470,7 @@ function pickWaveEnemyType(wv) {
       for (let i = 0; i < meleeTable.length; i++) {
         const mType = meleeTable[i][0];
         if (!TANK_MELEE_TYPES.has(mType) && mType !== 'sand_worm' && mType !== 'healer') {
-          meleeTable[i][1] += freedNeedleW * (meleeTable[i][1] / agileMeleeW);
+          meleeTable[i][1] += freedToAgileW * (meleeTable[i][1] / agileMeleeW);
         }
       }
     }
@@ -1683,7 +1695,8 @@ function createEnemy(x, y, type, variant = '') {
   const canElite = wave >= 3 && !isBossLike && type !== 'mini_slime' && type !== 'bomber' && (type !== 'juggernaut' || wave >= 8);
   const rawEChance = (diff.eliteRate || 0.05) + Math.min(0.12, (wave - 3) * 0.011);
   const lateEliteAdd = wave >= 10 ? (0.045 + Math.min(0.085, (wave - 10) * 0.013)) : 0;
-  const eChance = wave === 3 ? rawEChance * 0.40 : (wave === 4 ? rawEChance * 0.55 : (wave === 5 ? rawEChance * 0.72 : (rawEChance + lateEliteAdd)));
+  const baseEChance = wave === 3 ? rawEChance * 0.40 : (wave === 4 ? rawEChance * 0.55 : (wave === 5 ? rawEChance * 0.72 : (rawEChance + lateEliteAdd)));
+  const eChance = baseEChance * ELITE_MOB_COUNT_MUL;
   if (canElite && Math.random() < eChance) {
     ent.elite = true;
     ent.r = Math.round(ent.r * 1.20);

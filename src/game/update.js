@@ -1265,8 +1265,8 @@ function update(dt) {
         const evoChains = (evo && evo.chainOnHit) ? evo.chainOnHit : 0;
         // 动态补偿武器环绕偏移，确保索敌锁定的近身目标 100% 落入真实刀光与碰撞盒
         const effReach = Math.max(maxR, Math.min(maxR + orbitR * 0.95, Math.hypot(best.x - baseWx, best.y - baseWy) + 14));
-        // 近战斩弹收敛：T1~T4 普通近战无法直接抹除弹道；仅佩戴 T4 唯一饰品【断刃狐月鞘】(35%) 或晋升 T5 神话近战武器 (40%，叠加软上限 60%) 时按概率斩碎敌弹！
-        const cutChance = Math.min(0.60, (w.tier >= 5 ? 0.40 : 0) + (player.meleeBulletCutChance || 0));
+        // 近战斩弹几率减半调优（-50%）：T1~T4 普通近战无法直接抹除弹道；仅佩戴 T4 唯一饰品【断刃狐月鞘】(17.5%) 或晋升 T5 神话近战武器 (20%，叠加软上限 30%) 时按概率斩碎敌弹！
+        const cutChance = Math.min(0.30, (w.tier >= 5 ? 0.20 : 0) + (player.meleeBulletCutChance || 0));
 
         if (tpl.mode === 'spear') {
           // 长矛 / 5阶沧溟三叉戟 / 冈格尼尔超距雷霆枪
@@ -3040,7 +3040,7 @@ function update(dt) {
               x: e.x, y: e.y, px: e.x, py: e.y,
               vx: Math.cos(ba) * 140, vy: Math.sin(ba) * 140,
               life: 0.65,
-              dmg: Math.max(3, Math.round(e.dmg * 0.78)), r: 5.4, hitR: 4.8, color: '#fde68a', shape: 'stinger'
+              dmg: Math.max(3, Math.round(e.dmg * 0.78 * 1.10)), r: 5.94, hitR: 5.28, color: '#fde68a', shape: 'stinger'
             });
           }
           if (Math.hypot(player.x - e.x, player.y - e.y) <= 66 + player.r) {
