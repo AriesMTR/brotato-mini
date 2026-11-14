@@ -142,6 +142,7 @@ function castChainLightning(sx, sy, firstTarget, jumps, rawDmg, critChance) {
     const falloff = Math.pow(0.88, step);
     const cmul = getEffectiveCritMult(1.85);
     hurtEnemy(target, rawDmg * falloff * (isCrit ? cmul : 1), isCrit, Math.atan2(target.y - curY, target.x - curX), true, { forceChill: true });
+    if (state !== 'wave') break;
     curX = target.x; curY = target.y;
 
     let next = null, bestDSq = 195 * 195;
@@ -183,8 +184,10 @@ function triggerExplosion(x, y, radius, enemyDmg, hurtPlayerToo = false, playerD
         if (dSq <= outerR * outerR && (!innerSafeR || dSq >= Math.max(0, innerSafeR - e.r) * Math.max(0, innerSafeR - e.r))) {
           const applyNapalm = !hurtPlayerToo && player && player.napalmBlast;
           hurtEnemy(e, enemyDmg, false, Math.atan2(dy, dx), true, { noProc: true, silentHit: true, knockMult: 1.4, forceBurn: applyNapalm });
+          if (state !== 'wave') break;
         }
       }
+      if (state !== 'wave') return;
       for (let i = trees.length - 1; i >= 0; i--) {
         const tr = trees[i];
         if (!tr || tr.hp <= 0) continue;
@@ -252,6 +255,7 @@ function getEffectiveSpdMul() {
 function triggerSoulDash() {
   if (!player || state !== 'wave' || player.hp <= 0 || bossCutscene) return false;
   if (typeof SpireDirector !== 'undefined' && SpireDirector && SpireDirector.isBlockingGameplay()) return false;
+  if ((player.iceFreezeT || 0) > 0) return false;
   if ((player.dashCd || 0) > 0.01 || (player.dashT || 0) > 0) return false;
 
   let dx = 0, dy = 0;
@@ -486,6 +490,8 @@ function triggerBossMythicPhase2(e) {
   e.dmg = Math.round(e.dmg * 1.30);
   e.spd *= 1.10;
   e.exposeT = 0;
+  e.p2SkillT = 1.85;
+  e.p2WindupT = 0;
   if (storyPhase) {
     e.bossTitle = String(e.bossTitle || '守誓者').replace(/ · 第一阶段$/, '') + ' · 第二阶段';
   } else if (!String(e.bossTitle || '').includes('神话')) {
@@ -521,8 +527,8 @@ function triggerBossMythicPhase2(e) {
   // 随机觉醒立绘横幅属于无尽模式；主线由剧情导演演出，不叠加横幅或神话掉落承诺。
   if (endlessMode) {
     const p2Title = (e.bossTitle || '神话首领').replace(/^⚡\s*/, '');
-    const p2Sub = '宿命死战 · 二阶段专属隐藏立绘解封！';
-    const p2Tag = '不加冗余时间 · 血量+50% / 攻击+30% · 死战击败必爆【传说圣遗物匣】与永久弑神赐福！';
+    const p2Sub = '宿命死战 · 二阶段专属隐藏立绘与专属终式解封！';
+    const p2Tag = '不加冗余时间 · 解锁二阶段专属终极杀招 · 击败必爆【传说圣遗物匣】与永久赐福！';
     const p2Dur = (typeof BOSS_CUTSCENE_TOTAL_SEC === 'number') ? BOSS_CUTSCENE_TOTAL_SEC : 5.85;
     const dirBlocking = (typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.isBlockingGameplay === 'function' && SpireDirector.isBlockingGameplay());
     if (dirBlocking && typeof queueBossCutscene === 'function') {
@@ -534,8 +540,8 @@ function triggerBossMythicPhase2(e) {
   if (storyPhase) {
     logInfo('STORY_PHASE2', `${e.bossTitle} · HP=${e.maxHp} · DMG=${e.dmg} · 不发放胜利奖励`);
   } else {
-    if (player) addText(player.x, player.y - 52, '◆ 隐藏二阶段死战！血量+50% · 攻击+30%！', '#ffd166', 21, 2.8);
-    announce('◆ 逆天异变！首领觉醒【隐藏神话二阶段】（血量+50%·攻击+30%），死战到底击败必掉传说神装！', '#ffd166', 4.5);
+    if (player) addText(player.x, player.y - 52, '◆ 二阶段觉醒！专属终极技能解封！', '#ffd166', 21, 2.8);
+    announce('◆ 逆天异变！首领觉醒【隐藏神话二阶段】并解锁专属二阶终式，击败必掉传说神装！', '#ffd166', 4.5);
     logInfo('MYTHIC_PHASE2', `首领触发隐藏二阶段死战觉醒 ${e.bossTitle} · HP=${e.maxHp} · DMG=${e.dmg}`);
   }
   return true;
@@ -570,12 +576,17 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
     }
   }
 
+  // 潜渊骨蛇遁地期间减免 45% 非破盾擦伤
+  if (e.type === 'sand_worm' && (e.burrowT || 0) > 0 && !ignoreShield) {
+    rawDmg *= 0.55;
+  }
+
   // 远近战公平性与流派专精增伤联动：
-  // 1) 近战武器对首领/统领自带 1.28x 破甲加成，且对重甲血牛怪（镇狱像/重锤卫/盾卫）享有 1.18x 碎甲加成，杜绝近战打重装吃亏
+  // 1) 近战武器对首领/统领自带 1.28x 破甲加成，且对重甲血牛怪（镇狱像/重锤卫/盾卫/铁卫）享有 1.18x 碎甲加成，杜绝近战打重装吃亏
   const isBossTarget = e.type === 'boss' || e.type === 'special_boss' || e.type === 'mini_boss';
   if (opts.isMelee) {
     if (isBossTarget) rawDmg *= 1.28;
-    else if (e.type === 'juggernaut' || e.type === 'brute' || e.type === 'shielder') rawDmg *= 1.18;
+    else if (e.type === 'juggernaut' || e.type === 'brute' || e.type === 'shielder' || e.type === 'iron_guard') rawDmg *= 1.18;
   }
   // 1b) 【精钢磨刀石】近战破甲易伤印记：受破甲目标承受全源伤害 +12%
   if ((e.sunderT || 0) > 0) rawDmg *= 1.12;
@@ -614,7 +625,7 @@ function hurtEnemy(e, rawDmg, isCrit, knockA = null, ignoreShield = false, opts 
   }
 
   if (knockA !== null && e.type !== 'boss' && e.type !== 'mini_boss' && e.type !== 'special_boss') {
-    const baseKb = e.type === 'juggernaut' ? 0.8 : ((e.type === 'brute' || e.type === 'shielder') ? 2.5 : (e.type === 'charger' ? 4.5 : 10));
+    const baseKb = e.type === 'juggernaut' ? 0.5 : ((e.type === 'brute' || e.type === 'shielder') ? 2.5 : (e.type === 'charger' || e.type === 'iron_guard' ? 4.2 : 10));
     const kb = baseKb * (opts.knockMult || 1);
     e.x += Math.cos(knockA) * kb; e.y += Math.sin(knockA) * kb;
   }
@@ -954,11 +965,11 @@ function awardEnemyRewards(e) {
     const luck = Math.min(90, Math.max(0, player.luck || 0));
     let cratesOnMap = 0;
     for (let di = 0; di < drops.length; di++) if (drops[di].kind === 'crate') cratesOnMap++;
-    const maxWaveCrates = 1 + (luck >= 60 ? 1 : 0);
+    const maxWaveCrates = 1 + (luck >= 72 ? 1 : 0);
     if ((e.type === 'boss' || e.type === 'mini_boss') && cratesOnMap < 4) {
       drops.push({ x: e.x, y: e.y, kind: 'crate', isBoss: true, bob: 0 });
       addText(e.x, e.y - e.r - 16, '◆ 首领秘宝箱!', '#ffd166', 16, 1.65, true);
-    } else if (e.elite && waveCratesDropped < maxWaveCrates && cratesOnMap < 2 && Math.random() < Math.min(0.16, 0.06 + luck * 0.0014)) {
+    } else if (e.elite && waveCratesDropped < maxWaveCrates && cratesOnMap < 2 && Math.random() < Math.min(0.12, 0.045 + luck * 0.0010)) {
       waveCratesDropped++;
       drops.push({ x: e.x, y: e.y, kind: 'crate', bob: 0 });
       addText(e.x, e.y - e.r - 16, '◆ 战利品箱!', '#ffd166', 16, 1.65, true);

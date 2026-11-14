@@ -795,6 +795,21 @@ function drawEnemySprite(e) {
   const isMini = e.type === 'mini_boss';
   const flash = e.hitFlash > 0 || (e.primed && ((now * 0.014) | 0) % 2 === 1);
 
+  // 潜渊骨蛇遁地期间隐藏地面躯体，仅渲染黑水暗金潜行地波裂痕
+  if (e.type === 'sand_worm' && (e.burrowT || 0) > 0) {
+    ctx.save();
+    ctx.translate(e.x, e.y + 4);
+    ctx.fillStyle = 'rgba(8, 10, 18, 0.76)';
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 1.15, r * 0.52, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.9, -2); ctx.lineTo(-r * 0.25, 5); ctx.lineTo(r * 0.3, -4); ctx.lineTo(r * 0.95, 3);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
   // 1. 地面接触阴影与首领/精英/神话二阶段清晰气场底环
   ctx.fillStyle = 'rgba(0,0,0,0.44)';
   ctx.beginPath(); ctx.ellipse(e.x, e.y + r * 0.88, r * 0.96, r * 0.38, 0, 0, Math.PI * 2); ctx.fill();
@@ -841,8 +856,8 @@ function drawEnemySprite(e) {
   if (bossSheet && bossSheet.canvas) {
     const bossAttacking = !!(e.dashing || isWindingUp || (e.burstLeft && e.burstLeft > 0));
     const dt = _stepEntityAnim(e, now, !isWindingUp && (e.spd > 10), targetFace, bossAttacking);
-    const drawSize = r * 3.05;
-    const footOffset = r * 0.86;
+    const drawSize = Math.max(174, r * 3.20);
+    const footOffset = r * 0.90;
     const visFlip = Math.abs(e._visFlip) < 0.24 ? (e._visFlip < 0 ? -0.24 : 0.24) : e._visFlip;
 
     if (e.dashing) {
@@ -875,7 +890,9 @@ function drawEnemySprite(e) {
     ctx.scale(targetFace * pulse, pulse);
 
     if (spr && spr.canvas) {
-      const targetSize = isBoss ? r * 2.95 : (isMini ? r * 2.75 : r * 2.62);
+      const targetSize = isBoss
+        ? Math.max(166, r * 3.20)
+        : (isMini ? Math.max(134, r * 3.08) : Math.max(60, r * 3.22));
       const sc = targetSize / Math.max(16, Math.max(spr.w, spr.h));
       const dw = spr.w * sc, dh = spr.h * sc;
       ctx.drawImage(spr.canvas, -dw * 0.5, -dh * 0.56, dw, dh);
@@ -923,21 +940,24 @@ function drawEnemySprite(e) {
     ctx.beginPath(); ctx.arc(e.x, e.y, r + 5, e.faceA - 0.85, e.faceA + 0.85); ctx.stroke();
   }
 
-  if ((e.sigWindupT || 0) > 0 && e.castLabel && isBoss) {
-    const wProg = Math.max(0, Math.min(1, 1 - e.sigWindupT / Math.max(0.1, e.sigMaxW || 0.88)));
+  const activeWindup = (e.p2WindupT || 0) > 0 ? e.p2WindupT : (e.sigWindupT || 0);
+  const activeMaxW = (e.p2WindupT || 0) > 0 ? (e.p2WindupMax || 0.78) : (e.sigMaxW || 0.88);
+  const activeBadgeTxt = (e.p2WindupT || 0) > 0 ? (e.p2Label || e.castLabel) : e.castLabel;
+  if (activeWindup > 0 && activeBadgeTxt && (isBoss || isMini)) {
+    const wProg = Math.max(0, Math.min(1, 1 - activeWindup / Math.max(0.1, activeMaxW)));
     ctx.save();
     ctx.font = '900 12px -apple-system, sans-serif';
     ctx.textAlign = 'center';
-    const cw = Math.max(128, Math.min(220, e.castLabel.length * 13 + 22));
+    const cw = Math.max(132, Math.min(238, activeBadgeTxt.length * 13 + 24));
     const cy = e.y - r - 34;
-    ctx.fillStyle = 'rgba(12, 9, 22, 0.88)';
-    ctx.strokeStyle = '#fde68a';
-    ctx.lineWidth = 1.6;
+    ctx.fillStyle = (e.p2WindupT || 0) > 0 ? 'rgba(34, 8, 20, 0.92)' : 'rgba(12, 9, 22, 0.88)';
+    ctx.strokeStyle = (e.p2WindupT || 0) > 0 ? '#ffd166' : '#fde68a';
+    ctx.lineWidth = 1.7;
     ctx.beginPath(); ctx.roundRect(e.x - cw * 0.5, cy - 12, cw, 20, 6); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = 'rgba(251, 113, 133, 0.45)';
+    ctx.fillStyle = 'rgba(251, 113, 133, 0.50)';
     ctx.fillRect(e.x - cw * 0.5 + 3, cy + 4, Math.max(2, (cw - 6) * wProg), 2.5);
     ctx.fillStyle = '#fef08a';
-    ctx.fillText(e.castLabel, e.x, cy + 2);
+    ctx.fillText(activeBadgeTxt, e.x, cy + 2);
     ctx.restore();
   } else if (e.exposeT > 0 && isBoss) {
     ctx.font = '800 11px -apple-system, sans-serif';
@@ -952,12 +972,13 @@ function drawEnemySprite(e) {
     ctx.fillText(`毒×${e.poisonStacks}`, e.x, e.y - r - 20);
   }
 
-  if (!isBoss && !isMini && (e.type === 'brute' || e.type === 'juggernaut' || e.elite || e.hp < e.maxHp)) {
-    const bw = Math.max(24, r * 1.8);
-    ctx.fillStyle = 'rgba(6,9,16,0.80)';
-    ctx.fillRect(e.x - bw / 2, e.y - r - 15, bw, 5);
+  if (!isBoss && !isMini && (e.type === 'brute' || e.type === 'juggernaut' || e.type === 'iron_guard' || e.elite || e.hp < e.maxHp)) {
+    const bw = Math.max(30, r * 1.85);
+    const barY = e.y - Math.max(r + 16, r * 1.48);
+    ctx.fillStyle = 'rgba(6,9,16,0.82)';
+    ctx.fillRect(e.x - bw / 2, barY, bw, 5.5);
     ctx.fillStyle = e.freezeT > 0 ? '#72efdd' : (e.poisonStacks > 0 ? '#a3e635' : (e.burnT > 0 ? '#fb923c' : (e.elite ? '#f6d379' : '#fb7185')));
-    ctx.fillRect(e.x - bw / 2 + 1, e.y - r - 14, (bw - 2) * Math.max(0, e.hp / e.maxHp), 3);
+    ctx.fillRect(e.x - bw / 2 + 1, barY + 1, (bw - 2) * Math.max(0, e.hp / e.maxHp), 3.5);
   }
 }
 
@@ -1087,6 +1108,42 @@ function drawPotatoHero() {
       ctx.fillStyle = orbCols[i]; ctx.strokeStyle = '#090d16'; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.arc(ox, oy, 4.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
+  }
+
+  // 5. 寒冰地形渐进冰封状态视觉反馈（5秒寒霜进度条 + 冰封 1秒蓝宝石冰晶棱罩）
+  if ((p.iceFreezeT || 0) > 0) {
+    ctx.save();
+    ctx.translate(p.x, p.y - 6);
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.36)';
+    ctx.strokeStyle = '#e0f2fe';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(0, -34);
+    ctx.lineTo(22, -14);
+    ctx.lineTo(18, 22);
+    ctx.lineTo(0, 30);
+    ctx.lineTo(-18, 22);
+    ctx.lineTo(-22, -14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.font = '900 11px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#e0f2fe';
+    ctx.fillText(`❄️ 冰封 ${p.iceFreezeT.toFixed(1)}s`, 0, -40);
+    ctx.restore();
+  } else if ((p.frostGauge || 0) > 0.05) {
+    const fPct = Math.max(0, Math.min(1, p.frostGauge / 5.0));
+    const inGrace = (p.frostLeaveGrace || 0) > 0 && fPct > 0;
+    const bw = 44, barY = p.y - 46;
+    ctx.save();
+    ctx.fillStyle = 'rgba(6, 14, 24, 0.85)';
+    ctx.strokeStyle = fPct >= 0.75 ? '#38bdf8' : 'rgba(125, 211, 252, 0.65)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.roundRect(p.x - bw * 0.5, barY, bw, 6, 3); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = fPct >= 0.78 ? '#7dd3fc' : (inGrace ? '#38bdf8' : '#93c5fd');
+    ctx.fillRect(p.x - bw * 0.5 + 1.5, barY + 1.5, Math.max(2, (bw - 3) * fPct), 3);
+    ctx.restore();
   }
 
   // 最后 5 秒倒计时徽标

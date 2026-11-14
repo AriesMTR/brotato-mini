@@ -402,12 +402,12 @@ function settleWaveRewards() {
   document.getElementById('pauseMenu').classList.add('hidden');
 }
 
-// 严格受控的战利品与商店品质概率曲线（兼顾五阶神话兵装合成节奏与幸运递减软上限）
+// 严格受控的战利品与商店品质概率曲线（稀有/史诗/传说装备出率适度收敛，突出高阶神装珍稀感）
 function rollShopTier(waveNum, luck) {
-  const luckF = Math.min(1, Math.max(0, luck || 0) / 90);
-  const p4 = waveNum < 5 ? 0 : Math.min(0.13, 0.012 + (waveNum - 5) * 0.0095 + luckF * 0.032);
-  const p3 = waveNum < 3 ? 0 : Math.min(0.30, 0.042 + (waveNum - 3) * 0.021 + luckF * 0.050);
-  const p2 = waveNum < 2 ? 0 : Math.min(0.44, 0.19 + (waveNum - 2) * 0.032 + luckF * 0.04);
+  const luckF = Math.min(1, Math.max(0, luck || 0) / 95);
+  const p4 = waveNum < 5 ? 0 : Math.min(0.095, 0.008 + (waveNum - 5) * 0.0072 + luckF * 0.024);
+  const p3 = waveNum < 3 ? 0 : Math.min(0.23, 0.030 + (waveNum - 3) * 0.0165 + luckF * 0.038);
+  const p2 = waveNum < 2 ? 0 : Math.min(0.42, 0.17 + (waveNum - 2) * 0.028 + luckF * 0.035);
   const u = Math.random();
   if (u < p4) return 4;
   if (u < p4 + p3) return 3;
@@ -416,10 +416,10 @@ function rollShopTier(waveNum, luck) {
 }
 
 function rollCrateTier(waveNum, luck, isBossCrate = false) {
-  const luckF = Math.min(1, Math.max(0, luck || 0) / 90);
-  const p4 = waveNum < 5 ? 0 : Math.min(isBossCrate ? 0.22 : 0.15, (isBossCrate ? 0.048 : 0.016) + (waveNum - 5) * 0.010 + luckF * 0.035);
-  const p3 = waveNum < 3 ? 0 : Math.min(isBossCrate ? 0.38 : 0.31, (isBossCrate ? 0.16 : 0.065) + (waveNum - 3) * 0.022 + luckF * 0.055);
-  const p2 = waveNum < 2 ? (isBossCrate ? 0.45 : 0.22) : Math.min(0.46, 0.28 + (waveNum - 2) * 0.024);
+  const luckF = Math.min(1, Math.max(0, luck || 0) / 95);
+  const p4 = waveNum < 5 ? 0 : Math.min(isBossCrate ? 0.17 : 0.11, (isBossCrate ? 0.035 : 0.011) + (waveNum - 5) * 0.0078 + luckF * 0.026);
+  const p3 = waveNum < 3 ? 0 : Math.min(isBossCrate ? 0.31 : 0.24, (isBossCrate ? 0.125 : 0.048) + (waveNum - 3) * 0.0175 + luckF * 0.042);
+  const p2 = waveNum < 2 ? (isBossCrate ? 0.44 : 0.20) : Math.min(0.45, 0.26 + (waveNum - 2) * 0.022);
   const u = Math.random();
   if (u < p4) return 4;
   if (u < p4 + p3) return 3;

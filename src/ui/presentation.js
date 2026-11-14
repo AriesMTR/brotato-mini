@@ -209,7 +209,7 @@ window.addEventListener('keydown', event => {
 window.addEventListener('blur', () => {
   for (const k in keys) keys[k] = false;
   resetJoy();
-  if (state === 'wave' && !SpireDirector.isBlockingGameplay()) pauseGame();
+  // 仅清空残留按键与摇杆，不再在 window.blur 时强制弹开驻留设置页（避免 Windows 中文输入法 Shift+WASD 切状态或系统弹窗失焦导致战斗中途误进设置页；真正切后台由 visibilitychange -> document.hidden 托管）
 });
 
 refreshSpireHome();

@@ -1,4 +1,4 @@
-// 绘制多形态真地形块（斜向细长裂脉 / 蜿蜒曲流沟壑 / 斜切岩台块 / 月牙弧带 / 拉伸洼地 / 折弯大裂谷，支持主战场与预览共用，0渐变0滤镜）
+// 绘制嵌地石砌方砖真地形块（细长矩石槽 / 折角L型块 / T型拼接块 / 错位阶梯双拼块 / 重型方砖池 / 石砌断层深渊，0渐变0滤镜）
 function tracePolygon(verts) {
   if (!verts || !verts.length) return;
   ctx.beginPath();
@@ -9,24 +9,26 @@ function tracePolygon(verts) {
   ctx.closePath();
 }
 
-function traceSmoothPoly(verts, ox = 0, oy = 0) {
-  if (!verts || verts.length < 3) return;
-  const n = verts.length;
+function tracePolygonOffset(verts, ox = 0, oy = 0) {
+  if (!verts || !verts.length) return;
   ctx.beginPath();
-  for (let k = 0; k < n; k++) {
-    const p0 = verts[k];
-    const p1 = verts[(k + 1) % n];
-    const x0 = p0.x + ox, y0 = p0.y + oy;
-    const x1 = p1.x + ox, y1 = p1.y + oy;
-    const mx = (x0 + x1) * 0.5, my = (y0 + y1) * 0.5;
-    if (k === 0) {
-      const prev = verts[n - 1];
-      const px = prev.x + ox, py = prev.y + oy;
-      ctx.moveTo((px + x0) * 0.5, (py + y0) * 0.5);
-    }
-    ctx.quadraticCurveTo(x0, y0, mx, my);
+  for (let k = 0; k < verts.length; k++) {
+    const px = verts[k].x + ox, py = verts[k].y + oy;
+    if (k === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
   }
   ctx.closePath();
+}
+
+function _strokeSegList(segs) {
+  if (!segs || !segs.length) return;
+  ctx.beginPath();
+  for (let i = 0; i < segs.length; i++) {
+    const sg = segs[i];
+    ctx.moveTo(sg.x1, sg.y1);
+    ctx.lineTo(sg.x2, sg.y2);
+  }
+  ctx.stroke();
 }
 
 function drawSingleTerrain(tr, showLabel = false) {
@@ -34,56 +36,53 @@ function drawSingleTerrain(tr, showLabel = false) {
   if (typeof ensureTerrainGeometry === 'function') ensureTerrainGeometry(tr);
   ctx.save();
   if (tr.kind === 'chasm') {
-    // 锯齿折线/弧弯断层大裂谷：四层凿石断崖阶地 + 岩壁斜切高光 + 地壳横裂纹 + 金紫虚空深渊微光
-    if (tr.outerCliff && tr.outerCliff.length >= 6) {
-      ctx.fillStyle = '#3b2e4a';
+    // 嵌地石砌断层深渊槽：切角花岗石外框 + 砖缝刻线 + 三阶下沉石阶 + 紫晶次元裂口
+    if (tr.outerCliff && tr.outerCliff.length >= 4) {
+      ctx.fillStyle = 'rgba(4, 6, 14, 0.46)';
+      tracePolygonOffset(tr.outerCliff, 3, 5);
+      ctx.fill();
+
+      ctx.fillStyle = '#2d2542';
       tracePolygon(tr.outerCliff);
       ctx.fill();
-      ctx.strokeStyle = '#0d0914';
-      ctx.lineWidth = 2.8;
+      ctx.strokeStyle = '#090712';
+      ctx.lineWidth = 2.6;
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(216, 180, 254, 0.34)';
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      for (let k = 0; k < Math.min(tr.outerCliff.length - 1, Math.ceil(tr.outerCliff.length * 0.5)); k++) {
-        if (k === 0) ctx.moveTo(tr.outerCliff[k].x, tr.outerCliff[k].y);
-        else ctx.lineTo(tr.outerCliff[k].x, tr.outerCliff[k].y);
+      if (tr.curbJoints && tr.curbJoints.length) {
+        ctx.strokeStyle = '#120d1d';
+        ctx.lineWidth = 1.5;
+        _strokeSegList(tr.curbJoints);
       }
-      ctx.stroke();
+      if (tr.litEdges && tr.litEdges.length) {
+        ctx.strokeStyle = 'rgba(233, 213, 255, 0.42)';
+        ctx.lineWidth = 1.6;
+        _strokeSegList(tr.litEdges);
+      }
 
-      ctx.fillStyle = '#22172f';
+      ctx.fillStyle = '#191227';
       tracePolygon(tr.midCliff);
       ctx.fill();
-      ctx.strokeStyle = '#140c1f';
-      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = '#0c0816';
+      ctx.lineWidth = 2.0;
       ctx.stroke();
 
-      ctx.fillStyle = '#06030c';
+      ctx.fillStyle = '#05030b';
       tracePolygon(tr.abyssPoly);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(192, 132, 252, 0.55)';
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.62)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      if (tr.cracks) {
-        ctx.strokeStyle = '#160e22';
-        ctx.lineWidth = 2.4;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        for (let c = 0; c < tr.cracks.length; c++) {
-          const ck = tr.cracks[c];
-          ctx.moveTo(ck.x1, ck.y1); ctx.lineTo(ck.mx, ck.my); ctx.lineTo(ck.x2, ck.y2);
-        }
-        ctx.stroke();
-        ctx.strokeStyle = 'rgba(233, 213, 255, 0.22)';
-        ctx.lineWidth = 0.9;
-        ctx.stroke();
+      if (tr.voidCore && tr.voidCore.length >= 3) {
+        ctx.fillStyle = 'rgba(192, 132, 252, 0.22)';
+        tracePolygon(tr.voidCore);
+        ctx.fill();
       }
       if (tr.spine && tr.spine.length >= 2) {
-        ctx.strokeStyle = 'rgba(216, 180, 254, 0.58)';
+        ctx.strokeStyle = 'rgba(233, 213, 255, 0.72)';
         ctx.lineWidth = 2.0;
-        ctx.setLineDash([8, 6]);
+        ctx.setLineDash([10, 6]);
         ctx.beginPath();
         for (let s = 0; s < tr.spine.length; s++) {
           if (s === 0) ctx.moveTo(tr.spine[s].x, tr.spine[s].y);
@@ -93,213 +92,219 @@ function drawSingleTerrain(tr, showLabel = false) {
         ctx.setLineDash([]);
       }
     }
-  } else if (tr.kind === 'lava') {
-    // 细长斜脉/蜿蜒火沟/斜切玄武岩火台：双阶焦黑玄武岩砌岸 + 沿主脊贯穿全长的金红熔流心 + 浮游黑曜碎岛
-    const wobX = Math.sin(tr.pulse || 0) * 1.8, wobY = Math.cos(tr.pulse || 0) * 1.4;
+  } else {
     const verts = tr.verts || [];
-    if (tr.outerRim && tr.outerRim.length >= 3) {
-      ctx.fillStyle = '#1b0d0e';
-      ctx.strokeStyle = '#090406';
-      ctx.lineWidth = 3.0;
-      tracePolygon(tr.outerRim);
-      ctx.fill();
-      ctx.stroke();
-    }
-    if (tr.midRim && tr.midRim.length >= 3) {
-      ctx.fillStyle = '#2d1514';
-      ctx.strokeStyle = '#451a14';
-      ctx.lineWidth = 1.6;
-      tracePolygon(tr.midRim);
-      ctx.fill();
-      ctx.stroke();
-    }
+    const outerRim = tr.outerRim || verts;
+    const midRim = tr.midRim || verts;
+    const wobX = Math.sin(tr.pulse || 0) * 1.2, wobY = Math.cos(tr.pulse || 0) * 1.0;
 
-    ctx.fillStyle = '#b91c1c';
-    tracePolygon(verts);
+    // 1. 石砌外框贴地投影 + 哥特雕石路缘砖框（与石砖地面浑然一体，告别浮空泥团）
+    ctx.fillStyle = 'rgba(4, 7, 15, 0.44)';
+    tracePolygonOffset(outerRim, 3, 5);
     ctx.fill();
 
-    if (tr.inner1 && tr.inner1.length >= 3) {
-      ctx.fillStyle = '#ea580c';
-      traceSmoothPoly(tr.inner1, wobX * 0.4, wobY * 0.4);
-      ctx.fill();
-    }
-    if (tr.inner2 && tr.inner2.length >= 3) {
-      ctx.fillStyle = '#fb923c';
-      traceSmoothPoly(tr.inner2, -wobX * 0.5, wobY * 0.3);
-      ctx.fill();
-    }
-    if (tr.inner3 && tr.inner3.length >= 3) {
-      ctx.fillStyle = '#fde047';
-      traceSmoothPoly(tr.inner3, wobX * 0.6, -wobY * 0.5);
-      ctx.fill();
-    }
-
-    if (tr.veinSegs && tr.veinSegs.length) {
-      ctx.strokeStyle = 'rgba(254, 240, 138, 0.62)';
-      ctx.lineWidth = 1.3;
-      ctx.beginPath();
-      for (let k = 0; k < tr.veinSegs.length; k++) {
-        const vs = tr.veinSegs[k];
-        ctx.moveTo(vs.x1, vs.y1);
-        ctx.lineTo(vs.mx, vs.my);
-        ctx.lineTo(vs.x2, vs.y2);
-      }
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = '#fdba74';
-    ctx.lineWidth = 1.8;
-    tracePolygon(verts);
+    ctx.fillStyle = tr.kind === 'lava' ? '#252f42' : (tr.kind === 'swamp' ? '#1e2e3d' : '#1c364d');
+    tracePolygon(outerRim);
+    ctx.fill();
+    ctx.strokeStyle = '#070b14';
+    ctx.lineWidth = 2.6;
     ctx.stroke();
 
-    if (tr.crusts) {
-      ctx.fillStyle = '#23110e';
-      ctx.strokeStyle = '#fb923c';
+    ctx.strokeStyle = tr.kind === 'lava'
+      ? 'rgba(251, 146, 60, 0.24)'
+      : (tr.kind === 'swamp' ? 'rgba(110, 231, 183, 0.24)' : 'rgba(186, 230, 253, 0.30)');
+    ctx.lineWidth = 1.4;
+    tracePolygon(midRim);
+    ctx.stroke();
+
+    if (tr.curbJoints && tr.curbJoints.length) {
+      ctx.strokeStyle = '#0b111d';
       ctx.lineWidth = 1.5;
-      for (let c = 0; c < tr.crusts.length; c++) {
-        const cr = tr.crusts[c], sz = cr.sz;
-        ctx.save();
-        ctx.translate(cr.x + Math.sin((tr.pulse || 0) * 0.6 + c) * 1.8, cr.y);
-        ctx.rotate(cr.rot);
-        ctx.beginPath();
-        ctx.moveTo(-sz, -sz * 0.5); ctx.lineTo(sz * 0.3, -sz * 0.85); ctx.lineTo(sz * 1.1, sz * 0.1);
-        ctx.lineTo(sz * 0.2, sz * 0.75); ctx.lineTo(-sz * 0.85, sz * 0.45);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.restore();
-      }
+      _strokeSegList(tr.curbJoints);
     }
-  } else if (tr.kind === 'swamp') {
-    // 蜿蜒毒沟/斜长泥沼带/月牙腐殖滩：暗苔泥岸 + 全段贯通荧光绿毒流层 + 岸畔荧光毒蕈簇
-    const verts = tr.verts || [];
-    const isAngularSlab = tr.form === 'oblique_slab';
-    if (tr.shoals) {
-      ctx.fillStyle = '#132c22';
-      ctx.strokeStyle = '#091712';
+    if (tr.litEdges && tr.litEdges.length) {
+      ctx.strokeStyle = 'rgba(226, 232, 240, 0.42)';
       ctx.lineWidth = 1.6;
-      for (let s = 0; s < tr.shoals.length; s++) {
-        const sh = tr.shoals[s];
-        ctx.save();
-        ctx.translate(sh.x, sh.y); ctx.rotate(sh.rot);
-        ctx.beginPath();
-        ctx.moveTo(-sh.rx, 0); ctx.quadraticCurveTo(-sh.rx * 0.3, -sh.ry, sh.rx, -sh.ry * 0.2);
-        ctx.quadraticCurveTo(sh.rx * 0.4, sh.ry, -sh.rx, 0);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.restore();
-      }
-    }
-    if (tr.outerRim && tr.outerRim.length >= 3) {
-      ctx.fillStyle = '#0e2019';
-      ctx.strokeStyle = '#07110d';
-      ctx.lineWidth = 2.6;
-      if (isAngularSlab) tracePolygon(tr.outerRim); else traceSmoothPoly(tr.outerRim);
-      ctx.fill();
-      ctx.stroke();
+      _strokeSegList(tr.litEdges);
     }
 
-    ctx.fillStyle = '#1b4332';
-    if (isAngularSlab) tracePolygon(verts); else traceSmoothPoly(verts);
-    ctx.fill();
+    // 2. 下沉凹槽石壁与元素方槽内芯（严格裁剪于石槽内口，呈现真实嵌地凹坑立体感）
+    if (verts.length >= 3) {
+      ctx.save();
+      tracePolygon(verts);
+      ctx.clip();
 
-    if (tr.inner1 && tr.inner1.length >= 3) {
-      const swX = Math.sin(tr.pulse || 0) * 2.0, swY = Math.cos(tr.pulse || 0) * 1.6;
-      ctx.fillStyle = 'rgba(132, 204, 22, 0.36)';
-      traceSmoothPoly(tr.inner1, swX, swY);
-      ctx.fill();
-    }
-    if (tr.inner2 && tr.inner2.length >= 3) {
-      ctx.fillStyle = 'rgba(163, 230, 53, 0.22)';
-      traceSmoothPoly(tr.inner2, -1.5, 1.5);
-      ctx.fill();
-    }
-
-    ctx.strokeStyle = 'rgba(190, 242, 100, 0.78)';
-    ctx.lineWidth = 2.0;
-    if (isAngularSlab) tracePolygon(verts); else traceSmoothPoly(verts);
-    ctx.stroke();
-
-    if (tr.mushrooms && tr.mushrooms.length) {
-      for (let m = 0; m < tr.mushrooms.length; m++) {
-        const mp = tr.mushrooms[m];
-        ctx.fillStyle = '#e2e8f0';
-        ctx.fillRect(mp.x - 1.5, mp.y - 2, 3, 5);
-        ctx.fillStyle = mp.alt ? '#c77dff' : '#a3e635';
-        ctx.strokeStyle = '#090d16';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(mp.x - 6, mp.y - 2); ctx.quadraticCurveTo(mp.x, mp.y - 9, mp.x + 6, mp.y - 2);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-      }
-    }
-  } else if (tr.kind === 'ice_sheet') {
-    // 斜向寒霜冰带/多面体冰岩台：深渊冰棱外框 + 多面体切面 + 沿冰脊延伸的冰裂纹与镜面反光带
-    const verts = tr.verts || [];
-    if (tr.outerRim && tr.outerRim.length >= 3) {
-      ctx.fillStyle = 'rgba(14, 42, 66, 0.56)';
-      ctx.strokeStyle = '#081826';
-      ctx.lineWidth = 3.0;
-      tracePolygon(tr.outerRim);
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.28)';
-    tracePolygon(verts);
-    ctx.fill();
-
-    if (tr.inner1 && tr.inner1.length >= 3) {
-      ctx.fillStyle = 'rgba(224, 242, 254, 0.24)';
-      tracePolygon(tr.inner1);
-      ctx.fill();
-    }
-
-    if (tr.iceGlints && tr.iceGlints.length) {
-      for (let g = 0; g < tr.iceGlints.length; g++) {
-        const gl = tr.iceGlints[g], gw = gl.gw || 24;
-        ctx.save();
-        ctx.translate(gl.x, gl.y);
-        ctx.rotate(gl.ang);
-        ctx.fillStyle = g % 2 === 0 ? 'rgba(255, 255, 255, 0.34)' : 'rgba(255, 255, 255, 0.22)';
-        ctx.beginPath();
-        ctx.moveTo(-gw * 0.72, -4.5);
-        ctx.lineTo(gw * 0.56, -4.5);
-        ctx.lineTo(gw * 0.72, 4.5);
-        ctx.lineTo(-gw * 0.56, 4.5);
-        ctx.closePath();
+      if (tr.kind === 'lava') {
+        // 嵌石熔火方槽：深岩下沉池壁 + 几何金红炽热锻炉岩浆 + 切角黑曜浮板
+        ctx.fillStyle = '#160b12';
+        tracePolygon(verts);
         ctx.fill();
-        ctx.restore();
-      }
-    }
 
-    if (tr.iceCracks && tr.iceCracks.length) {
-      ctx.strokeStyle = 'rgba(224, 251, 252, 0.58)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      for (let c = 0; c < tr.iceCracks.length; c++) {
-        const ic = tr.iceCracks[c];
-        ctx.moveTo(ic.x1, ic.y1);
-        ctx.lineTo(ic.x2, ic.y2);
+        ctx.fillStyle = '#b91c1c';
+        tracePolygon(tr.sunkenPoly || verts);
+        ctx.fill();
+
+        if (tr.gridSegs && tr.gridSegs.length) {
+          ctx.strokeStyle = 'rgba(254, 215, 170, 0.28)';
+          ctx.lineWidth = 1.3;
+          _strokeSegList(tr.gridSegs);
+        }
+        if (tr.inner1 && tr.inner1.length >= 3) {
+          ctx.fillStyle = '#ea580c';
+          tracePolygonOffset(tr.inner1, wobX * 0.4, 4.5 + wobY * 0.3);
+          ctx.fill();
+        }
+        if (tr.inner2 && tr.inner2.length >= 3) {
+          ctx.fillStyle = '#f97316';
+          tracePolygonOffset(tr.inner2, -wobX * 0.4, 4.5 - wobY * 0.3);
+          ctx.fill();
+        }
+        if (tr.inner3 && tr.inner3.length >= 3) {
+          ctx.fillStyle = '#fde047';
+          tracePolygonOffset(tr.inner3, wobX * 0.5, 4.5);
+          ctx.fill();
+        }
+        if (tr.accents && tr.accents.length) {
+          ctx.fillStyle = '#1e293b';
+          ctx.strokeStyle = '#fb923c';
+          ctx.lineWidth = 1.5;
+          for (let i = 0; i < tr.accents.length; i++) {
+            const ac = tr.accents[i];
+            const hw = ac.w * 0.5, hh = ac.h * 0.5, ch = 3;
+            ctx.save();
+            ctx.translate(ac.x + Math.sin((tr.pulse || 0) * 0.7 + i) * 1.2, ac.y);
+            ctx.rotate(ac.rot);
+            ctx.beginPath();
+            ctx.moveTo(-hw + ch, -hh); ctx.lineTo(hw - ch, -hh); ctx.lineTo(hw, -hh + ch);
+            ctx.lineTo(hw, hh - ch); ctx.lineTo(hw - ch, hh); ctx.lineTo(-hw + ch, hh);
+            ctx.lineTo(-hw, hh - ch); ctx.lineTo(-hw, -hh + ch);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            ctx.restore();
+          }
+        }
+        ctx.strokeStyle = '#fdba74';
+        ctx.lineWidth = 1.6;
+        tracePolygon(tr.sunkenPoly || verts);
+        ctx.stroke();
+      } else if (tr.kind === 'swamp') {
+        // 嵌石翡翠秘毒方渠：青石下沉渠壁 + 剔透祖母绿炼金毒液 + 菱晶毒芒（零暗褐烂泥色！）
+        ctx.fillStyle = '#041f1e';
+        tracePolygon(verts);
+        ctx.fill();
+
+        ctx.fillStyle = '#064e3b';
+        tracePolygon(tr.sunkenPoly || verts);
+        ctx.fill();
+
+        if (tr.gridSegs && tr.gridSegs.length) {
+          ctx.strokeStyle = 'rgba(110, 231, 183, 0.22)';
+          ctx.lineWidth = 1.2;
+          _strokeSegList(tr.gridSegs);
+        }
+        if (tr.inner1 && tr.inner1.length >= 3) {
+          ctx.fillStyle = '#047857';
+          tracePolygonOffset(tr.inner1, wobX * 0.5, 4.5 + wobY * 0.4);
+          ctx.fill();
+        }
+        if (tr.inner2 && tr.inner2.length >= 3) {
+          ctx.fillStyle = '#10b981';
+          tracePolygonOffset(tr.inner2, -wobX * 0.5, 4.5 - wobY * 0.3);
+          ctx.fill();
+        }
+        if (tr.inner3 && tr.inner3.length >= 3) {
+          ctx.fillStyle = 'rgba(110, 231, 183, 0.58)';
+          tracePolygonOffset(tr.inner3, wobX * 0.4, 4.5);
+          ctx.fill();
+        }
+        if (tr.accents && tr.accents.length) {
+          ctx.lineWidth = 1.3;
+          for (let i = 0; i < tr.accents.length; i++) {
+            const ac = tr.accents[i];
+            const rx = ac.h * 0.65, ry = ac.h * 0.42;
+            ctx.save();
+            ctx.translate(ac.x, ac.y + Math.cos((tr.pulse || 0) * 0.9 + i) * 1.2);
+            ctx.fillStyle = ac.alt ? '#c4b5fd' : '#a7f3d0';
+            ctx.strokeStyle = '#042f2e';
+            ctx.beginPath();
+            ctx.moveTo(0, -ry); ctx.lineTo(rx, 0); ctx.lineTo(0, ry); ctx.lineTo(-rx, 0);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            ctx.restore();
+          }
+        }
+        ctx.strokeStyle = '#6ee7b7';
+        ctx.lineWidth = 1.6;
+        tracePolygon(tr.sunkenPoly || verts);
+        ctx.stroke();
+      } else if (tr.kind === 'ice_sheet') {
+        // 嵌石寒晶方砖台：冰岩下沉石框 + 蓝宝石冰砖网格 + 斜向镜面高光带
+        ctx.fillStyle = '#082032';
+        tracePolygon(verts);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(14, 116, 144, 0.62)';
+        tracePolygon(tr.sunkenPoly || verts);
+        ctx.fill();
+
+        if (tr.inner1 && tr.inner1.length >= 3) {
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.38)';
+          tracePolygonOffset(tr.inner1, 0, 3.5);
+          ctx.fill();
+        }
+        if (tr.inner2 && tr.inner2.length >= 3) {
+          ctx.fillStyle = 'rgba(186, 230, 253, 0.30)';
+          tracePolygonOffset(tr.inner2, 0, 3.5);
+          ctx.fill();
+        }
+        if (tr.gridSegs && tr.gridSegs.length) {
+          ctx.strokeStyle = 'rgba(224, 242, 254, 0.42)';
+          ctx.lineWidth = 1.25;
+          _strokeSegList(tr.gridSegs);
+        }
+        if (tr.accents && tr.accents.length) {
+          for (let i = 0; i < tr.accents.length; i++) {
+            const gl = tr.accents[i], gw = gl.w * 1.45;
+            ctx.save();
+            ctx.translate(gl.x, gl.y - 1.5);
+            ctx.rotate(gl.rot);
+            ctx.fillStyle = i % 2 === 0 ? 'rgba(255, 255, 255, 0.36)' : 'rgba(224, 242, 254, 0.24)';
+            ctx.beginPath();
+            ctx.moveTo(-gw * 0.72, -4.5); ctx.lineTo(gw * 0.56, -4.5);
+            ctx.lineTo(gw * 0.72, 4.5); ctx.lineTo(-gw * 0.56, 4.5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+        ctx.strokeStyle = '#bae6fd';
+        ctx.lineWidth = 1.8;
+        tracePolygon(tr.sunkenPoly || verts);
+        ctx.stroke();
       }
+
+      ctx.restore();
+
+      // 石槽内口硬朗切石暗边
+      ctx.strokeStyle = '#090e1a';
+      ctx.lineWidth = 2.2;
+      tracePolygon(verts);
       ctx.stroke();
     }
-
-    ctx.strokeStyle = 'rgba(186, 230, 253, 0.92)';
-    ctx.lineWidth = 2.4;
-    tracePolygon(verts);
-    ctx.stroke();
   }
 
   if (showLabel) {
     const tLabel = tr.kind === 'lava'
-      ? '🌋 熔岩裂脉 (灼烧减速)'
+      ? '🌋 嵌石熔火槽 (灼烧减速)'
       : (tr.kind === 'swamp'
-        ? '🧪 剧毒泥沼 (阻滞腐蚀)'
-        : (tr.kind === 'ice_sheet' ? '🧊 寒霜冰带 (疾滑加速)' : '🕳️ 断层裂谷 (阻挡通行)'));
+        ? '🧪 翡翠秘毒渠 (阻滞腐蚀)'
+        : (tr.kind === 'ice_sheet' ? '🧊 寒晶方砖台 (疾滑加速)' : '🕳️ 石砌断层渊 (阻挡通行)'));
     const midPt = (tr.spine && tr.spine.length) ? tr.spine[Math.floor(tr.spine.length * 0.5)] : tr;
-    const lx = midPt.x, ly = tr.kind === 'chasm' ? midPt.y - 4 : midPt.y - Math.min(54, (tr.r || 42) * 0.85);
+    const lx = midPt.x, ly = tr.kind === 'chasm' ? midPt.y - 6 : midPt.y - 46;
     ctx.font = '800 11.5px -apple-system, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(14, 10, 24, 0.78)';
-    ctx.beginPath(); ctx.roundRect(lx - 66, ly - 11, 132, 16, 6); ctx.fill();
+    ctx.fillStyle = 'rgba(14, 10, 24, 0.82)';
+    ctx.beginPath(); ctx.roundRect(lx - 68, ly - 11, 136, 16, 6); ctx.fill();
     ctx.fillStyle = '#f1ecff';
     ctx.fillText(tLabel, lx, ly + 1);
   }
@@ -686,7 +691,8 @@ function drawCrispArenaBalustrade(vL, vR, vT, vB, sceneId) {
 
 // 战场主相机裁剪渲染、首领预警提示、悬浮摇杆绘制与 RAF 主循环
 function draw() {
-  if (typeof _frameNow !== 'undefined') _frameNow = performance.now();
+  const now = performance.now();
+  if (typeof _frameNow !== 'undefined') _frameNow = now;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = (curScene && curScene.voidBg) || '#110e17';
   ctx.fillRect(0, 0, viewW, viewH);
@@ -1349,14 +1355,15 @@ function draw() {
         }
         ctx.restore();
       }
-      // 艾丝特莉亚实时旋转双翼极光冰束 & 伽蓝十字次元锁定光轨（独立绘制，与冲刺/咏唱互不遮挡）
+      // 艾丝特莉亚实时旋转双翼/四翼极光冰束 & 伽蓝十字次元锁定光轨 & 首领高压剧毒龙息喷流 & 二阶段专属终式预警
       if ((e.beamSweepT || 0) > 0) {
-        const bLen = 350;
+        const bLen = e.beamSweepQuad ? 385 : 350;
+        const beamCnt = e.beamSweepQuad ? 4 : 2;
         const ba0 = e.beamSweepA || 0;
         ctx.save();
         ctx.lineCap = 'round';
-        for (let side = -1; side <= 1; side += 2) {
-          const ba = ba0 + (side < 0 ? Math.PI : 0);
+        for (let bi = 0; bi < beamCnt; bi++) {
+          const ba = ba0 + (bi / beamCnt) * Math.PI * 2;
           const bx2 = e.x + Math.cos(ba) * bLen, by2 = e.y + Math.sin(ba) * bLen;
           ctx.strokeStyle = 'rgba(56, 189, 248, 0.28)';
           ctx.lineWidth = 24;
@@ -1367,6 +1374,147 @@ function draw() {
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 3.2;
           ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(bx2, by2); ctx.stroke();
+        }
+        ctx.restore();
+      }
+      // 首领高压扇形【剧毒吐息喷流】蓄力扇面预警与多层雾化毒息特效（支持单向横扫与二阶段双龙双向毒息！）
+      if ((e.venomWindupT || 0) > 0 || (e.venomBreathT || 0) > 0) {
+        const vLen = e.venomLen || 278;
+        const vSpan = e.venomSpan || 0.46;
+        const nozzles = e.venomTwin ? [0, Math.PI] : [0];
+        ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        if ((e.venomWindupT || 0) > 0) {
+          const vProg = Math.max(0.06, Math.min(1, 1 - e.venomWindupT / Math.max(0.1, e.venomWindupMax || 0.56)));
+          for (let ni = 0; ni < nozzles.length; ni++) {
+            const na = (e.venomAimA || 0) + nozzles[ni];
+            ctx.fillStyle = `rgba(132, 204, 22, ${0.12 + vProg * 0.16})`;
+            ctx.beginPath();
+            ctx.moveTo(e.x, e.y);
+            ctx.arc(e.x, e.y, vLen, na - vSpan, na + vSpan);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = 'rgba(163, 230, 53, 0.24)';
+            ctx.beginPath();
+            ctx.moveTo(e.x, e.y);
+            ctx.arc(e.x, e.y, vLen * vProg, na - vSpan * 0.92, na + vSpan * 0.92);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#bef264';
+            ctx.lineWidth = 2.2;
+            ctx.setLineDash([9, 6]);
+            ctx.beginPath();
+            ctx.moveTo(e.x, e.y);
+            ctx.lineTo(e.x + Math.cos(na - vSpan) * vLen, e.y + Math.sin(na - vSpan) * vLen);
+            ctx.moveTo(e.x, e.y);
+            ctx.lineTo(e.x + Math.cos(na + vSpan) * vLen, e.y + Math.sin(na + vSpan) * vLen);
+            ctx.arc(e.x, e.y, vLen, na - vSpan, na + vSpan);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        } else {
+          const bAlpha = Math.min(1, (e.venomBreathT || 0) / 0.22);
+          for (let ni = 0; ni < nozzles.length; ni++) {
+            const na = (e.venomAimA || 0) + nozzles[ni];
+            const mx = e.x + Math.cos(na) * (e.r * 0.56);
+            const my = e.y + Math.sin(na) * (e.r * 0.56);
+            // 1) 外层翻涌祖母绿毒雾锥幕
+            ctx.globalAlpha = 0.28 * bAlpha;
+            ctx.fillStyle = '#10b981';
+            ctx.beginPath();
+            ctx.moveTo(mx, my);
+            ctx.arc(e.x, e.y, vLen, na - vSpan, na + vSpan);
+            ctx.closePath();
+            ctx.fill();
+            // 2) 中层高压荧光毒液喷射扇流
+            ctx.globalAlpha = 0.46 * bAlpha;
+            ctx.fillStyle = '#84cc16';
+            ctx.beginPath();
+            ctx.moveTo(mx, my);
+            ctx.arc(e.x, e.y, vLen * 0.93, na - vSpan * 0.62, na + vSpan * 0.62);
+            ctx.closePath();
+            ctx.fill();
+            // 3) 内芯蜿蜒高压酸液激流线
+            ctx.globalAlpha = 0.92 * bAlpha;
+            ctx.strokeStyle = '#ecfccb';
+            ctx.lineWidth = 7.5;
+            ctx.beginPath();
+            ctx.moveTo(mx, my);
+            for (let s = 1; s <= 5; s++) {
+              const frac = s / 5;
+              const wag = Math.sin(now * 0.022 - s * 1.35 + ni) * (10 * frac);
+              const px = e.x + Math.cos(na) * (vLen * 0.88 * frac) - Math.sin(na) * wag;
+              const py = e.y + Math.sin(na) * (vLen * 0.88 * frac) + Math.cos(na) * wag;
+              ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+            // 4) 扇区内高速飞溅的毒泡气团，营造饱满立体喷毒流体质感
+            for (let pk = 0; pk < 7; pk++) {
+              const tFlow = ((now * 0.0036 + pk * 0.143) % 1);
+              const spreadA = na + Math.sin(pk * 2.3 + now * 0.005) * (vSpan * 0.78);
+              const distFlow = e.r * 0.6 + tFlow * (vLen - e.r * 0.6);
+              const bx = e.x + Math.cos(spreadA) * distFlow;
+              const by = e.y + Math.sin(spreadA) * distFlow;
+              const bubR = (3.5 + (pk % 3) * 2.2) * (0.65 + tFlow * 0.75);
+              ctx.globalAlpha = (1 - tFlow * 0.58) * 0.82 * bAlpha;
+              ctx.fillStyle = pk % 2 === 0 ? '#bef264' : '#34d399';
+              ctx.beginPath(); ctx.arc(bx, by, bubR, 0, Math.PI * 2); ctx.fill();
+            }
+          }
+        }
+        ctx.restore();
+      }
+      // 隐藏二阶段【专属额外终式】地面高辨识度蓄力法阵预警
+      if ((e.p2WindupT || 0) > 0) {
+        const p2Prog = Math.max(0.08, Math.min(1, 1 - e.p2WindupT / Math.max(0.1, e.p2WindupMax || 0.78)));
+        const baseA = Number.isFinite(e.p2BaseA) ? e.p2BaseA : 0;
+        ctx.save();
+        ctx.lineCap = 'round';
+        if (e.p2Kind === 'p2_chrono_octa') {
+          const gx = Number.isFinite(e.p2TargetX) ? e.p2TargetX : e.x;
+          const gy = Number.isFinite(e.p2TargetY) ? e.p2TargetY : e.y;
+          const span = 520;
+          for (let k = 0; k < 4; k++) {
+            const la = baseA + k * (Math.PI * 0.25);
+            const x1 = gx - Math.cos(la) * span, y1 = gy - Math.sin(la) * span;
+            const x2 = gx + Math.cos(la) * span, y2 = gy + Math.sin(la) * span;
+            ctx.strokeStyle = `rgba(253, 230, 138, ${0.14 + p2Prog * 0.22})`;
+            ctx.lineWidth = 20;
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            ctx.strokeStyle = k % 2 === 0 ? '#fde68a' : '#e879f9';
+            ctx.lineWidth = 2.2;
+            ctx.setLineDash([10, 7]);
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        } else if (e.p2Kind === 'p2_absolute_zero') {
+          for (let k = 0; k < 4; k++) {
+            const ba = baseA + k * (Math.PI * 0.5);
+            const ex = e.x + Math.cos(ba) * 380, ey = e.y + Math.sin(ba) * 380;
+            ctx.strokeStyle = `rgba(125, 211, 252, ${0.16 + p2Prog * 0.22})`;
+            ctx.lineWidth = 20;
+            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+            ctx.strokeStyle = '#e0f2fe'; ctx.lineWidth = 2.4; ctx.setLineDash([9, 6]);
+            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        } else if (e.p2Kind === 'p2_twin_venom') {
+          for (let ni = 0; ni < 2; ni++) {
+            const na = baseA + ni * Math.PI;
+            ctx.fillStyle = `rgba(163, 230, 53, ${0.14 + p2Prog * 0.16})`;
+            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 288, na - 0.44, na + 0.44); ctx.closePath(); ctx.fill();
+            ctx.strokeStyle = '#d9f99d'; ctx.lineWidth = 2.2; ctx.setLineDash([8, 6]);
+            ctx.beginPath(); ctx.arc(e.x, e.y, 288 * p2Prog, na - 0.44, na + 0.44); ctx.stroke(); ctx.setLineDash([]);
+          }
+        } else {
+          const cx = (e.p2Kind === 'p2_eclipse_apocalypse' || e.p2Kind === 'p2_crimson_prison') && Number.isFinite(e.p2TargetX) ? e.p2TargetX : e.x;
+          const cy = (e.p2Kind === 'p2_eclipse_apocalypse' || e.p2Kind === 'p2_crimson_prison') && Number.isFinite(e.p2TargetY) ? e.p2TargetY : e.y;
+          ctx.strokeStyle = '#ffd166';
+          ctx.lineWidth = 2.8;
+          ctx.setLineDash([12, 6]);
+          ctx.beginPath(); ctx.arc(cx, cy, 145 * (0.45 + p2Prog * 0.55), 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
         }
         ctx.restore();
       }
@@ -1394,52 +1542,228 @@ function draw() {
         ctx.restore();
       }
       if (e.lockedAim !== undefined && !e.dashing && !((e.sigWindupT || 0) > 0) && !e.aimA) {
-        // 冲锋怪/统领/首领蓄力锁定预警走廊 + 蓄力推进条 + 精准落点箭头（预警多长就实打实冲多远！）
+        // 5 大差异化冲刺招式几何预警（尖角楔阵轨 horn_wedge / 重装铁门轨 battering_ram / 居合一闪细斩线 iai_slash / 双轨寒冰棱镜轨 frost_rail / 圣枪雷电导轨 spear_conduit）
         const warnLen = Math.max(48, e.dashWarnLen || 255);
         const ca = Math.cos(e.lockedAim), sa = Math.sin(e.lockedAim);
+        const nx = -sa, ny = ca;
         const endX = e.x + ca * warnLen, endY = e.y + sa * warnLen;
         const wMax = Math.max(0.1, e.dashWindupMax || 0.55);
         const prog = Math.max(0, Math.min(1, 1 - Math.max(0, e.dashT || 0) / wMax));
-        const isIceDash = e.dashWarnColor === '#72efdd';
+        const dStyle = e.dashStyle || 'corridor';
+        const mainCol = e.dashWarnColor || '#ff4d6d';
         const bandW = Math.max(14, e.r * 1.12);
         ctx.save();
         ctx.lineCap = 'round';
-        // 1) 全长危险走廊底带
-        ctx.strokeStyle = isIceDash ? `rgba(76, 201, 240, ${0.13 + prog * 0.12})` : `rgba(255, 77, 109, ${0.13 + prog * 0.14})`;
-        ctx.lineWidth = bandW;
-        ctx.beginPath();
-        ctx.moveTo(e.x, e.y);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-        // 2) 随蓄力填满的压迫感推进条
-        if (prog > 0.03) {
-          ctx.strokeStyle = isIceDash ? 'rgba(114, 239, 221, 0.34)' : 'rgba(255, 159, 28, 0.36)';
-          ctx.lineWidth = Math.max(8, bandW * 0.62);
+        ctx.lineJoin = 'round';
+        if (dStyle === 'horn_wedge') {
+          // 1) 眠冬破阵骑：前窄后张的多级尖角楔阵冲锋轨 + 终点新月挑击弧预警
+          const w0 = Math.max(10, e.r * 0.48), w1 = Math.max(20, e.r * 0.96);
+          ctx.fillStyle = `rgba(251, 146, 60, ${0.14 + prog * 0.16})`;
+          ctx.beginPath();
+          ctx.moveTo(e.x + nx * w0, e.y + ny * w0);
+          ctx.lineTo(endX + nx * w1, endY + ny * w1);
+          ctx.lineTo(endX - nx * w1, endY - ny * w1);
+          ctx.lineTo(e.x - nx * w0, e.y - ny * w0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#fdba74';
+          ctx.lineWidth = 2.4;
+          for (let ck = 1; ck <= 4; ck++) {
+            const cf = ((ck * 0.22 + prog * 0.35) % 0.96);
+            const cx = e.x + ca * (warnLen * cf), cy = e.y + sa * (warnLen * cf);
+            const cw = w0 + (w1 - w0) * cf;
+            ctx.beginPath();
+            ctx.moveTo(cx - ca * 12 + nx * cw, cy - sa * 12 + ny * cw);
+            ctx.lineTo(cx + ca * 8, cy + sa * 8);
+            ctx.lineTo(cx - ca * 12 - nx * cw, cy - sa * 12 - ny * cw);
+            ctx.stroke();
+          }
+          ctx.strokeStyle = '#fed7aa';
+          ctx.lineWidth = 2.6;
+          ctx.setLineDash([7, 5]);
+          ctx.beginPath(); ctx.arc(endX, endY, 54, e.lockedAim - 0.95, e.lockedAim + 0.95); ctx.stroke();
+          ctx.setLineDash([]);
+        } else if (dStyle === 'iai_slash') {
+          // 2) 烬羽 / 提线斩首偶：极细居合拔刀寒芒斩线 + 刀镡十字星芒 + 落点 X 斩印（彻底告别粗红条！）
+          ctx.strokeStyle = mainCol;
+          ctx.globalAlpha = 0.28 + prog * 0.25;
+          ctx.lineWidth = 9;
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(endX, endY); ctx.stroke();
+          ctx.globalAlpha = 1;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.6;
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + ca * warnLen * Math.max(0.18, prog), e.y + sa * warnLen * Math.max(0.18, prog)); ctx.stroke();
+          ctx.strokeStyle = mainCol;
+          ctx.lineWidth = 1.8;
+          ctx.setLineDash([14, 6]);
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(endX, endY); ctx.stroke();
+          ctx.setLineDash([]);
+          const xr = 15;
+          ctx.strokeStyle = '#fde68a';
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.moveTo(endX - xr, endY - xr); ctx.lineTo(endX + xr, endY + xr);
+          ctx.moveTo(endX + xr, endY - xr); ctx.lineTo(endX - xr, endY + xr);
+          ctx.stroke();
+        } else if (dStyle === 'frost_rail') {
+          // 3) 艾丝特莉亚 / 碎晶圣枪骑：平行双轨冰晶导轨 + 沿途六角霜晶节点
+          const hw = Math.max(11, e.r * 0.56);
+          ctx.strokeStyle = mainCol;
+          ctx.globalAlpha = 0.22 + prog * 0.16;
+          ctx.lineWidth = hw * 1.9;
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(endX, endY); ctx.stroke();
+          ctx.globalAlpha = 0.92;
+          ctx.lineWidth = 2.3;
+          ctx.beginPath();
+          ctx.moveTo(e.x + nx * hw, e.y + ny * hw); ctx.lineTo(endX + nx * hw, endY + ny * hw);
+          ctx.moveTo(e.x - nx * hw, e.y - ny * hw); ctx.lineTo(endX - nx * hw, endY - ny * hw);
+          ctx.stroke();
+          ctx.fillStyle = '#e0f2fe';
+          for (let nk = 1; nk <= 3; nk++) {
+            const nf = nk * 0.25;
+            if (nf <= prog + 0.15) {
+              const px = e.x + ca * (warnLen * nf), py = e.y + sa * (warnLen * nf);
+              ctx.beginPath();
+              ctx.moveTo(px + ca * 6, py + sa * 6);
+              ctx.lineTo(px + nx * 6, py + ny * 6);
+              ctx.lineTo(px - ca * 6, py - sa * 6);
+              ctx.lineTo(px - nx * 6, py - ny * 6);
+              ctx.closePath(); ctx.fill();
+            }
+          }
+        } else if (dStyle === 'battering_ram') {
+          // 4) 重铠武者统领：攻城铁门枕木横梁走廊 + 重盾撞角前端
+          const hw = Math.max(15, e.r * 0.72);
+          ctx.fillStyle = `rgba(247, 37, 133, ${0.13 + prog * 0.14})`;
+          ctx.beginPath();
+          ctx.moveTo(e.x + nx * hw, e.y + ny * hw);
+          ctx.lineTo(endX + nx * hw, endY + ny * hw);
+          ctx.lineTo(endX - nx * hw, endY - ny * hw);
+          ctx.lineTo(e.x - nx * hw, e.y - ny * hw);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = mainCol;
+          ctx.lineWidth = 2.6;
+          ctx.beginPath();
+          ctx.moveTo(e.x + nx * hw, e.y + ny * hw); ctx.lineTo(endX + nx * hw, endY + ny * hw);
+          ctx.moveTo(e.x - nx * hw, e.y - ny * hw); ctx.lineTo(endX - nx * hw, endY - ny * hw);
+          for (let rk = 1; rk <= 4; rk++) {
+            const rf = rk * 0.22;
+            const rx = e.x + ca * (warnLen * rf), ry = e.y + sa * (warnLen * rf);
+            ctx.moveTo(rx + nx * (hw - 2), ry + ny * (hw - 2));
+            ctx.lineTo(rx - nx * (hw - 2), ry - ny * (hw - 2));
+          }
+          ctx.stroke();
+          const ramX = e.x + ca * (warnLen * Math.max(0.16, prog)), ramY = e.y + sa * (warnLen * Math.max(0.16, prog));
+          ctx.strokeStyle = '#fde68a'; ctx.lineWidth = 3.2;
+          ctx.beginPath();
+          ctx.moveTo(ramX - ca * 8 + nx * hw, ramY - sa * 8 + ny * hw);
+          ctx.lineTo(ramX + ca * 10, ramY + sa * 10);
+          ctx.lineTo(ramX - ca * 8 - nx * hw, ramY - sa * 8 - ny * hw);
+          ctx.stroke();
+        } else if (dStyle === 'spear_conduit') {
+          // 5) 日蚀圣女 / 星律奏鸣偶：双轨雷电圣枪导轨 + 折线电弧中芯 + 三叉枪尖落点
+          const hw = Math.max(10, e.r * 0.48);
+          ctx.strokeStyle = mainCol;
+          ctx.globalAlpha = 0.24 + prog * 0.18;
+          ctx.lineWidth = hw * 1.8;
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(endX, endY); ctx.stroke();
+          ctx.globalAlpha = 0.95;
+          ctx.strokeStyle = '#fef08a';
+          ctx.lineWidth = 2.0;
           ctx.beginPath();
           ctx.moveTo(e.x, e.y);
-          ctx.lineTo(e.x + ca * warnLen * prog, e.y + sa * warnLen * prog);
+          for (let zk = 1; zk <= 6; zk++) {
+            const zf = zk / 6;
+            const side = zk === 6 ? 0 : ((zk % 2 === 0 ? 1 : -1) * 7);
+            ctx.lineTo(e.x + ca * (warnLen * zf) + nx * side, e.y + sa * (warnLen * zf) + ny * side);
+          }
           ctx.stroke();
+          ctx.strokeStyle = mainCol; ctx.lineWidth = 2.6;
+          ctx.beginPath();
+          ctx.moveTo(endX - ca * 14 + nx * 11, endY - sa * 14 + ny * 11);
+          ctx.lineTo(endX + ca * 6, endY + sa * 6);
+          ctx.lineTo(endX - ca * 14 - nx * 11, endY - sa * 14 - ny * 11);
+          ctx.stroke();
+        } else {
+          ctx.strokeStyle = `rgba(255, 77, 109, ${0.14 + prog * 0.14})`;
+          ctx.lineWidth = bandW;
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(endX, endY); ctx.stroke();
+          ctx.strokeStyle = 'rgba(255, 190, 11, 0.90)';
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([10, 6]);
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(endX, endY); ctx.stroke();
+          ctx.setLineDash([]);
         }
-        // 3) 中轴锁定虚线
-        ctx.strokeStyle = isIceDash ? 'rgba(114, 239, 221, 0.90)' : 'rgba(255, 190, 11, 0.90)';
-        ctx.lineWidth = 2.5;
-        ctx.setLineDash([10, 6]);
-        ctx.beginPath();
-        ctx.moveTo(e.x, e.y);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-        // 4) 终点落点准星环与锐利箭头
-        ctx.setLineDash([]);
-        ctx.strokeStyle = isIceDash ? 'rgba(114, 239, 221, 0.95)' : 'rgba(255, 77, 109, 0.95)';
+        ctx.restore();
+      }
+      // 近战丰富兵种专属地面招式预警（潜渊骨蛇遁地裂波 / 铁卫160°半月横扫 / 冰骑寒枪直刺 / 双刃剑客旋风锯环 / 勾魂镰卫瞬步暗镰 / 重锤卫90°扇形裂地 / 镇狱像十字地裂）
+      if (e.type === 'sand_worm' && ((e.burrowWindup || 0) > 0 || (e.burrowT || 0) > 0)) {
+        ctx.save();
+        ctx.strokeStyle = '#fbbf24';
         ctx.lineWidth = 2.4;
-        const tipR = Math.max(5, Math.min(13, e.r * 0.34));
-        ctx.beginPath();
-        ctx.arc(endX, endY, tipR, 0, Math.PI * 2);
-        ctx.moveTo(endX, endY);
-        ctx.lineTo(endX - Math.cos(e.lockedAim - 0.52) * 14, endY - Math.sin(e.lockedAim - 0.52) * 14);
-        ctx.moveTo(endX, endY);
-        ctx.lineTo(endX - Math.cos(e.lockedAim + 0.52) * 14, endY - Math.sin(e.lockedAim + 0.52) * 14);
-        ctx.stroke();
+        ctx.setLineDash([6, 5]);
+        ctx.beginPath(); ctx.arc(e.x, e.y, (e.burrowT || 0) > 0 ? 52 : 34, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      } else if (e.type === 'iron_guard' && (e.cleaveWindup || 0) > 0) {
+        const ca = e._cleaveA !== undefined ? e._cleaveA : (e.faceA || 0);
+        const cp = Math.max(0.1, Math.min(1, 1 - e.cleaveWindup / Math.max(0.1, e.cleaveWindupMax || 0.46)));
+        ctx.save();
+        ctx.fillStyle = `rgba(225, 29, 72, ${0.14 + cp * 0.18})`;
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 104, ca - 1.38, ca + 1.38); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#fda4af'; ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.arc(e.x, e.y, 104 * cp, ca - 1.38, ca + 1.38); ctx.stroke();
+        ctx.restore();
+      } else if (e.type === 'frost_knight' && (e.thrustWindup || 0) > 0) {
+        const ta = e._thrustA !== undefined ? e._thrustA : (e.faceA || 0);
+        const ex = e.x + Math.cos(ta) * 132, ey = e.y + Math.sin(ta) * 132;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.28)'; ctx.lineWidth = 16; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.strokeStyle = '#e0f2fe'; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.restore();
+      } else if (e.type === 'blade_duelist' && (e.whirlT || 0) > 0) {
+        const sp = Number.isFinite(e.whirlSpin) ? e.whirlSpin : (now * 0.02);
+        ctx.save();
+        ctx.translate(e.x, e.y); ctx.rotate(sp);
+        ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 3.2;
+        for (let k = 0; k < 2; k++) {
+          const ba = k * Math.PI;
+          ctx.beginPath(); ctx.arc(0, 0, e.r + 18, ba, ba + 2.1); ctx.stroke();
+        }
+        ctx.restore();
+      } else if (e.type === 'shadow_reaper' && (e.reapWindup || 0) > 0) {
+        const rx = e._reapX || e.x, ry = e._reapY || e.y;
+        ctx.save();
+        ctx.strokeStyle = '#c084fc'; ctx.lineWidth = 2.0; ctx.setLineDash([7, 5]);
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(rx, ry); ctx.stroke();
+        ctx.beginPath(); ctx.arc(rx, ry, 72, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      } else if (e.type === 'brute' && (e.slamWindup || 0) > 0) {
+        const sa = e._slamA !== undefined ? e._slamA : (e.faceA || 0);
+        const sp = Math.max(0.1, Math.min(1, 1 - e.slamWindup / Math.max(0.1, e.slamWindupMax || 0.48)));
+        ctx.save();
+        ctx.fillStyle = `rgba(168, 85, 247, ${0.15 + sp * 0.20})`;
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 132, sa - 0.78, sa + 0.78); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#e9d5ff'; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 132 * sp, sa - 0.78, sa + 0.78); ctx.closePath(); ctx.stroke();
+        ctx.restore();
+      } else if (e.type === 'juggernaut' && (e.slamWindup || 0) > 0) {
+        const sa = e._slamA !== undefined ? e._slamA : 0;
+        const sp = Math.max(0.1, Math.min(1, 1 - e.slamWindup / Math.max(0.1, e.slamWindupMax || 0.56)));
+        ctx.save();
+        ctx.lineCap = 'round';
+        for (let k = 0; k < 4; k++) {
+          const ba = sa + k * (Math.PI * 0.5);
+          const ex = e.x + Math.cos(ba) * 168, ey = e.y + Math.sin(ba) * 168;
+          ctx.strokeStyle = `rgba(226, 232, 240, ${0.16 + sp * 0.20})`; ctx.lineWidth = 22;
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+          ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 2.4; ctx.setLineDash([8, 5]);
+          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(ba) * 168 * sp, e.y + Math.sin(ba) * 168 * sp); ctx.stroke();
+          ctx.setLineDash([]);
+        }
         ctx.restore();
       }
     }

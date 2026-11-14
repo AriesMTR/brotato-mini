@@ -85,17 +85,17 @@ const SET_DEFS = {
   tech:      { label: '⚙️发条机巧', steps: [2, 3, 5], desc: '2/3/5把: 发条机关攻速与伤害 +25%/+52%/+85%' }
 };
 
-// 全局硬核平衡常量（无主角无敌帧；整体怪物与首领血量在此前基础上回调 -20%；前 5 层强度温和下调、第 10 轮及以后难度陡峭加压；怪物移速 -20%；远程怪数量 -20% 且怪物总量不变）
+// 全局硬核平衡常量（无主角无敌帧；全流程小怪血量再下调 -20%，第 10 层及以后首领血量下调 -20%；前 5 层强度温和下调；怪物移速 -20%；远程怪数量 -20% 且怪物总量不变）
 const PLAYER_RANGE_SCALE = 0.80;
 const PLAYER_ASPD_SCALE = 0.70;
-const MONSTER_HP_BASE_MUL = 1.80;
+const MONSTER_HP_BASE_MUL = 1.44;
 const MONSTER_HP_LINEAR_SLOPE = 0.72;
 const MONSTER_DMG_MUL = 1.20;
 const MONSTER_SPD_MUL = 0.80;
 const RANGED_ENEMY_COUNT_MUL = 0.80;
 const CRYSTAL_YIELD_MUL = 0.70;
 const BOSS_HP_MUL = 4.80;
-const LATE_BOSS_HP_MUL = 12.00;
+const LATE_BOSS_HP_MUL = 9.60;
 const MID_LATE_HP_MAX_MUL = 3.00;
 const MID_LATE_DMG_MAX_MUL = 2.45;
 
