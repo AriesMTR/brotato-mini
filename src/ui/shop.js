@@ -267,7 +267,7 @@ function checkPendingWeaponEvolutions(onAllResolved) {
   const box = document.getElementById('evoChoices');
   if (titleEl) titleEl.textContent = `【${tpl.name}】晋升五阶神话 · 二选一终极进化`;
   if (subEl) subEl.textContent = tpl.melee
-    ? '择定唯一神话觉醒方向，永久重塑兵装圣徽并额外觉醒 40% 概率斩碎敌弹！'
+    ? '择定唯一神话觉醒方向，永久重塑兵装圣徽并额外觉醒 20% 概率斩碎敌弹！'
     : '择定唯一神话觉醒方向，永久重塑兵装圣徽外观与专属战斗机制';
   if (box) {
     box.innerHTML = '';

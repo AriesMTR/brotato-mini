@@ -150,7 +150,7 @@ const WEAPONS = {
   // --- 🌿 古誓套装 (5 把) ---
   stick: {
     name: '守誓残杖', icon: '🪵', set: 'primitive', melee: true, dmg: 18.0, cd: 0.67, range: 132, cost: 12, mode: 'blunt', arcColor: '#72efdd',
-    desc: '刻有旧王城铭文的修长古木残杖，大范围横扫，每多持一把基础伤害 +4.8（晋升 5 阶神话可觉醒 40% 概率斩弹）',
+    desc: '刻有旧王城铭文的修长古木残杖，大范围横扫，每多持一把基础伤害 +4.8（晋升 5 阶神话可觉醒 20% 概率斩弹）',
     evos: [
       { id: 'stick_worldtree', name: '世界树镇魂神木', tag: '巨木震地 · 刚猛群伤', color: '#4ade80', dmgMul: 1.42, rangeAdd: 38, slam: true, slamScale: 1.25, desc: '伤害 +42%、挥击范围 +38，每次挥杖额外引发大范围【世界树震地波】！' },
       { id: 'stick_banner',    name: '百誓共鸣灵幡',   tag: '疾速连舞 · 苍岚剑波', color: '#72efdd', dmgMul: 1.20, cdMul: 0.72, rangeAdd: 22, waveCount: 2, desc: '间隔 -28%、挥击范围 +22、伤害 +20%，每次挥击向前斩出 2 道穿透苍岚灵波！' }
@@ -166,7 +166,7 @@ const WEAPONS = {
   },
   spear: {
     name: '银月长枪', icon: '🔱', set: 'primitive', melee: true, dmg: 25.0, cd: 0.79, range: 168, cost: 16, mode: 'spear', arcColor: '#f6d379',
-    desc: '王城守桥骑士长枪，超长直线突刺贯穿路径上所有目标（晋升 5 阶神话觉醒 40% 概率刺碎敌弹）',
+    desc: '王城守桥骑士长枪，超长直线突刺贯穿路径上所有目标（晋升 5 阶神话觉醒 20% 概率刺碎敌弹）',
     evos: [
       { id: 'spear_trident',  name: '沧溟破浪三叉戟', tag: '三戟齐刺 · 扇面清潮', color: '#38bdf8', dmgMul: 1.28, rangeAdd: 26, tridentThrust: true, forceFreeze: 0.35, desc: '化为寒渊三叉圣戟：每次突刺同时刺出【左中右三道超长枪芒】，35% 概率冰封目标！' },
       { id: 'spear_gungnir',  name: '贯日神枪·冈格尼尔', tag: '超距雷霆 · 必暴神罚', color: '#fde047', dmgMul: 1.52, rangeAdd: 68, critAdd: 0.20, chainOnHit: 4, desc: '突刺射程暴增 +68、伤害 +52%、暴击率 +20%，枪尖贯穿触发 4 跳黄金雷霆！' }
@@ -498,7 +498,7 @@ const ITEMS = [
   { id: 'omega_factory',    name: '倒悬钟楼母枢',   icon: '🏭', cost: 70, tier: 4, maxCount: 1, tags: ['tech'], desc: '【传说·唯一】每波额外部署 2 座发条炮台，工程伤害 +45%，炮台附带灼烧与冰缓！', apply: p => { p.bonusTurrets += 2; p.techBonus = (p.techBonus || 0) + 0.45; p.turretElem = true; } },
   { id: 'doomsday_warhead', name: '日蚀黑炎核',     icon: '☢️', cost: 70, tier: 4, maxCount: 1, tags: ['explosive', 'elemental'], desc: '【传说·唯一】爆炸范围 +35%，攻击爆破率 +25%，所有爆炸引燃敌人造成高额灼烧！', apply: p => { p.explosionScale += 0.35; p.blastChance += 0.25; p.elemBonus += 0.22; p.napalmBlast = true; } },
   { id: 'titan_breaker',    name: '绯红九百九十九斩',icon: '⚔️', cost: 70, tier: 4, maxCount: 1, weaponOnly: true, tags: ['melee', 'tank'], desc: '【传说·唯一】近战伤害 +42%，生命 +14，护甲 +4；近战挥砍额外震出破军剑气波！', apply: p => { p.meleeBonus += 0.42; p.maxHp += 14; p.hp += 14; p.armor += 4; p.meleeShockwave = true; } },
-  { id: 'fox_parry_sheath', name: '断刃狐月鞘',     icon: '🦊', cost: 70, tier: 4, maxCount: 1, weaponOnly: true, tags: ['melee', 'dodge'], desc: '【传说·唯一】近战伤害 +28%，攻速 +12%，闪避 +6%；近战挥击获得 35% 概率斩碎触及的敌方弹道！', apply: p => { p.meleeBonus += 0.28; p.atkSpd += 0.12; p.dodge = Math.min(p.dodgeCap, p.dodge + 0.06); p.meleeBulletCutChance = Math.max(p.meleeBulletCutChance || 0, 0.35); } },
+  { id: 'fox_parry_sheath', name: '断刃狐月鞘',     icon: '🦊', cost: 70, tier: 4, maxCount: 1, weaponOnly: true, tags: ['melee', 'dodge'], desc: '【传说·唯一】近战伤害 +28%，攻速 +12%，闪避 +6%；近战挥击获得 17.5% 概率斩碎触及的敌方弹道！', apply: p => { p.meleeBonus += 0.28; p.atkSpd += 0.12; p.dodge = Math.min(p.dodgeCap, p.dodge + 0.06); p.meleeBulletCutChance = Math.max(p.meleeBulletCutChance || 0, 0.175); } },
   { id: 'trinity_orb',      name: '四象共鸣魂枢',   icon: '🔮', cost: 72, tier: 4, maxCount: 1, tags: ['elemental'], desc: '【传说·唯一】元素伤害 +40%，火/冰/风毒触发率全面提升；目标每带1种异常易伤+12%！', apply: p => { p.elemBonus += 0.40; p.burnChance += 0.22; p.freezeChance = (p.freezeChance || 0) + 0.18; p.poisonChance = (p.poisonChance || 0) + 0.25; p.elemSynergy = true; } }
 ];
 

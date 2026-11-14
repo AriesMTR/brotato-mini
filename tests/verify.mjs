@@ -517,6 +517,11 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running", preferences 
     if (!sheath || sheath.tier !== 4 || sheath.maxCount !== 1) {
       return { ok: false, reason: 'Missing T4 unique melee deflect relic fox_parry_sheath' };
     }
+    const probeP = { meleeBonus: 0, atkSpd: 0, dodge: 0, dodgeCap: 0.80, meleeBulletCutChance: 0 };
+    sheath.apply(probeP);
+    if (Math.abs(probeP.meleeBulletCutChance - 0.175) > 1e-6) {
+      return { ok: false, reason: 'Expected fox_parry_sheath meleeBulletCutChance to be 0.175 (-50%), got ' + probeP.meleeBulletCutChance };
+    }
 
     // Test T4 + T4 -> T5 merge & 2-choice evolution modal + multi-form elongated/oblique terrain blocks
     if (
@@ -896,20 +901,20 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
       sigBossesVerified++;
     }
 
-    // Verify 16x2 Boss Phase 1 & Phase 2 Cutout Portraits, 33% rates, 5.0s + 0.85s dissolve banner & 100% guaranteed Phase 2 portrait
+    // Verify 16x2 Boss Phase 1 & Phase 2 Cutout Portraits, 33% rates, 4.0s + 0.85s dissolve banner & 100% guaranteed Phase 2 portrait
     const portraitKeys = Object.keys(BOSS_PORTRAIT_DATA || {});
     const all32PortraitsReady = portraitKeys.length === 16 && portraitKeys.every(k => {
       const p1 = getBossAnimePortrait(k, false);
       const p2 = getBossAnimePortrait(k, true);
       return p1 && p2 && p1 !== p2 && p1.width === 440 && p1.height === 516 && p2.width === 440 && p2.height === 516;
     });
-    const ratesValid = (RARE_PORTRAIT_RATE === 0.33 && PHASE2_AWAKEN_RATE === 0.33 && BOSS_CUTSCENE_SHOW_SEC === 5.0);
+    const ratesValid = (RARE_PORTRAIT_RATE === 0.33 && PHASE2_AWAKEN_RATE === 0.33 && BOSS_CUTSCENE_SHOW_SEC === 4.0);
 
-    // Render Phase 1 & Phase 2 cut-in banners across entrance, 5s hold, and 0.85s dissolve fade-out
+    // Render Phase 1 & Phase 2 cut-in banners across entrance, 4s hold, and 0.85s dissolve fade-out
     endlessMode = true;
     startBossCutscene('final_boss', 'butcher', '绯红断刃剑姬 · 烬羽', '🕯️ 第 4 层守誓之主', '⚔️ 贴近风眼安全');
     const p1Dur = bossCutscene ? bossCutscene.maxT : 0;
-    for (const stepDt of [0.10, 2.40, 2.80]) { _advanceClock(stepDt * 1000); update(stepDt); draw(); }
+    for (const stepDt of [0.10, 2.00, 2.30]) { _advanceClock(stepDt * 1000); update(stepDt); draw(); }
     bossCutscene = null;
 
     // Trigger Phase 2 in Endless Mode -> must 100% guarantee immediate mythic_phase2 portrait banner + +50% HP + +30% DMG + ZERO extra time inflation!
@@ -921,8 +926,8 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     p2Boss.canPhase2 = true;
     hurtEnemy(p2Boss, p2Boss.maxHp + 99999, true);
     const p2StatsOk = (p2Boss.maxHp === Math.max(450, Math.round(p1Hp * 1.50)) && p2Boss.hp === p2Boss.maxHp && p2Boss.dmg === Math.round(p1Dmg * 1.30) && waveTime === preP2WaveTime);
-    const p2Guaranteed = !!(p2StatsOk && bossCutscene && bossCutscene.mode === 'mythic_phase2' && bossCutscene.variant === 'frost_queen' && bossCutscene.maxT >= 5.8);
-    for (const stepDt of [0.12, 2.50, 2.75]) { _advanceClock(stepDt * 1000); update(stepDt); draw(); }
+    const p2Guaranteed = !!(p2StatsOk && bossCutscene && bossCutscene.mode === 'mythic_phase2' && bossCutscene.variant === 'frost_queen' && bossCutscene.maxT >= 4.8 && bossCutscene.maxT <= 4.9);
+    for (const stepDt of [0.12, 2.00, 2.30]) { _advanceClock(stepDt * 1000); update(stepDt); draw(); }
     bossCutscene = null;
 
     return { ok: true, sheetsValid, flipLeft, midTurnFlip, atkPoseTriggered, floorScale: curFloorScale, dashArtsTested, sigBossesVerified, all32PortraitsReady, ratesValid, p1Dur, p2Guaranteed };
@@ -936,8 +941,8 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
   assert.strictEqual(actionAudit.dashArtsTested, 6, "All 6 heroes must execute their signature Soul Dash arts & slice projectiles");
   assert.strictEqual(actionAudit.sigBossesVerified, 4, "All 4 Fixed Act Bosses must telegraph and unleash their signature named skills");
   assert.strictEqual(actionAudit.all32PortraitsReady, true, "All 16 Bosses must provide distinct 440x516 Phase 1 & Phase 2 cutout portraits (32 total)");
-  assert.strictEqual(actionAudit.ratesValid, true, "Phase 1 portrait rate & Phase 2 awaken rate must both be 33% (0.33), with 5.0s display");
-  assert(actionAudit.p1Dur >= 5.8, "Boss portrait cut-in banner must display for 5.0s plus smooth fade-out (~5.85s total)");
+  assert.strictEqual(actionAudit.ratesValid, true, "Phase 1 portrait rate & Phase 2 awaken rate must both be 33% (0.33), with 4.0s display");
+  assert(actionAudit.p1Dur >= 4.8 && actionAudit.p1Dur <= 4.9, "Boss portrait cut-in banner must display for 4.0s plus smooth fade-out (~4.85s total)");
   assert.strictEqual(actionAudit.p2Guaranteed, true, "Triggering Phase 2 awakening must 100% guarantee displaying the Phase 2 portrait banner");
 
   // Confirm 4-frame sprite sheet slicing (sw=256, sh=256 across sx = 0, 256, 512, 768) actually executed on game canvas
@@ -1327,6 +1332,10 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     const needleShiftOk = (
       typeof NEEDLE_RANGED_MUL === 'number' &&
       Math.abs(NEEDLE_RANGED_MUL - 0.70) < 1e-6 &&
+      typeof YELLOW_ARROW_MOB_MUL === 'number' &&
+      Math.abs(YELLOW_ARROW_MOB_MUL - 0.80) < 1e-6 &&
+      typeof ELITE_MOB_COUNT_MUL === 'number' &&
+      Math.abs(ELITE_MOB_COUNT_MUL - 0.80) < 1e-6 &&
       NEEDLE_RANGED_TYPES.has('frost_wisp') &&
       NEEDLE_RANGED_TYPES.has('shooter') &&
       NEEDLE_RANGED_TYPES.has('rad_scorpion') &&

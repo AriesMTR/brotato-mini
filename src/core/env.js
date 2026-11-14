@@ -1,4 +1,4 @@
-// 核心画布环境、DPR 像素比与全局品质常量（v2.1.6 回合时长阶梯调整版 · 30秒起步逐层+5秒至60秒封顶 · 单图唯一石砌地形 & 全系怪物高清放大）
+// 核心画布环境、DPR 像素比与全局品质常量（v2.1.7 立绘展示缩短至4秒 & 近战挥砍斩弹几率下调50%）
 if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
   CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
     const rad = Math.min(typeof r === 'number' ? r : 4, Math.abs(w) * 0.5, Math.abs(h) * 0.5);
@@ -16,13 +16,22 @@ let viewW = window.innerWidth, viewH = window.innerHeight, dpr = 1, camZoom = 1.
 let isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 let bootReady = false;
 let bootIntegrityPassed = false;
-const APP_VERSION = 'v2.1.6';
+const APP_VERSION = 'v2.1.7';
 const APP_BUILD_DATE = '2026-11-14';
 
 // 游戏内置版本更新日志数据（供开局主界面「纪元志」弹窗展示）
 const CHANGELOG_HISTORY = [
   {
-    ver: 'v2.1.6', date: '2026-11-14', tag: '当前版本 · 回合时长30s起逐层+5s至60s封顶 · 旋转十字光束近战友好化 · 白针怪-30%转补近战',
+    ver: 'v2.1.7', date: '2026-11-14', tag: '当前版本 · 立绘缩短至4秒 · 近战砍弹道几率-50% · 黄色小箭头怪-20%且弹道伤/体+10%',
+    title: '🎬 首领立绘展示缩短（5s → 4s） + ⚔️ 近战挥击斩弹几率下调 50% + 🏹 后期黄色小箭头怪数目 -20%（对应弹道伤害与大小 +10%）',
+    items: [
+      '🎬 首领破框立绘展示时长紧凑化（BOSS_CUTSCENE_SHOW_SEC: 5.0s → 4.0s）：将一阶段登场特写与二阶段神话觉醒换装立绘横幅的停留展示时间由 5 秒缩短为 4 秒（配 0.85 秒丝滑上浮消逝），减少对高速战斗心流的打断！',
+      '⚔️ 近战砍弹道概率整体削减 50%：将 T4 唯一饰品【断刃狐月鞘】斩弹概率由 35% 下调至 17.5%、T5 神话近战武器觉醒斩弹概率由 40% 下调至 20%，两者叠加软上限同步由 60% 下调至 30%！',
+      '🏹 后期黄色小箭头弹道调优：将发射黄色小箭头的【蚀影潜渊骨蛇】与【狂化精英词缀怪】刷出数目统一减少 20%（总刷怪量保持不变），并相应将其黄色箭头弹道的伤害与弹体大小各提升 +10%，降低满屏碎箭杂乱感、提升单发辨识度与博弈感！'
+    ]
+  },
+  {
+    ver: 'v2.1.6', date: '2026-11-14', tag: '回合时长30s起逐层+5s至60s封顶 · 旋转十字光束近战友好化 · 白针怪-30%转补近战',
     title: '⏱️ 回合时长 30s 起逐层 +5s（60s 封顶） + ❄️ 首领/统领旋转十字激光与横扫近战友好化 + 🎯 白芯针梭怪减少 30% 并 1:1 补充至近战怪',
     items: [
       '⏱️ 统一全流程回合战斗时长阶梯（getWaveDuration）：第 1 层固定 30 秒开局，之后每攀登 1 层稳定增加 +5 秒（第 1~7 层依次为 30s / 35s / 40s / 45s / 50s / 55s / 60s），自第 7 层起全程封顶最多 60 秒（含首领层与无尽层，提前击败首领保留剩余时间刷晶石，超时未击破转入死战）！',

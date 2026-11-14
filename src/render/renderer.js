@@ -2714,13 +2714,13 @@ function draw() {
   }
 
   // 👑 首领登场（一阶段 33% 概率）/ 神话二阶段觉醒（二阶段 33% 概率觉醒且 100% 必出立绘）全屏斜向破框立绘横幅
-  // 完整展示 5.0 秒后进入 0.85 秒丝滑上浮消逝动画（0 radialGradient / 0 shadowBlur）
+  // 完整展示 4.0 秒后进入 0.85 秒丝滑上浮消逝动画（0 radialGradient / 0 shadowBlur）
   if (state === 'wave' && endlessMode &&
       typeof bossCutscene !== 'undefined' && bossCutscene && bossCutscene.t > 0 &&
       !(typeof SpireDirector !== 'undefined' && SpireDirector && typeof SpireDirector.isBlockingGameplay === 'function' && SpireDirector.isBlockingGameplay())) {
     const bc = bossCutscene;
     const fadeDur = Math.max(0.35, bc.fadeDur || 0.85);
-    const maxT = Math.max(fadeDur + 0.5, bc.maxT || 5.85);
+    const maxT = Math.max(fadeDur + 0.5, bc.maxT || 4.85);
     const showDur = Math.max(0.5, maxT - fadeDur);
     const elapsed = Math.max(0, maxT - bc.t);
     const rawEnter = Math.min(1, elapsed / 0.30);
@@ -2999,7 +2999,7 @@ function draw() {
         }
       }
 
-      // 5. 右下角防误触手动跳过胶囊（避免走位摇杆或空格闪避误关 5 秒立绘演出）
+      // 5. 右下角防误触手动跳过胶囊（避免走位摇杆或空格闪避误关 4 秒立绘演出）
       if (elapsed > 0.60 && bc.t > fadeDur + 0.05) {
         const skW = portraitPortrait ? 132 : 164;
         const skH = 26;
