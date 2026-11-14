@@ -510,8 +510,8 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running", preferences 
     if (!(getMidLateWaveDmgMul(1) < 0.80 && getMidLateWaveDmgMul(4) < 1.0 && getMidLateWaveDmgMul(8) > 1.3 && getMidLateWaveDmgMul(10) >= 1.70 && Math.abs(getMidLateWaveDmgMul(16) - 2.45) <= 1e-6)) {
       return { ok: false, reason: 'Bad midLateDmgMul curve' };
     }
-    if (MONSTER_HP_BASE_MUL !== 1.80 || BOSS_HP_MUL !== 4.80 || MONSTER_SPD_MUL !== 0.80 || RANGED_ENEMY_COUNT_MUL !== 0.80 || WEAPONS.stick.range < 130 || WEAPONS.stick.dmg < 18 || WEAPONS.katana.dmg < 30) {
-      return { ok: false, reason: 'Bad v2.1.3 balance constants' };
+    if (MONSTER_HP_BASE_MUL !== 1.44 || BOSS_HP_MUL !== 4.80 || LATE_BOSS_HP_MUL !== 9.60 || MONSTER_SPD_MUL !== 0.80 || RANGED_ENEMY_COUNT_MUL !== 0.80 || WEAPONS.stick.range < 130 || WEAPONS.stick.dmg < 18 || WEAPONS.katana.dmg < 30) {
+      return { ok: false, reason: 'Bad v2.1.5 balance constants' };
     }
     const sheath = ITEMS.find(it => it.id === 'fox_parry_sheath');
     if (!sheath || sheath.tier !== 4 || sheath.maxCount !== 1) {
@@ -530,7 +530,13 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running", preferences 
         drawSingleTerrain(tr, true);
       }
     }
-    if (seenForms.size < 3) return { ok: false, reason: 'Expected diverse elongated/oblique terrain forms, got ' + [...seenForms].join(',') };
+    if (seenForms.size < 3) return { ok: false, reason: 'Expected diverse architectural block terrain forms, got ' + [...seenForms].join(',') };
+    createEnemy(260, 260, 'swarmer');
+    const swSample = enemies[enemies.length - 1];
+    const chSample = createEnemy(340, 260, 'chaser');
+    if (!swSample || swSample.r < 15 || !chSample || chSample.r < 20) {
+      return { ok: false, reason: 'Expected enlarged readable monster radii in v2.1.5' };
+    }
     openShop(true);
     player.weapons = [makeWeapon('katana', 4), makeWeapon('katana', 4)];
     mergeSlot(0);
@@ -1143,6 +1149,153 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     const retryBoss = enemies.find(e => e.type === 'boss');
     const retryOk = state === 'wave' && wave === 8 && player.cls === 'allrounder' && !endlessMode && player.mats === 88 && player.hp === preHp && retryBoss && retryBoss.variant === 'frost_queen' && magCircleDrawn;
 
+    // 4) Single terrain element per map (including Boss terrain skills)
+    let singleTerrainOk = true;
+    for (const sid of ['foundry', 'glacier', 'wasteland', 'desert']) {
+      curScene = SCENES.find(sc => sc.id === sid) || SCENES[0];
+      spawnArenaTerrains();
+      spawnBossTerrain('lava', 1200, 1200);
+      spawnBossTerrain('swamp', 1350, 1350);
+      const kinds = new Set(terrains.map(t => t.kind));
+      if (terrains.length === 0 || kinds.size !== 1) singleTerrainOk = false;
+    }
+
+    // 5) Reworked Frost Terrain: 5s progressive slow -> 1s freeze -> thaw; 1s exit grace; monster -20% slow & never frozen
+    endlessMode = true;
+    selectedScene = 'glacier';
+    wave = 2;
+    beginWave();
+    curScene = SCENES.find(sc => sc.id === 'glacier') || curScene;
+    player.weapons = [];
+    player.noSlow = false;
+    player.maxHp = 500; player.hp = 500;
+    player.frostGauge = 0; player.frostLeaveGrace = 0; player.iceFreezeT = 0; player.frostThawImmT = 0;
+    enemies.length = 0; eBullets.length = 0; bullets.length = 0; spawns.length = 0;
+    terrains.length = 0;
+    terrains.push(ensureTerrainGeometry({ kind: 'ice_sheet', shape: 'square_slab', x: player.x, y: player.y, r: 220, rot: 0, pulse: 0 }));
+    const iceMob = createEnemy(player.x + 36, player.y, 'chaser');
+    iceMob.hp = 99999; iceMob.maxHp = 99999; iceMob.dmg = 0;
+    for (let k = 0; k < 50; k++) {
+      spawnAcc = 99;
+      iceMob.x = player.x + 36; iceMob.y = player.y;
+      update(0.05);
+    }
+    const midGauge = player.frostGauge;
+    const midSlowOk = midGauge > 2.2 && midGauge < 2.8 && player.terrainSpdMul < 0.94 && player.terrainSpdMul >= 0.80 && player.iceFreezeT === 0;
+    const mobSlow20Ok = Math.abs((iceMob._terrainSpdMul || 1) - 0.80) < 0.001 && iceMob.freezeT === 0;
+    // Leave terrain: 0.8s within 1s grace must hold frostGauge; +0.6s after grace must decay
+    terrains.length = 0;
+    for (let k = 0; k < 16; k++) { spawnAcc = 99; update(0.05); }
+    const graceHeldOk = Math.abs(player.frostGauge - midGauge) < 0.02;
+    for (let k = 0; k < 12; k++) { spawnAcc = 99; update(0.05); }
+    const decayAfterGraceOk = player.frostGauge < midGauge - 0.45;
+    // Accumulate to 5.0s: max slow right before 5.0s is strictly capped at -20% (>= 0.80) -> freeze 1.0s -> thaw
+    terrains.push(ensureTerrainGeometry({ kind: 'ice_sheet', shape: 'square_slab', x: player.x, y: player.y, r: 220, rot: 0, pulse: 0 }));
+    player.frostGauge = 4.92;
+    spawnAcc = 99; update(0.05);
+    const maxSlowCap20Ok = player.iceFreezeT === 0 && player.terrainSpdMul >= 0.80 && player.terrainSpdMul <= 0.81;
+    for (let k = 0; k < 3; k++) { spawnAcc = 99; update(0.05); }
+    const frozeAt5sOk = maxSlowCap20Ok && player.iceFreezeT > 0.80 && player.frostGauge === 0;
+    draw();
+    terrains.length = 0;
+    for (let k = 0; k < 24; k++) { spawnAcc = 99; update(0.05); }
+    const thawedAfter1sOk = player.iceFreezeT === 0;
+    const frostTerrainOk = midSlowOk && mobSlow20Ok && graceHeldOk && decayAfterGraceOk && frozeAt5sOk && thawedAfter1sOk;
+
+    // 6) Boss Venom-Spray VFX + Hidden Phase-2 Exclusive Skill
+    endlessMode = true;
+    wave = 12;
+    beginWave();
+    for (let k = 0; k < 20; k++) update(0.05);
+    const vBoss = enemies.find(e => e.type === 'boss');
+    vBoss.variant = 'plague_empress';
+    vBoss.hp = 999999; vBoss.maxHp = 999999;
+    vBoss.mythicPhase2 = false;
+    vBoss.venomCd = 0.02;
+    player.maxHp = 9999; player.hp = 9999;
+    let sawVenomSpray = false, sawP2Twin = false;
+    for (let k = 0; k < 24; k++) {
+      update(0.05);
+      if (vBoss.venomBreathT > 0) sawVenomSpray = true;
+      draw();
+    }
+    vBoss.venomBreathT = 0; vBoss.venomWindupT = 0; vBoss.venomCd = 99;
+    vBoss.mythicPhase2 = true;
+    vBoss.p2SkillT = 0.02;
+    for (let k = 0; k < 24; k++) {
+      update(0.05);
+      if (vBoss.venomTwin === true && vBoss.venomBreathT > 0) sawP2Twin = true;
+      draw();
+    }
+    const bossVenomAndP2Ok = sawVenomSpray && sawP2Twin;
+
+    // 6b) Render all 4 new melee mobs & active telegraphs (blade_duelist whirlT, iron_guard, frost_knight, shadow_reaper, sand_worm burrow) cleanly in draw()
+    const bd = createEnemy(player.x + 120, player.y, 'blade_duelist');
+    bd.whirlT = 0.90; bd.whirlSpin = undefined; // exact first-frame state before fix
+    const ig = createEnemy(player.x - 90, player.y, 'iron_guard');
+    ig.cleaveWindup = 0.30;
+    const fk = createEnemy(player.x, player.y + 110, 'frost_knight');
+    fk.thrustWindup = 0.30;
+    const sr = createEnemy(player.x, player.y - 110, 'shadow_reaper');
+    sr.reapWindup = 0.30; sr._reapX = player.x + 40; sr._reapY = player.y;
+    const swm = createEnemy(player.x + 150, player.y + 80, 'sand_worm');
+    swm.burrowT = 0.45;
+    draw();
+    update(0.05);
+    draw();
+
+    // 7) Regression: Killing Story Boss mid-bullet-loop during overtime must NOT throw undefined.x
+    endlessMode = false;
+    wave = 8;
+    beginWave();
+    __drainDirector();
+    for (let k = 0; k < 20; k++) update(0.05);
+    overtime = true; waveTime = 0;
+    const fqBoss = enemies.find(e => e.type === 'boss');
+    fqBoss.mythicPhase2 = true;
+    fqBoss.hp = 1;
+    fqBoss.x = 1200; fqBoss.y = 1200;
+    player.x = 950; player.y = 1200;
+    bullets.length = 0;
+    for (let bIdx = 0; bIdx < 5; bIdx++) {
+      bullets.push({
+        x: 1200, y: 1200, px: 1180, py: 1200, vx: 600, vy: 0,
+        r: 12, dmg: 9999, life: 1.0, maxLife: 1.0, pierce: 0, bounces: 0,
+        col: '#fff', crit: false, knock: 0
+      });
+    }
+    update(0.016);
+    const midBulletBossKillOk = (state === 'story' && bullets.length === 0);
+    __drainDirector();
+
+    // 8) Waves 1..10 tanky melee -15%, ranged unchanged, basic fodder melee increased correspondingly
+    endlessMode = true;
+    sceneMobEnabled = false;
+    enemies.length = 0; spawns.length = 0;
+    let tankEarly = 0, basicEarly = 0, rangedEarly = 0;
+    let tankLate = 0, basicLate = 0, rangedLate = 0;
+    const origRand = Math.random;
+    let rSeed = 13579;
+    Math.random = () => { rSeed = (rSeed * 16807) % 2147483647; return (rSeed - 1) / 2147483646; };
+    wave = 8;
+    for (let n = 0; n < 6000; n++) {
+      const tp = pickWaveEnemyType(8);
+      if (TANK_MELEE_TYPES.has(tp)) tankEarly++;
+      else if (BASIC_FODDER_MELEE_TYPES.has(tp)) basicEarly++;
+      else if (RANGED_ENEMY_TYPES.has(tp)) rangedEarly++;
+    }
+    rSeed = 13579;
+    wave = 11;
+    for (let n = 0; n < 6000; n++) {
+      const tp = pickWaveEnemyType(8);
+      if (TANK_MELEE_TYPES.has(tp)) tankLate++;
+      else if (BASIC_FODDER_MELEE_TYPES.has(tp)) basicLate++;
+      else if (RANGED_ENEMY_TYPES.has(tp)) rangedLate++;
+    }
+    Math.random = origRand;
+    const tankRatio = tankEarly / Math.max(1, tankLate);
+    const earlyTankShiftOk = (tankRatio > 0.81 && tankRatio < 0.89 && basicEarly > basicLate && rangedEarly === rangedLate);
+
     return {
       bootOnHome, storyViewShown, storyLockedToZero, returnedHome,
       endlessRosterCount, diffBtnsCount, sceneBtnsCount,
@@ -1150,7 +1303,8 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
       keyDigitHero, keyArrowHero,
       endlessRangerOk, endlessShopTitle,
       hpAfterBossNuke, invulnAfterHit, consecutiveHitRegistered,
-      wCnt, iCnt, hCnt, mCnt, sCnt, diedCleanly, retryOk
+      wCnt, iCnt, hCnt, mCnt, sCnt, diedCleanly, retryOk,
+      singleTerrainOk, frostTerrainOk, bossVenomAndP2Ok, midBulletBossKillOk, earlyTankShiftOk
     };
   })()`, s);
 
@@ -1176,10 +1330,15 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
   assert.strictEqual(coreCheck.wCnt, 32, "Codex must render 32 weapons");
   assert.strictEqual(coreCheck.iCnt, 75, "Codex must render 75 items");
   assert.strictEqual(coreCheck.hCnt, 6, "Codex must render 6 Spire heroes");
-  assert.strictEqual(coreCheck.mCnt, 37, "Codex must render all 37 unique Spire monsters, commanders & bosses");
+  assert.strictEqual(coreCheck.mCnt, 41, "Codex must render all 41 unique Spire monsters, commanders & bosses");
   assert.strictEqual(coreCheck.sCnt, 4, "Codex must render 4 Spire scenes");
   assert.strictEqual(coreCheck.diedCleanly, true, "Multi-hit lethal damage must transition to end state");
   assert.strictEqual(coreCheck.retryOk, true, "retryFailedWave() on Floor 8 must restore exact checkpoint and fixed Boss frost_queen");
+  assert.strictEqual(coreCheck.singleTerrainOk, true, "Every scene must strictly spawn only ONE terrain element kind (including Boss terrain skills)");
+  assert.strictEqual(coreCheck.frostTerrainOk, true, "Frost terrain must progressively slow player over 5s into 1s freeze, wait 1s after leaving before decaying, and slow monsters by 20% without freezing");
+  assert.strictEqual(coreCheck.bossVenomAndP2Ok, true, "Venom Boss must cast pressurized venom breath spray and Boss hidden Phase-2 must unlock exclusive ultimate skill");
+  assert.strictEqual(coreCheck.midBulletBossKillOk, true, "Killing Story Boss mid-bullet-loop must transition cleanly to story state without undefined.x crash");
+  assert.strictEqual(coreCheck.earlyTankShiftOk, true, "Waves 1..10 must reduce tanky melee by 15%, keep ranged unchanged, and increase ordinary fodder mobs");
   assert(els.retryWaveBtn.textContent.includes("重试"), "Player defeat must offer a floor retry control");
   assert.strictEqual(stats.radialGradients, 0, "Mobile combat & UI suite must create ZERO per-frame radial gradients");
   assert.strictEqual(stats.shadowBlurs, 0, "Mobile combat & UI suite must use ZERO shadowBlur");

@@ -179,29 +179,33 @@ const SpireAssets = (function () {
     desert:    'assets/spire/prop_s4_monolith.png'
   };
 
-  // 全 21 种普通怪与层域专属精英怪 1:1 独立高清贴图映射（零复用、造型与攻击机制严密对应）
+  // 全 25 种普通怪与层域专属精英怪 1:1 独立高清贴图映射（零复用、造型与攻击机制严密对应）
   const MONSTER_SPRITE_MAP = {
-    chaser:       'assets/spire/mob_s1_ronin.png',
-    swarmer:      'assets/spire/mob_swarmer.png',
-    stalker:      'assets/spire/mob_stalker.png',
-    magma_imp:    'assets/spire/mob_s1_umbrella.png',
-    shielder:     'assets/spire/mob_shielder.png',
-    shooter:      'assets/spire/mob_s2_prism.png',
-    charger:      'assets/spire/mob_charger.png',
-    sniper_bug:   'assets/spire/mob_sniper_bug.png',
-    frost_wisp:   'assets/spire/mob_frost_wisp.png',
-    bomber:       'assets/spire/mob_bomber.png',
-    spinner:      'assets/spire/mob_spinner.png',
-    mortar:       'assets/spire/mob_mortar.png',
-    rad_scorpion: 'assets/spire/mob_rad_scorpion.png',
-    splitter:     'assets/spire/mob_splitter.png',
-    mini_slime:   'assets/spire/mob_mini_slime.png',
-    summoner:     'assets/spire/mob_summoner.png',
-    healer:       'assets/spire/mob_healer.png',
-    brute:        'assets/spire/mob_brute.png',
-    juggernaut:   'assets/spire/mob_juggernaut.png',
-    sand_worm:    'assets/spire/mob_sand_worm.png',
-    spore_mother: 'assets/spire/mob_s5_reliquary.png'
+    chaser:        'assets/spire/mob_s1_ronin.png',
+    swarmer:       'assets/spire/mob_swarmer.png',
+    stalker:       'assets/spire/mob_stalker.png',
+    magma_imp:     'assets/spire/mob_s1_umbrella.png',
+    shielder:      'assets/spire/mob_shielder.png',
+    iron_guard:    'assets/spire/mob_s1_guard.png',
+    shooter:       'assets/spire/mob_s2_prism.png',
+    charger:       'assets/spire/mob_charger.png',
+    frost_knight:  'assets/spire/mob_s2_knight.png',
+    sniper_bug:    'assets/spire/mob_sniper_bug.png',
+    frost_wisp:    'assets/spire/mob_frost_wisp.png',
+    bomber:        'assets/spire/mob_bomber.png',
+    spinner:       'assets/spire/mob_spinner.png',
+    mortar:        'assets/spire/mob_mortar.png',
+    rad_scorpion:  'assets/spire/mob_rad_scorpion.png',
+    blade_duelist: 'assets/spire/mob_s3_duelist.png',
+    splitter:      'assets/spire/mob_splitter.png',
+    mini_slime:    'assets/spire/mob_mini_slime.png',
+    summoner:      'assets/spire/mob_summoner.png',
+    healer:        'assets/spire/mob_healer.png',
+    brute:         'assets/spire/mob_brute.png',
+    juggernaut:    'assets/spire/mob_juggernaut.png',
+    sand_worm:     'assets/spire/mob_sand_worm.png',
+    shadow_reaper: 'assets/spire/mob_s4_shade.png',
+    spore_mother:  'assets/spire/mob_s5_reliquary.png'
   };
 
   // 全 16 位守誓主宰、先锋统领与无尽祭坛首领 1:1 独立贴图映射（零复用）

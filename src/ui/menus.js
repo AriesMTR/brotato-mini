@@ -370,7 +370,7 @@ window.addEventListener('keydown', e => {
     closeAudioModal();
     return;
   }
-  if (k === 'escape' || k === 'p') {
+  if (k === 'escape') {
     if (state === 'wave' || state === 'paused') { if (e.preventDefault) e.preventDefault(); togglePause(); return; }
   } else if (k === ' ' && state === 'paused') {
     if (e.preventDefault) e.preventDefault();
@@ -859,6 +859,9 @@ function resumeGame() {
   state = 'wave';
   for (const k in keys) keys[k] = false;
   resetJoy();
+  if (document.activeElement && typeof document.activeElement.blur === 'function' && document.activeElement !== document.body) {
+    document.activeElement.blur();
+  }
   last = performance.now();
   beep(540, 0.05, 'triangle', 0.04);
   document.getElementById('pauseMenu').classList.add('hidden');

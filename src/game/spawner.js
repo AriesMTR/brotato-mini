@@ -43,445 +43,389 @@ function pointSegClosest(px, py, x1, y1, x2, y2) {
   return { cx, cy, dx, dy, dSq: dx * dx + dy * dy, t };
 }
 
-// 非规则异形地形极坐标轮廓函数（用于 basin 洼地块，配合长短轴拉伸与斜向旋转生成非对称地形块）
-function terrainRadiusAt(tr, ang) {
-  const baseR = Math.max(24, tr.r || 72);
-  const s = tr.seed !== undefined ? tr.seed : 1.7;
-  const rot = tr.rot !== undefined ? tr.rot : (s % 6.28);
-  const a = ang - rot;
-  let mod = 1;
-  if (tr.kind === 'lava') {
-    mod = 1 + 0.25 * Math.sin(2 * a + s * 0.7) + 0.17 * Math.cos(3 * a - s * 1.3) + 0.09 * Math.sin(5 * a + s * 2.1);
-  } else if (tr.kind === 'swamp') {
-    mod = 1 + 0.29 * Math.cos(2 * a + s * 0.9) + 0.16 * Math.sin(3 * a + s * 1.6) - 0.08 * Math.cos(4 * a - s * 0.5);
-  } else if (tr.kind === 'ice_sheet') {
-    mod = 1 + 0.22 * Math.sin(2 * a - s * 0.8) + 0.16 * Math.cos(3 * a + s * 1.4) + 0.11 * Math.cos(5 * a - s * 1.9);
+// 正交嵌地石砌地形块轮廓偏置器（顺时针局部坐标系 +u 向右、+v 向下，支持任意正负边距与凹凸直角 100% 严丝合缝偏置）
+function _offsetOrthoPoly(pts, d) {
+  const n = pts.length;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i - 1 + n) % n];
+    const curr = pts[i];
+    const next = pts[(i + 1) % n];
+    const dx1 = curr.x - prev.x, dy1 = curr.y - prev.y;
+    const l1 = Math.hypot(dx1, dy1) || 1;
+    const nx1 = dy1 / l1, ny1 = -dx1 / l1;
+    const dx2 = next.x - curr.x, dy2 = next.y - curr.y;
+    const l2 = Math.hypot(dx2, dy2) || 1;
+    const nx2 = dy2 / l2, ny2 = -dx2 / l2;
+    out.push({ x: curr.x + (nx1 + nx2) * d, y: curr.y + (ny1 + ny2) * d });
   }
-  return baseR * Math.max(0.56, Math.min(1.36, mod));
+  return out;
 }
 
-// 惰性烘焙多形态真地形块几何（支持细长斜脉 slash_vein、蜿蜒S/折角沟壑 meander_belt、斜切多边形岩台块 oblique_slab、月牙弧带 crescent_arc、拉伸洼地 basin 与折弯大裂谷 chasm，零每帧分配，渲染与碰撞 100% 对齐）
+// 正交石块凸角 45° 切角倒棱并旋转至世界坐标（凹角保持利落 90° 咬合，彻底告别香肠曲线与烂泥团块）
+function _chamferAndRotatePoly(localPts, chamfer, cx, cy, ca, sa) {
+  const n = localPts.length;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const prev = localPts[(i - 1 + n) % n];
+    const curr = localPts[i];
+    const next = localPts[(i + 1) % n];
+    const dx1 = curr.x - prev.x, dy1 = curr.y - prev.y;
+    const l1 = Math.hypot(dx1, dy1) || 1;
+    const ux1 = dx1 / l1, uy1 = dy1 / l1;
+    const dx2 = next.x - curr.x, dy2 = next.y - curr.y;
+    const l2 = Math.hypot(dx2, dy2) || 1;
+    const ux2 = dx2 / l2, uy2 = dy2 / l2;
+    const cross = ux1 * uy2 - uy1 * ux2;
+    if (cross > 0.1 && chamfer > 0) {
+      const c = Math.min(chamfer, l1 * 0.34, l2 * 0.34);
+      const ax = curr.x - ux1 * c, ay = curr.y - uy1 * c;
+      const bx = curr.x + ux2 * c, by = curr.y + uy2 * c;
+      out.push(
+        { x: cx + ca * ax - sa * ay, y: cy + sa * ax + ca * ay },
+        { x: cx + ca * bx - sa * by, y: cy + sa * bx + ca * by }
+      );
+    } else {
+      out.push({ x: cx + ca * curr.x - sa * curr.y, y: cy + sa * curr.x + ca * curr.y });
+    }
+  }
+  return out;
+}
+
+// 生成五大嵌地石砌真地形块局部正交多边形与碰撞矩形盒组（细长矩石槽 rect_strip / 折角L型石槽 l_block / T型拼接槽 t_block / 错位阶梯双拼块 stepped_block / 重型方砖池 square_slab）
+function _buildBlockLocalSpec(tr) {
+  const form = tr.form || 'rect_strip';
+  const s = tr.seed !== undefined ? tr.seed : 2.3;
+  if (form === 'l_block') {
+    const W = Math.max(176, tr.w || (196 + ((s * 23) % 48)));
+    const H = Math.max(158, tr.h || (172 + ((s * 19) % 42)));
+    const T = Math.max(70, Math.min(Math.min(W, H) * 0.48, tr.thick || (74 + ((s * 7) % 14))));
+    const flipU = (Math.floor(s * 11) % 2 === 0) ? 1 : -1;
+    // 以视觉重心微调局部原点，使旋转与外接圆更均衡
+    const ox = -W * 0.34, oy = -H * 0.34;
+    const rawPts = [
+      { x: ox, y: oy },
+      { x: ox + W, y: oy },
+      { x: ox + W, y: oy + T },
+      { x: ox + T, y: oy + T },
+      { x: ox + T, y: oy + H },
+      { x: ox, y: oy + H }
+    ];
+    const pts = flipU < 0
+      ? rawPts.map(p => ({ x: -p.x, y: p.y })).reverse()
+      : rawPts;
+    const boxes = flipU < 0
+      ? [
+          { u0: -(ox + W), u1: -ox, v0: oy, v1: oy + T },
+          { u0: -(ox + T), u1: -ox, v0: oy, v1: oy + H }
+        ]
+      : [
+          { u0: ox, u1: ox + W, v0: oy, v1: oy + T },
+          { u0: ox, u1: ox + T, v0: oy, v1: oy + H }
+        ];
+    return { pts, boxes, minThick: T };
+  }
+  if (form === 't_block') {
+    const W = Math.max(186, tr.w || (206 + ((s * 29) % 48)));
+    const H = Math.max(152, tr.h || (166 + ((s * 17) % 38)));
+    const T = Math.max(70, Math.min(W * 0.44, tr.thick || (74 + ((s * 5) % 12))));
+    const hw = W * 0.5, st = T * 0.5;
+    const topY = -H * 0.42, botY = topY + H;
+    const pts = [
+      { x: -hw, y: topY },
+      { x: hw, y: topY },
+      { x: hw, y: topY + T },
+      { x: st, y: topY + T },
+      { x: st, y: botY },
+      { x: -st, y: botY },
+      { x: -st, y: topY + T },
+      { x: -hw, y: topY + T }
+    ];
+    const boxes = [
+      { u0: -hw, u1: hw, v0: topY, v1: topY + T },
+      { u0: -st, u1: st, v0: topY, v1: botY }
+    ];
+    return { pts, boxes, minThick: T };
+  }
+  if (form === 'stepped_block') {
+    const W = Math.max(210, tr.w || (228 + ((s * 31) % 52)));
+    const T = Math.max(72, tr.thick || (74 + ((s * 9) % 12)));
+    const overlapY = Math.round(T * 0.74);
+    const H = T * 2 - overlapY;
+    const hw = W * 0.5, hh = H * 0.5;
+    const ox = Math.max(36, Math.min(hw - 42, Math.round(W * 0.21)));
+    const flipU = (Math.floor(s * 13) % 2 === 0) ? 1 : -1;
+    const rawPts = [
+      { x: -hw, y: -hh },
+      { x: ox, y: -hh },
+      { x: ox, y: hh - T },
+      { x: hw, y: hh - T },
+      { x: hw, y: hh },
+      { x: -ox, y: hh },
+      { x: -ox, y: -hh + T },
+      { x: -hw, y: -hh + T }
+    ];
+    const pts = flipU < 0
+      ? rawPts.map(p => ({ x: -p.x, y: p.y })).reverse()
+      : rawPts;
+    const boxes = flipU < 0
+      ? [
+          { u0: -ox, u1: hw, v0: -hh, v1: -hh + T },
+          { u0: -hw, u1: ox, v0: hh - T, v1: hh }
+        ]
+      : [
+          { u0: -hw, u1: ox, v0: -hh, v1: -hh + T },
+          { u0: -ox, u1: hw, v0: hh - T, v1: hh }
+        ];
+    return { pts, boxes, minThick: overlapY };
+  }
+  if (form === 'square_slab') {
+    const W = Math.max(138, tr.w || (150 + ((s * 21) % 36)));
+    const H = Math.max(122, tr.h || (130 + ((s * 15) % 32)));
+    const hw = W * 0.5, hh = H * 0.5;
+    return {
+      pts: [
+        { x: -hw, y: -hh },
+        { x: hw, y: -hh },
+        { x: hw, y: hh },
+        { x: -hw, y: hh }
+      ],
+      boxes: [{ u0: -hw, u1: hw, v0: -hh, v1: hh }],
+      minThick: Math.min(W, H)
+    };
+  }
+  // 默认 rect_strip：细长嵌地矩石长槽块（长宽比 ~3.0:1 ~ 4.2:1，横纵斜切皆极利落）
+  const W = Math.max(196, tr.len || tr.w || (236 + ((s * 37) % 92)));
+  const H = Math.max(70, tr.wid || (tr.r ? tr.r * 2.2 : 0) || (74 + ((s * 11) % 18)));
+  const hw = W * 0.5, hh = H * 0.5;
+  return {
+    pts: [
+      { x: -hw, y: -hh },
+      { x: hw, y: -hh },
+      { x: hw, y: hh },
+      { x: -hw, y: hh }
+    ],
+    boxes: [{ u0: -hw, u1: hw, v0: -hh, v1: hh }],
+    minThick: H
+  };
+}
+
+// 惰性烘焙嵌地石砌地形块几何（支持细长矩石槽 rect_strip、L型折角石块 l_block、T型石块 t_block、错位双拼块 stepped_block、重型方砖台 square_slab 与石砌断层深渊 chasm，零每帧分配，碰撞与像素 100% 对齐）
 function ensureTerrainGeometry(tr) {
   if (!tr || (tr._geoReady && tr._geoX === tr.x && tr._geoY === tr.y)) return tr;
   const s = tr.seed !== undefined ? tr.seed : 2.3;
   tr.seed = s;
-  if (tr.rot === undefined) tr.rot = (s * 1.37) % (Math.PI * 2);
+  if (tr.rot === undefined) tr.rot = 0;
+  const ca0 = Math.cos(tr.rot), sa0 = Math.sin(tr.rot);
+  tr._cosR = ca0; tr._sinR = sa0;
 
   if (tr.kind === 'chasm') {
-    const x1 = tr.x1 !== undefined ? tr.x1 : tr.x - Math.cos(tr.rot) * 105;
-    const y1 = tr.y1 !== undefined ? tr.y1 : tr.y - Math.sin(tr.rot) * 105;
-    const x2 = tr.x2 !== undefined ? tr.x2 : tr.x + Math.cos(tr.rot) * 105;
-    const y2 = tr.y2 !== undefined ? tr.y2 : tr.y + Math.sin(tr.rot) * 105;
-    const dx = x2 - x1, dy = y2 - y1;
-    const len = Math.hypot(dx, dy) || 160;
-    const ux = dx / len, uy = dy / len;
-    const nx = -uy, ny = ux;
-    const baseW = Math.max(18, tr.r || 28);
-    const bendAmp = tr.bendAmp !== undefined ? tr.bendAmp : (Math.sin(s * 1.73) * baseW * 1.15);
-    // 6 段折线/弧弯锯齿断层主脊（支持斜向细长断层与折角大裂谷）
-    const steps = 6;
-    const spine = [];
-    let maxDistSq = 0;
-    for (let k = 0; k <= steps; k++) {
-      const f = k / steps;
-      const midEnvelope = Math.sin(f * Math.PI);
-      const kink = (k === 0 || k === steps)
-        ? 0
-        : (bendAmp * midEnvelope + Math.sin(s * 2.3 + k * 2.15) * (baseW * 0.54) * midEnvelope);
-      const wScale = (k === 0 || k === steps) ? 0.20 : (0.58 + 0.54 * midEnvelope + 0.14 * Math.cos(s + k * 1.9));
-      const sx = x1 + dx * f + nx * kink;
-      const sy = y1 + dy * f + ny * kink;
-      const sw = baseW * wScale;
-      spine.push({ x: sx, y: sy, w: sw });
-      const ddx = sx - tr.x, ddy = sy - tr.y;
-      const reach = Math.hypot(ddx, ddy) + sw * 1.5;
-      if (reach * reach > maxDistSq) maxDistSq = reach * reach;
-    }
-    tr.spine = spine;
-    tr.boundR = Math.sqrt(maxDistSq) + 18;
-    tr.halfLen = Math.max(tr.halfLen || 0, tr.boundR);
-    // 计算每节主脊的局部切向法线，确保大幅弯曲时断崖两侧依然严丝合缝
-    const norms = [];
-    for (let k = 0; k <= steps; k++) {
-      const pPrev = spine[Math.max(0, k - 1)];
-      const pNext = spine[Math.min(steps, k + 1)];
-      const tdx = pNext.x - pPrev.x, tdy = tdyVal(pNext.y - pPrev.y, tdx);
-      const tLen = Math.hypot(tdx, tdy) || 1;
-      norms.push({ nx: -tdy / tLen, ny: tdx / tLen });
-    }
-    function tdyVal(v, vx) { return (v === 0 && vx === 0) ? 1 : v; }
-    const buildRim = (widthMul, jitterAmp) => {
-      const pts = [];
-      for (let k = 0; k <= steps; k++) {
-        const p = spine[k], nm = norms[k];
-        const jit = (k === 0 || k === steps) ? 0 : Math.sin(s * 3.1 + k * 2.7) * jitterAmp;
-        pts.push({ x: p.x + nm.nx * (p.w * widthMul + jit), y: p.y + nm.ny * (p.w * widthMul + jit) });
-      }
-      for (let k = steps; k >= 0; k--) {
-        const p = spine[k], nm = norms[k];
-        const jit = (k === 0 || k === steps) ? 0 : Math.cos(s * 2.7 + k * 2.3) * jitterAmp;
-        pts.push({ x: p.x - nm.nx * (p.w * widthMul + jit), y: p.y - nm.ny * (p.w * widthMul + jit) });
-      }
-      return pts;
-    };
-    tr.outerCliff = buildRim(1.36, 6.2);
-    tr.midCliff = buildRim(1.06, 4.0);
-    tr.abyssPoly = buildRim(0.74, 3.2);
-    tr.cracks = [];
-    for (let c = 1; c < steps; c += 2) {
-      const sp = spine[c], nm = norms[c];
-      const side = (c % 4 === 1) ? 1 : -1;
-      const ca = Math.atan2(nm.ny * side, nm.nx * side) + Math.sin(s + c) * 0.45;
-      const cl = baseW * (1.42 + (c % 2) * 0.28);
-      const sx0 = sp.x + nm.nx * side * sp.w * 0.9;
-      const sy0 = sp.y + nm.ny * side * sp.w * 0.9;
-      const mx = sp.x + Math.cos(ca + 0.22) * (cl * 0.58);
-      const my = sp.y + Math.sin(ca + 0.22) * (cl * 0.58);
-      const ex = sp.x + Math.cos(ca - 0.18) * cl;
-      const ey = sp.y + Math.sin(ca - 0.18) * cl;
-      tr.cracks.push({ x0: sx0, y0: sy0, x1: sx0, y1: sy0, mx, my, xm: mx, ym: my, x2: ex, y2: ey });
-    }
-    tr._geoX = tr.x; tr._geoY = tr.y;
-    tr._geoReady = true;
-    return tr;
-  }
-
-  const form = tr.form || 'basin';
-  tr.form = form;
-  const ca0 = Math.cos(tr.rot), sa0 = Math.sin(tr.rot);
-  const nx0 = -sa0, ny0 = ca0;
-
-  // 形态一至四：基于多节点主脊的真地形块（斜向细长裂脉 slash_vein / 蜿蜒S或折角沟壑 meander_belt / 斜切多边形岩台块 oblique_slab / 月牙弧带 crescent_arc）
-  if (form === 'slash_vein' || form === 'meander_belt' || form === 'oblique_slab' || form === 'crescent_arc') {
-    const isSlab = form === 'oblique_slab';
-    const steps = isSlab ? 4 : (form === 'slash_vein' ? 6 : 7);
-    const spine = [];
-    if (form === 'crescent_arc') {
-      const arcR = tr.arcR || (138 + ((s * 17) % 48));
-      const span = tr.arcSpan || (1.35 + ((s * 0.41) % 0.52));
-      const baseW = Math.max(22, tr.r || 33);
-      const midSag = arcR * (1 - Math.cos(span * 0.34));
-      const arcCx = tr.x - ca0 * (arcR - midSag);
-      const arcCy = tr.y - sa0 * (arcR - midSag);
-      for (let k = 0; k <= steps; k++) {
-        const f = k / steps;
-        const ak = tr.rot + (f - 0.5) * span;
-        const env = Math.sin(f * Math.PI);
-        const wScale = (k === 0 || k === steps) ? 0.48 : (0.78 + 0.34 * env + 0.08 * Math.sin(s * 2.1 + k * 1.6));
-        spine.push({
-          x: arcCx + Math.cos(ak) * arcR,
-          y: arcCy + Math.sin(ak) * arcR,
-          w: baseW * wScale
-        });
-      }
-    } else if (isSlab) {
-      // 斜切多边形岩台地形块（宽厚斜向断层块 / 楔形梯形块）
-      const halfL = (tr.len || (175 + ((s * 23) % 75))) * 0.5;
-      const baseW = Math.max(36, tr.r || 48);
-      const taper = (((Math.floor(s * 7) % 3) - 1) * 0.17);
-      const shear = (((Math.floor(s * 11) % 3) - 1) * baseW * 0.24);
-      for (let k = 0; k <= steps; k++) {
-        const f = k / steps;
-        const u = (f - 0.5) * 2;
-        const along = u * halfL;
-        const off = u * shear + Math.sin(f * Math.PI) * Math.sin(s * 1.9) * (baseW * 0.16);
-        const wScale = (1 + u * taper) * ((k === 0 || k === steps) ? 0.84 : (0.98 + 0.08 * Math.cos(s + k * 2.1)));
-        spine.push({
-          x: tr.x + ca0 * along + nx0 * off,
-          y: tr.y + sa0 * along + ny0 * off,
-          w: baseW * wScale
-        });
-      }
-    } else if (form === 'meander_belt') {
-      // 蜿蜒 S 弯河床或折角 L 型沟壑长带
-      const halfL = (tr.len || (285 + ((s * 29) % 125))) * 0.5;
-      const baseW = Math.max(22, tr.r || 33);
-      const bendSign = (Math.floor(s * 13) % 2 === 0) ? 1 : -1;
-      const isElbow = (Math.floor(s * 9) % 3 === 0);
-      for (let k = 0; k <= steps; k++) {
-        const f = k / steps;
-        const u = (f - 0.5) * 2;
-        const along = u * halfL;
-        const off = isElbow
-          ? ((0.55 - Math.abs(u) * 0.85) * (halfL * 0.44) * bendSign)
-          : (Math.sin(u * Math.PI * 0.92) * (halfL * 0.30) * bendSign);
-        const wScale = (k === 0 || k === steps) ? 0.54 : (0.86 + 0.24 * Math.sin(f * Math.PI) + 0.10 * Math.cos(s * 1.7 + k * 1.9));
-        spine.push({
-          x: tr.x + ca0 * along + nx0 * off,
-          y: tr.y + sa0 * along + ny0 * off,
-          w: baseW * wScale
-        });
-      }
+    const halfL = Math.max(78, tr.halfLen || 108);
+    const baseW = Math.max(24, tr.r || 30);
+    const isElbow = tr.chasmElbow !== undefined ? tr.chasmElbow : (Math.floor(s * 7) % 5 >= 3);
+    tr.chasmElbow = isElbow;
+    let localOrtho, spine;
+    if (isElbow) {
+      const armA = halfL * 1.12, armB = halfL * 0.94;
+      const T = baseW * 2;
+      const ox = -armA * 0.36, oy = -armB * 0.36;
+      localOrtho = [
+        { x: ox, y: oy },
+        { x: ox + armA, y: oy },
+        { x: ox + armA, y: oy + T },
+        { x: ox + T, y: oy + T },
+        { x: ox + T, y: oy + armB },
+        { x: ox, y: oy + armB }
+      ];
+      const p0u = ox + baseW, p0v = oy + armB - baseW * 0.65;
+      const p1u = ox + baseW, p1v = oy + baseW;
+      const p2u = ox + armA - baseW * 0.65, p2v = oy + baseW;
+      spine = [
+        { x: tr.x + ca0 * p0u - sa0 * p0v, y: tr.y + sa0 * p0u + ca0 * p0v, w: baseW },
+        { x: tr.x + ca0 * p1u - sa0 * p1v, y: tr.y + sa0 * p1u + ca0 * p1v, w: baseW },
+        { x: tr.x + ca0 * p2u - sa0 * p2v, y: tr.y + sa0 * p2u + ca0 * p2v, w: baseW }
+      ];
     } else {
-      // slash_vein：斜向细长裂脉条带（长宽比 4.5:1 ~ 6.5:1）
-      const halfL = (tr.len || (265 + ((s * 31) % 145))) * 0.5;
-      const baseW = Math.max(20, tr.r || 30);
-      for (let k = 0; k <= steps; k++) {
-        const f = k / steps;
-        const u = (f - 0.5) * 2;
-        const along = u * halfL;
-        const off = Math.sin(f * Math.PI) * Math.sin(s * 1.8 + u * 2.2) * (baseW * 0.42);
-        const wScale = (k === 0 || k === steps) ? 0.50 : (0.84 + 0.26 * Math.sin(f * Math.PI) + 0.11 * Math.sin(s * 2.3 + k * 1.8));
-        spine.push({
-          x: tr.x + ca0 * along + nx0 * off,
-          y: tr.y + sa0 * along + ny0 * off,
-          w: baseW * wScale
-        });
-      }
+      const hw = halfL, hh = baseW;
+      localOrtho = [
+        { x: -hw, y: -hh },
+        { x: hw, y: -hh },
+        { x: hw, y: hh },
+        { x: -hw, y: hh }
+      ];
+      const effL = Math.max(24, hw - baseW * 0.55);
+      spine = [
+        { x: tr.x - ca0 * effL, y: tr.y - sa0 * effL, w: baseW },
+        { x: tr.x + ca0 * effL, y: tr.y + sa0 * effL, w: baseW }
+      ];
+      tr.x1 = spine[0].x; tr.y1 = spine[0].y;
+      tr.x2 = spine[1].x; tr.y2 = spine[1].y;
     }
-
     tr.spine = spine;
-    const tangs = [];
-    let maxReach = 48;
-    for (let k = 0; k <= steps; k++) {
-      const pPrev = spine[Math.max(0, k - 1)];
-      const pNext = spine[Math.min(steps, k + 1)];
-      let tdx = pNext.x - pPrev.x, tdy = pNext.y - pPrev.y;
-      const tL = Math.hypot(tdx, tdy) || 1;
-      tdx /= tL; tdy /= tL;
-      tangs.push({ tx: tdx, ty: tdy, nx: -tdy, ny: tdx });
-      const dCenter = Math.hypot(spine[k].x - tr.x, spine[k].y - tr.y) + spine[k].w * 1.35;
-      if (dCenter > maxReach) maxReach = dCenter;
+    tr.outerCliff = _chamferAndRotatePoly(_offsetOrthoPoly(localOrtho, 12), 11, tr.x, tr.y, ca0, sa0);
+    tr.midCliff = _chamferAndRotatePoly(_offsetOrthoPoly(localOrtho, 2), 8, tr.x, tr.y, ca0, sa0);
+    tr.abyssPoly = _chamferAndRotatePoly(_offsetOrthoPoly(localOrtho, -7), 6, tr.x, tr.y, ca0, sa0);
+    tr.voidCore = _chamferAndRotatePoly(_offsetOrthoPoly(localOrtho, -Math.min(16, baseW * 0.55)), 4, tr.x, tr.y, ca0, sa0);
+
+    // 石砌路缘砖缝刻线与顶侧受光石棱
+    tr.curbJoints = [];
+    const outerO = _offsetOrthoPoly(localOrtho, 12);
+    const innerO = _offsetOrthoPoly(localOrtho, 2);
+    for (let i = 0; i < localOrtho.length; i++) {
+      const a = innerO[i], b = innerO[(i + 1) % innerO.length];
+      const edX = b.x - a.x, edY = b.y - a.y;
+      const eLen = Math.hypot(edX, edY);
+      if (eLen < 42) continue;
+      const ux = edX / eLen, uy = edY / eLen;
+      const nx = uy, ny = -ux;
+      const cnt = Math.max(1, Math.floor((eLen - 24) / 42));
+      for (let k = 1; k <= cnt; k++) {
+        const dist = (eLen / (cnt + 1)) * k;
+        const ix = a.x + ux * dist, iy = a.y + uy * dist;
+        const ox2 = ix + nx * 10, oy2 = iy + ny * 10;
+        tr.curbJoints.push({
+          x1: tr.x + ca0 * ix - sa0 * iy, y1: tr.y + sa0 * ix + ca0 * iy,
+          x2: tr.x + ca0 * ox2 - sa0 * oy2, y2: tr.y + sa0 * ox2 + ca0 * oy2
+        });
+      }
     }
-    tr.boundR = maxReach + 20;
+    tr.litEdges = [];
+    for (let i = 0; i < tr.outerCliff.length; i++) {
+      const p0 = tr.outerCliff[i], p1 = tr.outerCliff[(i + 1) % tr.outerCliff.length];
+      const edx = p1.x - p0.x, edy = p1.y - p0.y;
+      const el = Math.hypot(edx, edy) || 1;
+      const wnx = edy / el, wny = -edx / el;
+      if (wnx * -0.55 + wny * -0.83 > 0.08) {
+        tr.litEdges.push({ x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y });
+      }
+    }
+    let maxReach = 64;
+    for (let i = 0; i < outerO.length; i++) {
+      const d = Math.hypot(outerO[i].x, outerO[i].y);
+      if (d > maxReach) maxReach = d;
+    }
+    tr.boundR = maxReach + 18;
     tr.halfLen = Math.max(tr.halfLen || 0, tr.boundR);
-
-    const buildSpinePoly = (wMul, capMul, jitAmp) => {
-      const pts = [];
-      const p0 = spine[0], t0 = tangs[0];
-      const pm = spine[steps], tm = tangs[steps];
-      if (isSlab) {
-        // 斜切岩台两端采用利落的折角切面
-        pts.push({
-          x: p0.x - t0.tx * (p0.w * capMul * 0.58) + t0.nx * (p0.w * wMul * 0.56),
-          y: p0.y - t0.ty * (p0.w * capMul * 0.58) + t0.ny * (p0.w * wMul * 0.56)
-        });
-      } else {
-        pts.push({
-          x: p0.x - t0.tx * (p0.w * capMul * 0.85) + t0.nx * (p0.w * wMul * 0.34),
-          y: p0.y - t0.ty * (p0.w * capMul * 0.85) + t0.ny * (p0.w * wMul * 0.34)
-        });
-      }
-      for (let k = 0; k <= steps; k++) {
-        const p = spine[k], tg = tangs[k];
-        const tooth = tr.kind === 'lava' ? (k % 2 === 0 ? 1.05 : 0.94) : (tr.kind === 'ice_sheet' ? (k % 2 === 0 ? 1.08 : 0.92) : 1);
-        const jit = Math.sin(s * 2.9 + k * 2.3) * jitAmp;
-        const w = p.w * wMul * tooth + jit;
-        pts.push({ x: p.x + tg.nx * w, y: p.y + tg.ny * w });
-      }
-      if (isSlab) {
-        pts.push({
-          x: pm.x + tm.tx * (pm.w * capMul * 0.58) + tm.nx * (pm.w * wMul * 0.56),
-          y: pm.y + tm.ty * (pm.w * capMul * 0.58) + tm.ny * (pm.w * wMul * 0.56)
-        });
-        pts.push({
-          x: pm.x + tm.tx * (pm.w * capMul * 0.58) - tm.nx * (pm.w * wMul * 0.56),
-          y: pm.y + tm.ty * (pm.w * capMul * 0.58) - tm.ny * (pm.w * wMul * 0.56)
-        });
-      } else {
-        pts.push({
-          x: pm.x + tm.tx * (pm.w * capMul * 0.85) + tm.nx * (pm.w * wMul * 0.34),
-          y: pm.y + tm.ty * (pm.w * capMul * 0.85) + tm.ny * (pm.w * wMul * 0.34)
-        });
-        pts.push({
-          x: pm.x + tm.tx * (pm.w * capMul * 0.96),
-          y: pm.y + tm.ty * (pm.w * capMul * 0.96)
-        });
-        pts.push({
-          x: pm.x + tm.tx * (pm.w * capMul * 0.85) - tm.nx * (pm.w * wMul * 0.34),
-          y: pm.y + tm.ty * (pm.w * capMul * 0.85) - tm.ny * (pm.w * wMul * 0.34)
-        });
-      }
-      for (let k = steps; k >= 0; k--) {
-        const p = spine[k], tg = tangs[k];
-        const tooth = tr.kind === 'lava' ? (k % 2 === 1 ? 1.05 : 0.94) : (tr.kind === 'ice_sheet' ? (k % 2 === 1 ? 1.08 : 0.92) : 1);
-        const jit = Math.cos(s * 2.5 + k * 2.1) * jitAmp;
-        const w = p.w * wMul * tooth + jit;
-        pts.push({ x: p.x - tg.nx * w, y: p.y - tg.ny * w });
-      }
-      if (isSlab) {
-        pts.push({
-          x: p0.x - t0.tx * (p0.w * capMul * 0.58) - t0.nx * (p0.w * wMul * 0.56),
-          y: p0.y - t0.ty * (p0.w * capMul * 0.58) - t0.ny * (p0.w * wMul * 0.56)
-        });
-      } else {
-        pts.push({
-          x: p0.x - t0.tx * (p0.w * capMul * 0.85) - t0.nx * (p0.w * wMul * 0.34),
-          y: p0.y - t0.ty * (p0.w * capMul * 0.85) - t0.ny * (p0.w * wMul * 0.34)
-        });
-        pts.push({
-          x: p0.x - t0.tx * (p0.w * capMul * 0.96),
-          y: p0.y - t0.ty * (p0.w * capMul * 0.96)
-        });
-      }
-      return pts;
-    };
-
-    tr.outerRim = buildSpinePoly(1.20, 0.92, tr.kind === 'lava' ? 3.4 : 2.0);
-    tr.midRim = buildSpinePoly(1.08, 0.82, 1.8);
-    tr.verts = buildSpinePoly(1.00, 0.72, 1.5);
-    tr.inner1 = buildSpinePoly(0.74, 0.52, 1.1);
-    tr.inner2 = buildSpinePoly(0.46, 0.32, 0.7);
-    tr.inner3 = buildSpinePoly(0.22, 0.16, 0.4);
-
-    if (tr.kind === 'lava') {
-      tr.crusts = [];
-      tr.veinSegs = [];
-      for (let k = 1; k < steps; k += 2) {
-        const sp = spine[k], tg = tangs[k];
-        const side = (k % 4 === 1) ? 1 : -1;
-        tr.crusts.push({
-          x: sp.x + tg.nx * side * sp.w * 0.28,
-          y: sp.y + tg.ny * side * sp.w * 0.28,
-          sz: 6.5 + (k % 3) * 2.8,
-          rot: Math.atan2(tg.ty, tg.tx) + side * 0.4
-        });
-      }
-      for (let k = 1; k < steps; k++) {
-        const sp = spine[k], tg = tangs[k];
-        const side = (k % 2 === 0) ? 1 : -1;
-        const sx = sp.x + tg.nx * side * sp.w * 0.18, sy = sp.y + tg.ny * side * sp.w * 0.18;
-        const ex = sp.x + tg.nx * side * sp.w * 0.86 + tg.tx * 8, ey = sp.y + tg.ny * side * sp.w * 0.86 + tg.ty * 8;
-        tr.veinSegs.push({ x1: sx, y1: sy, mx: (sx + ex) * 0.5 + tg.tx * 5, my: (sy + ey) * 0.5 + tg.ty * 5, x2: ex, y2: ey });
-      }
-    } else if (tr.kind === 'swamp') {
-      tr.shoals = [];
-      tr.mushrooms = [];
-      for (let k = 1; k < steps; k += 2) {
-        const sp = spine[k], tg = tangs[k];
-        const side = (k % 4 === 1) ? 1 : -1;
-        tr.shoals.push({
-          x: sp.x + tg.nx * side * sp.w * 1.06,
-          y: sp.y + tg.ny * side * sp.w * 1.06,
-          rx: 17 + (k % 3) * 5,
-          ry: 9 + (k % 2) * 3.5,
-          rot: Math.atan2(tg.ty, tg.tx)
-        });
-      }
-      for (let k = 1; k <= steps - 1; k += 2) {
-        const sp = spine[k], tg = tangs[k];
-        const side = (k % 4 === 1) ? -1 : 1;
-        tr.mushrooms.push({
-          x: sp.x + tg.nx * side * sp.w * 0.94,
-          y: sp.y + tg.ny * side * sp.w * 0.94,
-          alt: (k % 3 === 0)
-        });
-      }
-    } else if (tr.kind === 'ice_sheet') {
-      tr.iceGlints = [];
-      tr.iceCracks = [];
-      for (let k = 1; k < steps; k += 2) {
-        const sp = spine[k], tg = tangs[k];
-        const gw = sp.w * 0.52;
-        tr.iceGlints.push({
-          x: sp.x, y: sp.y, gw,
-          ang: Math.atan2(tg.ty, tg.tx) - 0.55
-        });
-      }
-      for (let k = 0; k < steps; k++) {
-        const a = spine[k], b = spine[k + 1], tg = tangs[k];
-        const off = ((k % 2 === 0) ? 1 : -1) * a.w * 0.30;
-        tr.iceCracks.push({
-          x1: a.x + tg.nx * off * 0.5, y1: a.y + tg.ny * off * 0.5,
-          x2: b.x - tg.nx * off * 0.7, y2: b.y - tg.ny * off * 0.7
-        });
-      }
-    }
-
     tr._geoX = tr.x; tr._geoY = tr.y;
     tr._geoReady = true;
     return tr;
   }
 
-  // 形态五：斜向拉伸非对称洼地块（basin，长短轴比 1.28~1.82，绝非正圆）
-  const stretch = tr.stretch || (1.30 + ((s * 0.31) % 0.48));
-  tr.stretch = stretch;
-  const n = tr.kind === 'ice_sheet' ? 16 : (tr.kind === 'lava' ? 22 : 20);
-  const buildBasinPoly = (scaleMul) => {
-    const out = [];
-    for (let k = 0; k < n; k++) {
-      const localA = (k / n) * Math.PI * 2;
-      let rad = terrainRadiusAt(tr, localA + tr.rot) * scaleMul;
-      if (tr.kind === 'lava') {
-        rad *= (k % 2 === 0 ? 1.06 : 0.92);
-      } else if (tr.kind === 'ice_sheet') {
-        rad *= (k % 4 === 0 ? 1.14 : (k % 2 === 0 ? 0.88 : 0.97));
-      }
-      const lx = Math.cos(localA) * rad * stretch;
-      const ly = Math.sin(localA) * rad;
-      out.push({
-        x: tr.x + ca0 * lx - sa0 * ly,
-        y: tr.y + sa0 * lx + ca0 * ly
-      });
-    }
-    return out;
+  // 遗留形态名自动映射至五大嵌地石砌方砖块形态
+  const legacyMap = {
+    slash_vein: 'rect_strip',
+    meander_belt: 'l_block',
+    oblique_slab: 'stepped_block',
+    crescent_arc: 't_block',
+    basin: 'square_slab'
   };
-  const verts = buildBasinPoly(1.0);
-  let maxR = (tr.r || 72) * stretch;
-  for (let k = 0; k < verts.length; k++) {
-    const d = Math.hypot(verts[k].x - tr.x, verts[k].y - tr.y);
+  if (legacyMap[tr.form]) tr.form = legacyMap[tr.form];
+  if (!tr.form) tr.form = 'rect_strip';
+
+  const spec = _buildBlockLocalSpec(tr);
+  const localOrtho = spec.pts;
+  tr.boxes = spec.boxes;
+
+  const localOuter = _offsetOrthoPoly(localOrtho, 11);
+  const localMid = _offsetOrthoPoly(localOrtho, 4);
+  const maxIn1 = Math.min(8, spec.minThick * 0.16);
+  const maxIn2 = Math.min(16, spec.minThick * 0.30);
+  const maxIn3 = Math.min(23, spec.minThick * 0.41);
+
+  tr.outerRim = _chamferAndRotatePoly(localOuter, 11, tr.x, tr.y, ca0, sa0);
+  tr.midRim = _chamferAndRotatePoly(localMid, 9, tr.x, tr.y, ca0, sa0);
+  tr.verts = _chamferAndRotatePoly(localOrtho, 7, tr.x, tr.y, ca0, sa0);
+  tr.sunkenPoly = tr.verts.map(p => ({ x: p.x + 1.5, y: p.y + 6.5 }));
+  tr.inner1 = _chamferAndRotatePoly(_offsetOrthoPoly(localOrtho, -maxIn1), 5, tr.x, tr.y, ca0, sa0);
+  tr.inner2 = _chamferAndRotatePoly(_offsetOrthoPoly(localOrtho, -maxIn2), 4, tr.x, tr.y, ca0, sa0);
+  tr.inner3 = _chamferAndRotatePoly(_offsetOrthoPoly(localOrtho, -maxIn3), 3, tr.x, tr.y, ca0, sa0);
+
+  let maxR = 68;
+  for (let i = 0; i < tr.outerRim.length; i++) {
+    const d = Math.hypot(tr.outerRim[i].x - tr.x, tr.outerRim[i].y - tr.y);
     if (d > maxR) maxR = d;
   }
-  tr.verts = verts;
-  tr.outerRim = buildBasinPoly(1.14);
-  tr.midRim = buildBasinPoly(1.06);
-  tr.inner1 = buildBasinPoly(0.80);
-  tr.inner2 = buildBasinPoly(0.56);
-  tr.inner3 = buildBasinPoly(0.32);
-  tr.boundR = maxR + 20;
+  tr.boundR = maxR + 18;
   tr.halfLen = Math.max(tr.halfLen || 0, tr.boundR);
 
-  if (tr.kind === 'lava') {
-    tr.crusts = [];
-    tr.veinSegs = [];
-    for (let c = 0; c < 4; c++) {
-      const la = c * 1.57 + 0.42;
-      const crd = (tr.r || 72) * (0.26 + (c % 2) * 0.22);
-      const lx = Math.cos(la) * crd * stretch, ly = Math.sin(la) * crd;
-      tr.crusts.push({
-        x: tr.x + ca0 * lx - sa0 * ly,
-        y: tr.y + sa0 * lx + ca0 * ly,
-        sz: 7 + (c % 3) * 3.2,
-        rot: tr.rot + la * 0.7
+  // 石砌外框切砖接缝与左上受光高光石棱
+  tr.curbJoints = [];
+  for (let i = 0; i < localOrtho.length; i++) {
+    const a = localOrtho[i], b = localOrtho[(i + 1) % localOrtho.length];
+    const edX = b.x - a.x, edY = b.y - a.y;
+    const eLen = Math.hypot(edX, edY);
+    if (eLen < 40) continue;
+    const ux = edX / eLen, uy = edY / eLen;
+    const nx = uy, ny = -ux;
+    const cnt = Math.max(1, Math.floor((eLen - 22) / 44));
+    for (let k = 1; k <= cnt; k++) {
+      const dist = (eLen / (cnt + 1)) * k;
+      const ix = a.x + ux * dist, iy = a.y + uy * dist;
+      const ox2 = ix + nx * 11, oy2 = iy + ny * 11;
+      tr.curbJoints.push({
+        x1: tr.x + ca0 * ix - sa0 * iy, y1: tr.y + sa0 * ix + ca0 * iy,
+        x2: tr.x + ca0 * ox2 - sa0 * oy2, y2: tr.y + sa0 * ox2 + ca0 * oy2
       });
-    }
-    for (let k = 0; k < verts.length; k += 3) {
-      const vp = verts[k];
-      const sx = tr.x + (vp.x - tr.x) * 0.42, sy = tr.y + (vp.y - tr.y) * 0.42;
-      const ex = tr.x + (vp.x - tr.x) * 0.90, ey = tr.y + (vp.y - tr.y) * 0.90;
-      tr.veinSegs.push({ x1: sx, y1: sy, mx: (sx + ex) * 0.5 + 4, my: (sy + ey) * 0.5 - 3, x2: ex, y2: ey });
-    }
-  } else if (tr.kind === 'swamp') {
-    tr.shoals = [];
-    tr.mushrooms = [];
-    for (let sh = 0; sh < 3; sh++) {
-      const vp = verts[(sh * 6) % verts.length];
-      tr.shoals.push({
-        x: tr.x + (vp.x - tr.x) * 1.05,
-        y: tr.y + (vp.y - tr.y) * 1.05,
-        rx: 18 + sh * 5,
-        ry: 10 + (sh % 2) * 4,
-        rot: tr.rot + sh * 1.05
-      });
-    }
-    for (let m = 0; m < 3; m++) {
-      const vp = verts[(m * 5 + 2) % verts.length];
-      if (vp) tr.mushrooms.push({ x: vp.x, y: vp.y, alt: m % 2 === 1 });
-    }
-  } else if (tr.kind === 'ice_sheet') {
-    tr.iceGlints = [
-      { x: tr.x - ca0 * (tr.r || 72) * 0.24, y: tr.y - sa0 * (tr.r || 72) * 0.24, gw: (tr.r || 72) * 0.46, ang: tr.rot - 0.52 },
-      { x: tr.x + ca0 * (tr.r || 72) * 0.22, y: tr.y + sa0 * (tr.r || 72) * 0.22, gw: (tr.r || 72) * 0.34, ang: tr.rot - 0.52 }
-    ];
-    tr.iceCracks = [];
-    if (verts.length >= 12) {
-      tr.iceCracks.push(
-        { x1: verts[1].x, y1: verts[1].y, x2: tr.x - 6, y2: tr.y + 4 },
-        { x1: tr.x - 6, y1: tr.y + 4, x2: verts[9].x, y2: verts[9].y },
-        { x1: verts[3].x, y1: verts[3].y, x2: verts[11].x, y2: verts[11].y }
-      );
     }
   }
+  tr.litEdges = [];
+  for (let i = 0; i < tr.outerRim.length; i++) {
+    const p0 = tr.outerRim[i], p1 = tr.outerRim[(i + 1) % tr.outerRim.length];
+    const edx = p1.x - p0.x, edy = p1.y - p0.y;
+    const el = Math.hypot(edx, edy) || 1;
+    const wnx = edy / el, wny = -edx / el;
+    if (wnx * -0.55 + wny * -0.83 > 0.08) {
+      tr.litEdges.push({ x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y });
+    }
+  }
+
+  // 槽内几何砖格刻线与元素晶体/黑曜石板装饰（100% 几何块状，零烂泥边）
+  tr.gridSegs = [];
+  const stepG = tr.kind === 'ice_sheet' ? 42 : 48;
+  let uMin = Infinity, uMax = -Infinity, vMin = Infinity, vMax = -Infinity;
+  for (let i = 0; i < tr.boxes.length; i++) {
+    const bx = tr.boxes[i];
+    if (bx.u0 < uMin) uMin = bx.u0;
+    if (bx.u1 > uMax) uMax = bx.u1;
+    if (bx.v0 < vMin) vMin = bx.v0;
+    if (bx.v1 > vMax) vMax = bx.v1;
+  }
+  for (let u = Math.ceil((uMin + 18) / stepG) * stepG; u <= uMax - 18; u += stepG) {
+    tr.gridSegs.push({
+      x1: tr.x + ca0 * u - sa0 * (vMin - 4), y1: tr.y + sa0 * u + ca0 * (vMin - 4),
+      x2: tr.x + ca0 * u - sa0 * (vMax + 4), y2: tr.y + sa0 * u + ca0 * (vMax + 4)
+    });
+  }
+  for (let v = Math.ceil((vMin + 18) / stepG) * stepG; v <= vMax - 18; v += stepG) {
+    tr.gridSegs.push({
+      x1: tr.x + ca0 * (uMin - 4) - sa0 * v, y1: tr.y + sa0 * (uMin - 4) + ca0 * v,
+      x2: tr.x + ca0 * (uMax + 4) - sa0 * v, y2: tr.y + sa0 * (uMax + 4) + ca0 * v
+    });
+  }
+
+  tr.accents = [];
+  for (let bIdx = 0; bIdx < tr.boxes.length; bIdx++) {
+    const bx = tr.boxes[bIdx];
+    const bw = bx.u1 - bx.u0, bh = bx.v1 - bx.v0;
+    const majorHoriz = bw >= bh;
+    const span = majorHoriz ? bw : bh;
+    const cnt = Math.max(2, Math.min(4, Math.floor(span / 68)));
+    for (let k = 0; k < cnt; k++) {
+      const f = (k + 0.5) / cnt;
+      const jit = ((k % 2 === 0 ? 1 : -1) * 0.16);
+      const u = majorHoriz ? (bx.u0 + 24 + (bw - 48) * f) : ((bx.u0 + bx.u1) * 0.5 + bw * jit);
+      const v = majorHoriz ? ((bx.v0 + bx.v1) * 0.5 + bh * jit) : (bx.v0 + 24 + (bh - 48) * f);
+      tr.accents.push({
+        x: tr.x + ca0 * u - sa0 * v,
+        y: tr.y + sa0 * u + ca0 * v + 3,
+        w: 14 + ((k + bIdx) % 2) * 6,
+        h: 9 + (k % 2) * 4,
+        rot: tr.rot + (tr.kind === 'ice_sheet' ? -0.58 : (k % 2 === 0 ? 0 : Math.PI * 0.25)),
+        alt: ((k + bIdx) % 3 === 1)
+      });
+    }
+  }
+
   tr._geoX = tr.x; tr._geoY = tr.y;
   tr._geoReady = true;
   return tr;
@@ -491,25 +435,25 @@ function isPointInTerrain(tr, px, py, pad = 0) {
   if (!tr || tr.kind === 'chasm') return false;
   ensureTerrainGeometry(tr);
   const dx = px - tr.x, dy = py - tr.y;
-  const maxB = (tr.boundR || (tr.r || 78) * 1.8) + pad;
+  const maxB = (tr.boundR || 170) + Math.max(0, pad);
   if (dx * dx + dy * dy > maxB * maxB) return false;
-  if (tr.spine && tr.spine.length >= 2) {
-    for (let s = 0; s < tr.spine.length - 1; s++) {
-      const a = tr.spine[s], b = tr.spine[s + 1];
-      const seg = pointSegClosest(px, py, a.x, a.y, b.x, b.y);
-      const localW = a.w + (b.w - a.w) * seg.t + pad;
-      if (seg.dSq <= localW * localW) return true;
+  if (tr.boxes && tr.boxes.length) {
+    const ca = tr._cosR !== undefined ? tr._cosR : Math.cos(tr.rot || 0);
+    const sa = tr._sinR !== undefined ? tr._sinR : Math.sin(tr.rot || 0);
+    const u = dx * ca + dy * sa;
+    const v = -dx * sa + dy * ca;
+    for (let i = 0; i < tr.boxes.length; i++) {
+      const b = tr.boxes[i];
+      if (u < b.u0 - pad || u > b.u1 + pad || v < b.v0 - pad || v > b.v1 + pad) continue;
+      const cr = Math.min(7, (b.u1 - b.u0) * 0.25, (b.v1 - b.v0) * 0.25);
+      const effR = Math.max(0, cr + pad);
+      const qx = Math.max(0, Math.max(b.u0 + cr - u, u - (b.u1 - cr)));
+      const qy = Math.max(0, Math.max(b.v0 + cr - v, v - (b.v1 - cr)));
+      if (qx * qx + qy * qy <= effR * effR) return true;
     }
     return false;
   }
-  const ca = Math.cos(tr.rot || 0), sa = Math.sin(tr.rot || 0);
-  const stretch = tr.stretch || 1;
-  const lx = (dx * ca + dy * sa) / stretch;
-  const ly = -dx * sa + dy * ca;
-  const d = Math.hypot(lx, ly);
-  if (d <= (tr.r || 68) * 0.50 + pad) return true;
-  const localAng = Math.atan2(ly, lx);
-  return d < terrainRadiusAt(tr, localAng + (tr.rot || 0)) + pad;
+  return Math.hypot(dx, dy) < (tr.r || 68) + pad;
 }
 
 function closestOnChasm(tr, px, py) {
@@ -589,28 +533,54 @@ function makeRiftPortal(id, label, x, y, color, phaseOffset = 0) {
 
 function _terrainSampleDiscs(tr) {
   ensureTerrainGeometry(tr);
-  if (tr.spine && tr.spine.length) {
+  if (tr.spine && tr.spine.length >= 2) {
     const out = [];
-    for (let i = 0; i < tr.spine.length; i++) {
-      out.push({ x: tr.spine[i].x, y: tr.spine[i].y, r: (tr.spine[i].w || 28) * 1.15 });
+    for (let i = 0; i < tr.spine.length - 1; i++) {
+      const a = tr.spine[i], b = tr.spine[i + 1];
+      const segL = Math.hypot(b.x - a.x, b.y - a.y);
+      const cnt = Math.max(2, Math.ceil(segL / 52));
+      for (let k = 0; k <= cnt; k++) {
+        const t = k / cnt;
+        out.push({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+          r: (a.w || 28) + 12
+        });
+      }
     }
     return out;
   }
-  const r = tr.r || 68;
-  const st = tr.stretch || 1.35;
-  const ca = Math.cos(tr.rot || 0), sa = Math.sin(tr.rot || 0);
-  const off = r * (st - 0.35) * 0.55;
-  return [
-    { x: tr.x - ca * off, y: tr.y - sa * off, r: r * 0.92 },
-    { x: tr.x, y: tr.y, r: r * 1.05 },
-    { x: tr.x + ca * off, y: tr.y + sa * off, r: r * 0.92 }
-  ];
+  if (tr.boxes && tr.boxes.length) {
+    const ca = tr._cosR !== undefined ? tr._cosR : Math.cos(tr.rot || 0);
+    const sa = tr._sinR !== undefined ? tr._sinR : Math.sin(tr.rot || 0);
+    const out = [];
+    for (let i = 0; i < tr.boxes.length; i++) {
+      const bx = tr.boxes[i];
+      const bw = bx.u1 - bx.u0, bh = bx.v1 - bx.v0;
+      const majorHoriz = bw >= bh;
+      const halfMinor = (majorHoriz ? bh : bw) * 0.5;
+      const span = majorHoriz ? bw : bh;
+      const cnt = Math.max(2, Math.ceil(span / 58));
+      for (let k = 0; k < cnt; k++) {
+        const f = cnt === 1 ? 0.5 : (k / (cnt - 1));
+        const u = majorHoriz ? (bx.u0 + halfMinor * 0.6 + Math.max(0, bw - halfMinor * 1.2) * f) : (bx.u0 + bx.u1) * 0.5;
+        const v = majorHoriz ? (bx.v0 + bx.v1) * 0.5 : (bx.v0 + halfMinor * 0.6 + Math.max(0, bh - halfMinor * 1.2) * f);
+        out.push({
+          x: tr.x + ca * u - sa * v,
+          y: tr.y + sa * u + ca * v,
+          r: halfMinor + 11
+        });
+      }
+    }
+    return out;
+  }
+  return [{ x: tr.x, y: tr.y, r: (tr.r || 68) + 10 }];
 }
 
-function _canPlaceTerrainBlock(cand, cx, cy, minGap = 84) {
+function _canPlaceTerrainBlock(cand, cx, cy, minGap = 82) {
   ensureTerrainGeometry(cand);
   let poly = cand.outerCliff || cand.outerRim || cand.verts || [];
-  const wallPad = 70;
+  const wallPad = 72;
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (let i = 0; i < poly.length; i++) {
     const p = poly[i];
@@ -652,7 +622,7 @@ function _canPlaceTerrainBlock(cand, cx, cy, minGap = 84) {
   for (let tIdx = 0; tIdx < terrains.length; tIdx++) {
     const other = terrains[tIdx];
     const oDiscs = other._sampleDiscs || (other._sampleDiscs = _terrainSampleDiscs(other));
-    const reqGap = (cand.kind === 'chasm' && other.kind === 'chasm') ? 140 : minGap;
+    const reqGap = (cand.kind === 'chasm' && other.kind === 'chasm') ? 135 : minGap;
     for (let i = 0; i < discs.length; i++) {
       const a = discs[i];
       for (let j = 0; j < oDiscs.length; j++) {
@@ -665,17 +635,17 @@ function _canPlaceTerrainBlock(cand, cx, cy, minGap = 84) {
   return true;
 }
 
-// 随机斜角偏置生成器：优先产出极具战术切割感的斜向角度（如 25°~70°、110°~155°），兼顾少量横纵与任意角
+// 建筑石砌角度选择器：吸附哥特石砖地面的正交角 (0°/90°) 与利落切角 (±45°/±30°)，既有横纵方砖也有斜切长槽，严整高级不凌乱
+const _BLOCK_ANGLES = [
+  0, Math.PI * 0.5, 0, Math.PI * 0.5,
+  Math.PI * 0.25, -Math.PI * 0.25,
+  Math.PI / 6, -Math.PI / 6
+];
 function _pickObliqueAngle() {
-  const r = Math.random();
-  if (r < 0.72) {
-    const quad = Math.floor(Math.random() * 4);
-    return quad * (Math.PI * 0.5) + 0.36 + Math.random() * 0.85;
-  }
-  return Math.random() * Math.PI * 2;
+  return _BLOCK_ANGLES[Math.floor(Math.random() * _BLOCK_ANGLES.length)];
 }
 
-// 全域随机多形态真地形块生成器（覆盖边角、侧翼、走廊与中腹，融合斜向细长裂脉、蜿蜒S沟壑、斜切岩台块、月牙弧带、断层裂谷与异形洼地）
+// 全域随机嵌地石砌方砖地形块生成器（覆盖边角、侧翼与走廊，融合细长矩石槽、折角L型块、T型拼接块、错位双拼阶梯块、重型方砖台与石砌断层深渊）
 function spawnArenaTerrains() {
   terrains = [];
   portals = [];
@@ -685,8 +655,8 @@ function spawnArenaTerrains() {
   const compactArena = Math.min(WORLD.w, WORLD.h) < 1260;
 
   if (scId === 'wasteland') {
-    // 🕰️ 倒悬钟楼：随机斜跨或侧翼分布的双生裂隙门 A ↔ B（不再死板对称）
-    const baseA = _pickObliqueAngle();
+    // 🕰️ 倒悬钟楼：随机斜跨或侧翼分布的双生裂隙门 A ↔ B
+    const baseA = _pickObliqueAngle() + (Math.random() - 0.5) * 0.35;
     const spanX = Math.min(540, WORLD.w * 0.30) * (0.78 + Math.random() * 0.36);
     const spanY = Math.min(360, WORLD.h * 0.28) * (0.78 + Math.random() * 0.36);
     const shiftX = (Math.random() - 0.5) * Math.min(180, WORLD.w * 0.10);
@@ -701,7 +671,7 @@ function spawnArenaTerrains() {
     );
   }
 
-  // 构建全场 3x3 九宫战区分区洗牌表（含四角、上下左右侧翼及偏置中场，彻底告别扎堆中心）
+  // 全场 3x3 九宫战区分区洗牌表（含四角、上下左右侧翼及偏置中场，绝不扎堆中心）
   const zones = [];
   for (let gx = 0; gx < 3; gx++) {
     for (let gy = 0; gy < 3; gy++) {
@@ -723,13 +693,12 @@ function spawnArenaTerrains() {
     const usableW = Math.max(240, WORLD.w - padX * 2);
     const usableH = Math.max(240, WORLD.h - padY * 2);
     const cellW = usableW / 3, cellH = usableH / 3;
-    let x = padX + (z.gx + 0.12 + Math.random() * 0.76) * cellW;
-    let y = padY + (z.gy + 0.12 + Math.random() * 0.76) * cellH;
-    // 若落在正中格，则随机推向中场侧翼走廊，避免压住出生点
+    let x = padX + (z.gx + 0.14 + Math.random() * 0.72) * cellW;
+    let y = padY + (z.gy + 0.14 + Math.random() * 0.72) * cellH;
     if (z.gx === 1 && z.gy === 1 && Math.hypot(x - cx, y - cy) < 195) {
-      const pushA = _pickObliqueAngle();
-      x = cx + Math.cos(pushA) * (205 + Math.random() * 95);
-      y = cy + Math.sin(pushA) * (185 + Math.random() * 80);
+      const pushA = _pickObliqueAngle() + 0.35;
+      x = cx + Math.cos(pushA) * (205 + Math.random() * 90);
+      y = cy + Math.sin(pushA) * (185 + Math.random() * 75);
     }
     return {
       x: Math.max(padX, Math.min(WORLD.w - padX, x)),
@@ -743,18 +712,16 @@ function spawnArenaTerrains() {
         ? sampleArenaPoint(185, 175)
         : { x: 185 + Math.random() * Math.max(120, WORLD.w - 370), y: 175 + Math.random() * Math.max(120, WORLD.h - 350) };
       const ang = _pickObliqueAngle();
-      const halfLen = (88 + Math.random() * 68) * lenScale * (compactArena ? 0.82 : 1.0);
-      const r = 22 + Math.round(Math.random() * 11);
-      const bendAmp = (Math.random() - 0.5) * (halfLen * 0.46);
+      const halfLen = (92 + Math.random() * 54) * lenScale * (compactArena ? 0.84 : 1.0);
+      const r = 26 + Math.round(Math.random() * 7);
       const cand = {
         kind: 'chasm',
         x: pt.x, y: pt.y,
-        x1: pt.x - Math.cos(ang) * halfLen, y1: pt.y - Math.sin(ang) * halfLen,
-        x2: pt.x + Math.cos(ang) * halfLen, y2: pt.y + Math.sin(ang) * halfLen,
-        ang, rot: ang, halfLen, r, bendAmp,
+        ang, rot: ang, halfLen, r,
+        chasmElbow: Math.random() < 0.38,
         seed: 1.1 + Math.random() * 80
       };
-      if (_canPlaceTerrainBlock(cand, cx, cy, 92)) {
+      if (_canPlaceTerrainBlock(cand, cx, cy, 90)) {
         terrains.push(cand);
         return true;
       }
@@ -765,61 +732,67 @@ function spawnArenaTerrains() {
   const makeBlockSpec = (kind, form, pt, scale = 1.0) => {
     const rot = _pickObliqueAngle();
     const seed = 1.3 + Math.random() * 90;
-    const sc = scale * (compactArena ? 0.84 : 1.0);
-    if (form === 'slash_vein') {
+    const sc = scale * (compactArena ? 0.86 : 1.0);
+    if (form === 'rect_strip') {
       return {
         kind, form, x: pt.x, y: pt.y, rot, seed,
-        len: Math.round((255 + Math.random() * 175) * sc),
-        r: Math.round((24 + Math.random() * 13) * sc),
+        len: Math.round((225 + Math.random() * 105) * sc),
+        wid: Math.max(70, Math.round((74 + Math.random() * 20) * sc)),
+        r: 42,
         pulse: Math.random() * 6.28
       };
     }
-    if (form === 'meander_belt') {
+    if (form === 'l_block') {
       return {
         kind, form, x: pt.x, y: pt.y, rot, seed,
-        len: Math.round((275 + Math.random() * 165) * sc),
-        r: Math.round((26 + Math.random() * 13) * sc),
+        w: Math.max(176, Math.round((192 + Math.random() * 54) * sc)),
+        h: Math.max(158, Math.round((168 + Math.random() * 46) * sc)),
+        thick: Math.max(70, Math.round((74 + Math.random() * 14) * sc)),
+        r: 46,
         pulse: Math.random() * 6.28
       };
     }
-    if (form === 'oblique_slab') {
+    if (form === 't_block') {
       return {
         kind, form, x: pt.x, y: pt.y, rot, seed,
-        len: Math.round((175 + Math.random() * 95) * sc),
-        r: Math.round((40 + Math.random() * 16) * sc),
+        w: Math.max(186, Math.round((202 + Math.random() * 52) * sc)),
+        h: Math.max(152, Math.round((162 + Math.random() * 42) * sc)),
+        thick: Math.max(70, Math.round((74 + Math.random() * 12) * sc)),
+        r: 46,
         pulse: Math.random() * 6.28
       };
     }
-    if (form === 'crescent_arc') {
+    if (form === 'stepped_block') {
       return {
         kind, form, x: pt.x, y: pt.y, rot, seed,
-        arcR: Math.round((128 + Math.random() * 58) * sc),
-        arcSpan: 1.28 + Math.random() * 0.62,
-        r: Math.round((25 + Math.random() * 12) * sc),
+        w: Math.max(210, Math.round((224 + Math.random() * 58) * sc)),
+        thick: Math.max(72, Math.round((74 + Math.random() * 14) * sc)),
+        r: 46,
         pulse: Math.random() * 6.28
       };
     }
     return {
-      kind, form: 'basin', x: pt.x, y: pt.y, rot, seed,
-      r: Math.round((56 + Math.random() * 22) * sc),
-      stretch: 1.32 + Math.random() * 0.52,
+      kind, form: 'square_slab', x: pt.x, y: pt.y, rot, seed,
+      w: Math.max(138, Math.round((148 + Math.random() * 38) * sc)),
+      h: Math.max(122, Math.round((128 + Math.random() * 34) * sc)),
+      r: 52,
       pulse: Math.random() * 6.28
     };
   };
 
   const pushPool = (kind, preferredForm = '', seedHint = 0) => {
     const formPool = preferredForm
-      ? [preferredForm, 'slash_vein', 'oblique_slab', 'basin']
-      : shuffleArr(['slash_vein', 'meander_belt', 'oblique_slab', 'crescent_arc', 'basin']);
+      ? [preferredForm, 'rect_strip', 'l_block', 'square_slab']
+      : shuffleArr(['rect_strip', 'l_block', 'stepped_block', 't_block', 'square_slab']);
     for (let tries = 0; tries < 48; tries++) {
       const form = formPool[tries % formPool.length];
-      const scale = tries > 30 ? 0.78 : 1.0;
+      const scale = tries > 30 ? 0.84 : 1.0;
       const pt = tries < 27
-        ? sampleArenaPoint(145, 140)
-        : { x: 135 + Math.random() * Math.max(120, WORLD.w - 270), y: 135 + Math.random() * Math.max(120, WORLD.h - 270) };
+        ? sampleArenaPoint(148, 142)
+        : { x: 140 + Math.random() * Math.max(120, WORLD.w - 280), y: 140 + Math.random() * Math.max(120, WORLD.h - 280) };
       const cand = makeBlockSpec(kind, form, pt, scale);
       if (seedHint) cand.seed += seedHint * 0.17;
-      if (_canPlaceTerrainBlock(cand, cx, cy, tries > 34 ? 64 : 84)) {
+      if (_canPlaceTerrainBlock(cand, cx, cy, tries > 34 ? 64 : 82)) {
         terrains.push(cand);
         return true;
       }
@@ -827,52 +800,37 @@ function spawnArenaTerrains() {
     return false;
   };
 
-  // 每波随机数量（桌面 5~7 块，竖屏 4~5 块）与随机造型牌组（确保细长斜带、蜿蜒沟壑、斜向岩台块占主导）
+  // 每张地图严格只生成【单一主题地形元素】（杜绝多种不同颜色地形混杂）：
+  // 一层 foundry -> 仅嵌石熔火方槽 (lava) | 二层 glacier -> 仅碎冕寒晶方砖台 (ice_sheet)
+  // 三层 wasteland -> 仅翡翠秘毒方渠 (swamp) + 双生门 | 终层 desert -> 仅石砌断层深渊槽 (chasm)
   const targetBlocks = compactArena ? (4 + Math.floor(Math.random() * 2)) : (5 + Math.floor(Math.random() * 3));
   const formsDeck = shuffleArr([
-    'slash_vein', 'meander_belt', 'oblique_slab', 'crescent_arc',
-    'slash_vein', 'oblique_slab', 'meander_belt', 'basin'
+    'rect_strip', 'l_block', 'stepped_block', 't_block',
+    'square_slab', 'rect_strip', 'l_block', 'stepped_block'
   ]);
 
   if (scId === 'desert') {
-    // 🌑 日蚀镜界：1~2 道随机斜向/弯折断层裂谷 + 多块斜长熔岩裂脉与腐殖毒沼块
-    placeChasmBlock(1.05);
-    if (!compactArena && Math.random() < 0.55) placeChasmBlock(0.82);
-    const kinds = shuffleArr(['lava', 'swamp', 'lava', 'swamp', Math.random() < 0.55 ? 'lava' : 'swamp', 'ice_sheet']);
-    let idx = 0;
-    while (terrains.length < targetBlocks && idx < 8) {
-      const k = idx < 2 ? (idx === 0 ? 'lava' : 'swamp') : kinds[idx % kinds.length];
-      pushPool(k, formsDeck[idx % formsDeck.length], idx + 1);
-      idx++;
-    }
-  } else if (scId === 'glacier') {
-    // ❄️ 永冻冰窟：斜向寒霜冰带/冰岩台 + 细长地脉熔火裂口 + 冻土毒泥沟壑（小概率冰裂断崖）
-    if (Math.random() < 0.35) placeChasmBlock(0.78);
-    const kinds = ['ice_sheet', 'lava', 'swamp', 'ice_sheet', Math.random() < 0.55 ? 'swamp' : 'lava', 'ice_sheet', 'lava'];
-    let idx = 0;
-    while (terrains.length < targetBlocks && idx < 8) {
-      pushPool(kinds[idx % kinds.length], formsDeck[idx % formsDeck.length], idx + 1);
-      idx++;
-    }
-  } else if (scId === 'wasteland') {
-    // 🕰️ 倒悬钟楼：非对称双生裂隙门 + 细长熔炉火沟、斜向毒油泥沼块与偶发断层裂口
-    if (Math.random() < 0.38) placeChasmBlock(0.80);
-    const kinds = ['lava', 'swamp', Math.random() < 0.5 ? 'lava' : 'swamp', 'lava', 'swamp', Math.random() < 0.35 ? 'ice_sheet' : 'lava'];
-    let idx = 0;
-    while (terrains.length < targetBlocks && idx < 8) {
-      pushPool(kinds[idx % kinds.length], formsDeck[idx % formsDeck.length], idx + 1);
-      idx++;
+    const chasmTarget = compactArena ? 3 : 4;
+    const scales = [1.04, 0.94, 0.86, 0.80];
+    for (let idx = 0; idx < chasmTarget; idx++) {
+      placeChasmBlock(scales[idx % scales.length]);
     }
   } else {
-    // 🌧️ 雨夜长桥（foundry 等）：斜向熔岩裂脉、蜿蜒腐殖泥沼沟、斜切岩块与偶发古桥断口/寒水冰面
-    if (wave >= 2 && Math.random() < 0.36) placeChasmBlock(0.78);
-    const kinds = ['lava', 'swamp', 'lava', 'swamp', Math.random() < 0.5 ? 'lava' : 'swamp', Math.random() < 0.30 ? 'ice_sheet' : 'swamp', 'lava'];
+    const singleKind = scId === 'glacier' ? 'ice_sheet' : (scId === 'wasteland' ? 'swamp' : 'lava');
     let idx = 0;
-    while (terrains.length < targetBlocks && idx < 8) {
-      pushPool(kinds[idx % kinds.length], formsDeck[idx % formsDeck.length], idx + 1);
+    while (terrains.length < targetBlocks && idx < 9) {
+      pushPool(singleKind, formsDeck[idx % formsDeck.length], idx + 1);
       idx++;
     }
   }
+}
+
+function getSceneSignatureTerrainKind() {
+  const scId = (curScene && curScene.id) ? curScene.id : 'foundry';
+  if (scId === 'desert') return 'chasm';
+  if (scId === 'glacier') return 'ice_sheet';
+  if (scId === 'wasteland') return 'swamp';
+  return 'lava';
 }
 
 function spawnTree() {
@@ -906,8 +864,8 @@ function hurtTree(tr, rawDmg) {
     const luck = Math.min(90, Math.max(0, (player && player.luck) || 0));
     let cratesOnMap = 0;
     for (let di = 0; di < drops.length; di++) if (drops[di].kind === 'crate') cratesOnMap++;
-    const maxWaveCrates = 1 + (luck >= 60 ? 1 : 0);
-    const crateChance = Math.min(0.16, 0.05 + luck * 0.0014);
+    const maxWaveCrates = 1 + (luck >= 72 ? 1 : 0);
+    const crateChance = Math.min(0.11, 0.036 + luck * 0.0010);
     if (waveCratesDropped < maxWaveCrates && cratesOnMap < 2 && Math.random() < crateChance) {
       waveCratesDropped++;
       drops.push({ x: tr.x, y: tr.y, kind: 'crate', bob: 0 });
@@ -1054,46 +1012,45 @@ function queueBossCutscene(mode, variant, title, subtitle, extraTag = '', color 
   }, extra || {});
 }
 
-// 首领战斗中动态改造战场地形块（上限扩充至 <=10 块，随机生成细长斜脉、斜切岩块或弧形沟壑）
+// 首领战斗中动态改造战场地形块（严格遵循当前地图单一地形主题，绝不跨生态混出杂色地形）
 function spawnBossTerrain(kind, x, y, baseR = 74) {
   if (typeof terrains === 'undefined') return;
+  const sceneKind = getSceneSignatureTerrainKind();
   while (terrains.length >= 10) {
     terrains.shift();
   }
   const cx = Math.max(210, Math.min(WORLD.w - 210, x));
   const cy = Math.max(210, Math.min(WORLD.h - 210, y));
   const ang = _pickObliqueAngle();
-  if (kind === 'chasm') {
+  if (sceneKind === 'chasm') {
     let tx = cx, ty = cy;
     if (player && Math.hypot(tx - player.x, ty - player.y) < 130) {
       const pushA = Math.atan2(ty - player.y, tx - player.x) || 0;
       tx = Math.max(210, Math.min(WORLD.w - 210, player.x + Math.cos(pushA) * 155));
       ty = Math.max(210, Math.min(WORLD.h - 210, player.y + Math.sin(pushA) * 155));
     }
-    const halfLen = 82 + Math.random() * 34;
+    const halfLen = 88 + Math.random() * 34;
     terrains.push(ensureTerrainGeometry({
       kind: 'chasm', x: tx, y: ty,
-      x1: tx - Math.cos(ang) * halfLen, y1: ty - Math.sin(ang) * halfLen,
-      x2: tx + Math.cos(ang) * halfLen, y2: ty + Math.sin(ang) * halfLen,
-      ang, rot: ang, halfLen, r: 26, bendAmp: (Math.random() - 0.5) * 32, seed: Math.random() * 100
+      ang, rot: ang, halfLen, r: 28, chasmElbow: Math.random() < 0.35, seed: Math.random() * 100
     }));
     if (rings.length < 40) rings.push({ x: tx, y: ty, r: 95, color: '#c77dff', t: 0.35, maxT: 0.35, kind: 'hex' });
-    announce('🕳️ 首领撕裂大地！战场新增斜向【断层裂谷】', '#c77dff', 2.6);
+    announce('🕳️ 首领震塌石板！战场新增【石砌断层深渊】', '#c77dff', 2.6);
   } else {
-    const col = kind === 'lava' ? '#ff6b35' : (kind === 'ice_sheet' ? '#72efdd' : '#a3e635');
-    const bossForms = ['slash_vein', 'oblique_slab', 'crescent_arc', 'basin'];
+    const col = sceneKind === 'lava' ? '#ff6b35' : (sceneKind === 'ice_sheet' ? '#72efdd' : '#34d399');
+    const bossForms = ['rect_strip', 'l_block', 'stepped_block', 'square_slab'];
     const form = bossForms[Math.floor(Math.random() * bossForms.length)];
-    const spec = form === 'slash_vein'
-      ? { kind, form, x: cx, y: cy, rot: ang, len: 220 + Math.round(Math.random() * 85), r: 28, pulse: 0, seed: Math.random() * 100 }
-      : (form === 'oblique_slab'
-        ? { kind, form, x: cx, y: cy, rot: ang, len: 165 + Math.round(Math.random() * 55), r: 42, pulse: 0, seed: Math.random() * 100 }
-        : (form === 'crescent_arc'
-          ? { kind, form, x: cx, y: cy, rot: ang, arcR: 120 + Math.round(Math.random() * 35), arcSpan: 1.35, r: 28, pulse: 0, seed: Math.random() * 100 }
-          : { kind, form: 'basin', x: cx, y: cy, rot: ang, r: Math.round(baseR * 0.88), stretch: 1.42, pulse: 0, seed: Math.random() * 100 }));
+    const spec = form === 'rect_strip'
+      ? { kind: sceneKind, form, x: cx, y: cy, rot: ang, len: 220 + Math.round(Math.random() * 75), wid: 76, r: 42, pulse: 0, seed: Math.random() * 100 }
+      : (form === 'l_block'
+        ? { kind: sceneKind, form, x: cx, y: cy, rot: ang, w: 196, h: 174, thick: 74, r: 46, pulse: 0, seed: Math.random() * 100 }
+        : (form === 'stepped_block'
+          ? { kind: sceneKind, form, x: cx, y: cy, rot: ang, w: 228, thick: 74, r: 46, pulse: 0, seed: Math.random() * 100 }
+          : { kind: sceneKind, form: 'square_slab', x: cx, y: cy, rot: ang, w: 156, h: 138, r: 52, pulse: 0, seed: Math.random() * 100 }));
     terrains.push(ensureTerrainGeometry(spec));
     if (rings.length < 40) rings.push({ x: cx, y: cy, r: baseR + 24, color: col, t: 0.35, maxT: 0.35, kind: 'star' });
-    const nameMap = { lava: '🌋 首领劈开斜向【熔岩裂脉】封锁走位！', swamp: '🧪 首领倾泻异形【剧毒泥沼沟】污染地面！', ice_sheet: '🧊 首领凝结斜切【寒霜冰岩带】改造战场！' };
-    if (nameMap[kind]) announce(nameMap[kind], col, 2.6);
+    const nameMap = { lava: '🌋 首领震裂石砖！新增【嵌石熔火槽】封锁走位！', swamp: '🧪 首领灌注秘毒！新增【翡翠秘毒方渠】污染地面！', ice_sheet: '🧊 首领凝结地砖！新增【寒晶方砖台】改造战场！' };
+    if (nameMap[sceneKind]) announce(nameMap[sceneKind], col, 2.6);
   }
 }
 
@@ -1184,6 +1141,7 @@ function beginWave(retryMeta = null) {
   player.x = WORLD.w / 2; player.y = WORLD.h / 2;
   player.chillSlowT = 0; player.inSpore = false;
   player.lavaExposure = 0; player.lavaTick = 0; player.terrainHintT = 0; player.terrainSpdMul = 1;
+  player.frostGauge = 0; player.frostLeaveGrace = 0; player.iceFreezeT = 0; player.frostThawImmT = 0;
   player.waveMythicAwakened = false;
   cam.x = player.x; cam.y = player.y;
   clampCam();
@@ -1392,6 +1350,9 @@ function spawnWarning(x, y, type, variant = '') {
 }
 
 const RANGED_ENEMY_TYPES = new Set(['shooter', 'sniper_bug', 'mortar', 'spinner', 'rad_scorpion', 'frost_wisp', 'spore_mother', 'summoner']);
+const TANK_MELEE_TYPES = new Set(['shielder', 'brute', 'juggernaut', 'iron_guard', 'charger', 'splitter']);
+const BASIC_FODDER_MELEE_TYPES = new Set(['chaser', 'stalker', 'swarmer', 'magma_imp']);
+const EARLY_TANK_MELEE_MUL = 0.85;
 
 function countActiveRangedEnemies() {
   let c = 0;
@@ -1419,26 +1380,56 @@ function pickWaveEnemyType(wv) {
   }
 
   const meleeTable = [
-    ['chaser', 12.5],
-    ['stalker', 10.5],
-    ['swarmer', 7.2],
-    ['splitter', 7.2]
+    ['chaser', 10.5],
+    ['stalker', 8.8],
+    ['swarmer', 6.5],
+    ['splitter', 6.4]
   ];
   if (wv >= 2) {
-    meleeTable.push(['charger', 11.8]);
-    meleeTable.push(['shielder', 7.8]);
+    meleeTable.push(['charger', 8.8]);
+    meleeTable.push(['shielder', 6.6]);
+    meleeTable.push(['iron_guard', 7.4]);
   }
   if (wv >= 3) {
-    meleeTable.push(['sand_worm', 9.0]);
-    meleeTable.push(['bomber', 6.4]);
+    meleeTable.push(['sand_worm', 7.2]);
+    meleeTable.push(['bomber', 5.6]);
+    meleeTable.push(['frost_knight', 6.8]);
+    meleeTable.push(['blade_duelist', 6.8]);
   }
   if (wv >= 4) {
-    meleeTable.push(['brute', wv === 4 ? 4.2 : 8.6]);
-    meleeTable.push(['magma_imp', 5.2]);
+    meleeTable.push(['brute', wv === 4 ? 3.8 : 7.0]);
+    meleeTable.push(['magma_imp', 4.6]);
+  }
+  if (wv >= 5) {
+    meleeTable.push(['shadow_reaper', 6.2]);
   }
   if (wv >= 6) {
-    meleeTable.push(['juggernaut', 6.2]);
-    meleeTable.push(['healer', 4.6]);
+    meleeTable.push(['juggernaut', 5.2]);
+    meleeTable.push(['healer', 4.0]);
+  }
+
+  // 前 10 波肉盾怪数量精准减少 15%，远程怪占比保持 100% 不变，减少的份额等量转化为普通小怪
+  const curWaveNum = (typeof wave === 'number' && wave > 0) ? wave : wv;
+  if (curWaveNum <= 10) {
+    let freedTankW = 0;
+    let fodderTotalW = 0;
+    for (let i = 0; i < meleeTable.length; i++) {
+      const mType = meleeTable[i][0];
+      if (TANK_MELEE_TYPES.has(mType)) {
+        const cut = meleeTable[i][1] * (1 - EARLY_TANK_MELEE_MUL);
+        meleeTable[i][1] -= cut;
+        freedTankW += cut;
+      } else if (BASIC_FODDER_MELEE_TYPES.has(mType)) {
+        fodderTotalW += meleeTable[i][1];
+      }
+    }
+    if (freedTankW > 0 && fodderTotalW > 0) {
+      for (let i = 0; i < meleeTable.length; i++) {
+        if (BASIC_FODDER_MELEE_TYPES.has(meleeTable[i][0])) {
+          meleeTable[i][1] += freedTankW * (meleeTable[i][1] / fodderTotalW);
+        }
+      }
+    }
   }
 
   const rangedTable = [
@@ -1508,12 +1499,12 @@ function spawnHazard(x, y, r, dmg, delay = 1.22, extra = {}) {
 // 全异星怪物、4 大新增特异兵种、5 大场景专属怪、随机精英统领、4 大主宰 Boss 与 3 大奇遇首领生成
 // （整体怪物与首领血量下调 -20%，前 5 层进一步温和减压，第 10 轮及以后保持陡峭高压！）
 function createEnemy(x, y, type, variant = '') {
-  const hpBaseMul = typeof MONSTER_HP_BASE_MUL === 'number' ? MONSTER_HP_BASE_MUL : 1.80;
+  const hpBaseMul = typeof MONSTER_HP_BASE_MUL === 'number' ? MONSTER_HP_BASE_MUL : 1.44;
   const hpLinearSlope = typeof MONSTER_HP_LINEAR_SLOPE === 'number' ? MONSTER_HP_LINEAR_SLOPE : 0.72;
   const bossHpMul = typeof BOSS_HP_MUL === 'number' ? BOSS_HP_MUL : 4.80;
-  const lateBossMaxMul = typeof LATE_BOSS_HP_MUL === 'number' ? LATE_BOSS_HP_MUL : 12.00;
-  // 后期首领血量阶梯：第 10 层及以后进一步陡峭拉升
-  const lateBossScale = wave <= 4 ? 1.00 : (wave <= 6 ? 1.90 : (wave <= 8 ? 3.80 : (wave <= 10 ? 8.40 : (wave <= 12 ? 11.20 : lateBossMaxMul))));
+  const lateBossMaxMul = typeof LATE_BOSS_HP_MUL === 'number' ? LATE_BOSS_HP_MUL : 9.60;
+  // 后期首领血量阶梯：第 10 层及以后首领血量整体回调 -20%（6.72 / 8.96 / 9.60），前 8 层保持不变
+  const lateBossScale = wave <= 4 ? 1.00 : (wave <= 6 ? 1.90 : (wave <= 8 ? 3.80 : (wave === 9 ? 5.60 : (wave === 10 ? 6.72 : (wave <= 12 ? 8.96 : lateBossMaxMul)))));
   const monsterDmgMul = typeof MONSTER_DMG_MUL === 'number' ? MONSTER_DMG_MUL : 1.20;
   const midLateHpMul = typeof getMidLateWaveHpMul === 'function' ? getMidLateWaveHpMul(wave) : 1.0;
   const midLateDmgMul = typeof getMidLateWaveDmgMul === 'function' ? getMidLateWaveDmgMul(wave) : 1.0;
@@ -1535,8 +1526,8 @@ function createEnemy(x, y, type, variant = '') {
     const softCap = isTouch ? 64 : 80;
     const swCnt = Math.max(1, Math.min(wave >= 6 ? 3 : 2, softCap - (enemies.length + Math.max(0, spawns.length - 1))));
     for (let k = 0; k < swCnt; k++) {
-      const ox = x + (Math.random() - 0.5) * 40, oy = y + (Math.random() - 0.5) * 40;
-      enemies.push({ ...base, x: ox, y: oy, r: 9, hp: 5.0 * s, maxHp: 5.0 * s, spd: (146 + wave * 2.0) * sm, dmg: Math.max(2, Math.round(2.2 * dm)), color: '#ffbe0b', type, mat: k === 0 ? 1 : (Math.random() < 0.55 ? 1 : 0) });
+      const ox = x + (Math.random() - 0.5) * 54, oy = y + (Math.random() - 0.5) * 54;
+      enemies.push({ ...base, x: ox, y: oy, r: 16, hp: 5.0 * s, maxHp: 5.0 * s, spd: (146 + wave * 2.0) * sm, dmg: Math.max(2, Math.round(2.2 * dm)), color: '#ffbe0b', type, mat: k === 0 ? 1 : (Math.random() < 0.55 ? 1 : 0) });
     }
     addBurst(x, y, '#ff4d6d', 5, 85);
     return;
@@ -1564,11 +1555,12 @@ function createEnemy(x, y, type, variant = '') {
     // 主线以稳定的两阶段讲清每位守誓者的坚持与败北；无尽保留随机神话觉醒。
     const phase2Chance = isStoryBoss ? 1 : mythicRate;
     ent = {
-      ...base, r: 48, hp: bhp, maxHp: bhp, spd: bDef.spd * sm, dmg: Math.round(bossDmgBase * dm),
+      ...base, r: 56, hp: bhp, maxHp: bhp, spd: bDef.spd * sm, dmg: Math.round(bossDmgBase * dm),
       color: bDef.color, type: 'boss', variant: bKey,
       bossTitle: `${bDef.icon} ${bDef.name}${isStoryBoss ? ' · 第一阶段' : ''}`,
       storyPhaseBoss: isStoryBoss, storyStage: isStoryBoss ? 1 : 0,
       dashT: 2.5, sumT: 5.8, meteorT: 4.1, skillT: 2.0, sigSkillT: 4.2, terrainCd: 6.2, ringCd: 4.9,
+      venomCd: 4.4, p2SkillT: 2.8,
       burstLeft: 0, burstCd: 0, canPhase2: Math.random() < phase2Chance, mythicPhase2: false,
       mat: wave <= 4 ? 26 : (wave <= 8 ? 34 : (wave <= 12 ? 42 : 52))
     };
@@ -1578,9 +1570,9 @@ function createEnemy(x, y, type, variant = '') {
     const twinMiniScale = (diff.dualElite && wave >= 10) ? 0.70 : 1;
     const mhp = Math.round((460 + wave * 95 + Math.pow(Math.max(0, Math.min(16, wave) - 3), 2.05) * 32) * bossHpMul * lateBossScale * midLateHpMul * endlessMul * diff.hpMul * twinMiniScale);
     ent = {
-      ...base, r: 36, hp: mhp, maxHp: mhp, spd: mDef.spd * sm, dmg: Math.round(8.4 * dm),
+      ...base, r: 45, hp: mhp, maxHp: mhp, spd: mDef.spd * sm, dmg: Math.round(8.4 * dm),
       color: mDef.color, type: 'mini_boss', variant: mKey, bossTitle: `${mDef.icon} ${mDef.name}`,
-      dashT: 2.3, meteorT: 4.4, skillT: 1.9, ringCd: 5.0,
+      dashT: 2.3, meteorT: 4.4, skillT: 1.9, ringCd: 5.0, venomCd: 4.0, p2SkillT: 2.6,
       canPhase2: Math.random() < mythicRate, mythicPhase2: false, mat: 24
     };
   } else if (type === 'special_boss') {
@@ -1588,52 +1580,67 @@ function createEnemy(x, y, type, variant = '') {
     const shp = Math.round((960 + wave * 240 + Math.pow(wave, 1.92) * 14) * bossHpMul * lateBossScale * midLateHpMul * endlessMul * diff.hpMul);
     const sSpd = relDef.bossId === 'crimson_lord' ? 98 : (relDef.bossId === 'golden_golem' ? 74 : 86);
     ent = {
-      ...base, r: 43, hp: shp, maxHp: shp, spd: sSpd * sm, dmg: Math.round(9.0 * dm),
+      ...base, r: 52, hp: shp, maxHp: shp, spd: sSpd * sm, dmg: Math.round(9.0 * dm),
       color: relDef.bossColor, type: 'special_boss', variant: relDef.bossId, bossTitle: `${relDef.bossIcon} ${relDef.bossName}`,
       dashT: 2.1, skillT: 1.9, meteorT: 3.9, sumT: 5.8, terrainCd: 6.2, ringCd: 4.8,
+      venomCd: 4.2, p2SkillT: 2.6,
       goldStage: 4, canPhase2: Math.random() < mythicRate, mythicPhase2: false,
       mat: relDef.bossId === 'golden_golem' ? 48 : (relDef.bossId === 'crimson_lord' ? 30 : 26)
     };
   } else if (type === 'stalker') {
-    ent = { ...base, r: 14, hp: 20.0 * s, maxHp: 20.0 * s, spd: 138 * sm, dmg: Math.round(5.0 * dm), color: '#06d6a0', type, slashCd: 0.7, stepCd: 2.0 + Math.random(), zigT: 0.35 + Math.random() * 0.25, zigDir: Math.random() < 0.5 ? 1 : -1, mat: 2 };
+    ent = { ...base, r: 21, hp: 20.0 * s, maxHp: 20.0 * s, spd: 138 * sm, dmg: Math.round(5.0 * dm), color: '#06d6a0', type, slashCd: 0.7, stepCd: 2.0 + Math.random(), zigT: 0.35 + Math.random() * 0.25, zigDir: Math.random() < 0.5 ? 1 : -1, mat: 2 };
+  } else if (type === 'iron_guard') {
+    ent = { ...base, r: 29, hp: 60 * s, maxHp: 60 * s, spd: 66 * sm, dmg: Math.round(6.6 * dm), color: '#e11d48', type, cleaveCd: 2.0 + Math.random() * 0.6, cleaveWindup: 0, mat: 3 };
+  } else if (type === 'frost_knight') {
+    ent = { ...base, r: 26, hp: 46 * s, maxHp: 46 * s, spd: 106 * sm, dmg: Math.round(6.2 * dm), color: '#38bdf8', type, thrustCd: 1.85 + Math.random() * 0.6, thrustWindup: 0, mat: 3 };
+  } else if (type === 'blade_duelist') {
+    ent = { ...base, r: 20, hp: 24 * s, maxHp: 24 * s, spd: 132 * sm, dmg: Math.round(5.4 * dm), color: '#f59e0b', type, whirlCd: 2.1 + Math.random() * 0.6, whirlT: 0, whirlSpin: 0, orbitDir: Math.random() < 0.5 ? 1 : -1, mat: 3 };
+  } else if (type === 'shadow_reaper') {
+    ent = { ...base, r: 25, hp: 38 * s, maxHp: 38 * s, spd: 94 * sm, dmg: Math.round(6.8 * dm), color: '#a855f7', type, blinkCd: 2.6 + Math.random() * 0.8, reapWindup: 0, mat: 4 };
   } else if (type === 'sniper_bug') {
-    ent = { ...base, r: 15, hp: 13.0 * s, maxHp: 13.0 * s, spd: 54 * sm, dmg: Math.round(6.8 * dm), color: '#ef233c', type, shotT: 2.1 + Math.random() * 0.8, aimA: undefined, aimMaxT: 0.72, recoilT: 0, mat: 3 };
+    ent = { ...base, r: 22, hp: 13.0 * s, maxHp: 13.0 * s, spd: 54 * sm, dmg: Math.round(6.8 * dm), color: '#ef233c', type, shotT: 2.1 + Math.random() * 0.8, aimA: undefined, aimMaxT: 0.72, recoilT: 0, mat: 3 };
   } else if (type === 'spinner') {
-    ent = { ...base, r: 19, hp: 28 * s, maxHp: 28 * s, spd: 74 * sm, dmg: Math.round(5.0 * dm), color: '#f59e0b', type, shotT: 2.1 + Math.random() * 0.8, orbitDir: Math.random() < 0.5 ? 1 : -1, mat: 3 };
+    ent = { ...base, r: 26, hp: 28 * s, maxHp: 28 * s, spd: 74 * sm, dmg: Math.round(5.0 * dm), color: '#f59e0b', type, shotT: 2.1 + Math.random() * 0.8, orbitDir: Math.random() < 0.5 ? 1 : -1, mat: 3 };
   } else if (type === 'juggernaut') {
-    ent = { ...base, r: 38, hp: 310 * s, maxHp: 310 * s, spd: 45 * sm, dmg: Math.round(11.2 * dm), color: '#475569', type, slamCd: 3.0, mat: 7 };
+    // 泰坦超巨型血牛（r=54 山岳体型，极沉缓霸体推进 spd=34，十字四向地裂震波）
+    ent = { ...base, r: 54, hp: 340 * s, maxHp: 340 * s, spd: 34 * sm, dmg: Math.round(11.6 * dm), color: '#475569', type, slamCd: 3.1, slamWindup: 0, mat: 7 };
   } else if (type === 'rad_scorpion') {
-    ent = { ...base, r: 21, hp: 36 * s, maxHp: 36 * s, spd: 70 * sm, dmg: Math.round(5.5 * dm), color: '#a3e635', type, shotT: 2.0 + Math.random() * 0.8, mat: 3 };
+    ent = { ...base, r: 28, hp: 36 * s, maxHp: 36 * s, spd: 70 * sm, dmg: Math.round(5.5 * dm), color: '#a3e635', type, shotT: 2.0 + Math.random() * 0.8, mat: 3 };
   } else if (type === 'sand_worm') {
-    ent = { ...base, r: 18, hp: 48 * s, maxHp: 48 * s, spd: 108 * sm, dmg: Math.round(5.8 * dm), color: '#f4a261', type, dashT: 1.65 + Math.random() * 0.7, mat: 3 };
+    // 潜渊遁地奇袭怪（钻入地底化作高速黑水潜影突进，破土震爆并迸射斜十字骨刺）
+    ent = { ...base, r: 26, hp: 48 * s, maxHp: 48 * s, spd: 104 * sm, dmg: Math.round(6.0 * dm), color: '#f4a261', type, burrowCd: 2.0 + Math.random() * 0.7, burrowWindup: 0, burrowT: 0, mat: 3 };
   } else if (type === 'frost_wisp') {
-    ent = { ...base, r: 15, hp: 17 * s, maxHp: 17 * s, spd: 82 * sm, dmg: Math.round(4.6 * dm), color: '#48cae4', type, shotT: 1.8 + Math.random() * 0.8, orbitDir: Math.random() < 0.5 ? 1 : -1, mat: 3 };
+    ent = { ...base, r: 22, hp: 17 * s, maxHp: 17 * s, spd: 82 * sm, dmg: Math.round(4.6 * dm), color: '#48cae4', type, shotT: 1.8 + Math.random() * 0.8, orbitDir: Math.random() < 0.5 ? 1 : -1, mat: 3 };
   } else if (type === 'magma_imp') {
-    ent = { ...base, r: 14, hp: 20 * s, maxHp: 20 * s, spd: 118 * sm, dmg: Math.round(5.8 * dm), color: '#fb5607', type, mat: 3 };
+    ent = { ...base, r: 21, hp: 20 * s, maxHp: 20 * s, spd: 118 * sm, dmg: Math.round(5.8 * dm), color: '#fb5607', type, mat: 3 };
   } else if (type === 'spore_mother') {
-    ent = { ...base, r: 26, hp: 56 * s, maxHp: 56 * s, spd: 48 * sm, dmg: Math.round(5.8 * dm), color: '#c77dff', type, shotT: 2.4 + Math.random() * 0.9, mat: 4 };
+    ent = { ...base, r: 35, hp: 56 * s, maxHp: 56 * s, spd: 48 * sm, dmg: Math.round(5.8 * dm), color: '#c77dff', type, shotT: 2.4 + Math.random() * 0.9, mat: 4 };
   } else if (type === 'charger') {
-    ent = { ...base, r: 23, hp: 68 * s, maxHp: 68 * s, spd: 84 * sm, dmg: Math.round(6.8 * dm), color: '#f77f00', type, dashT: 1.75 + Math.random() * 0.75, mat: 3 };
+    // 健硕重骑（r=31，快步 spd=92，尖角楔阵冲锋 + 收招前挑弧斩）
+    ent = { ...base, r: 31, hp: 68 * s, maxHp: 68 * s, spd: 92 * sm, dmg: Math.round(6.8 * dm), color: '#f77f00', type, dashT: 1.85 + Math.random() * 0.75, mat: 3 };
   } else if (type === 'shooter') {
-    ent = { ...base, r: 16, hp: 13.5 * s, maxHp: 13.5 * s, spd: 62 * sm, dmg: Math.round(4.2 * dm), color: '#00b4d8', type, shotT: 1.6 + Math.random() * 0.9, mat: 2 };
+    ent = { ...base, r: 23, hp: 13.5 * s, maxHp: 13.5 * s, spd: 62 * sm, dmg: Math.round(4.2 * dm), color: '#00b4d8', type, shotT: 1.6 + Math.random() * 0.9, mat: 2 };
   } else if (type === 'mortar') {
-    ent = { ...base, r: 20, hp: 24 * s, maxHp: 24 * s, spd: 52 * sm, dmg: Math.round(7.8 * dm), color: '#ff9f1c', type, shotT: 2.0 + Math.random() * 1.0, mat: 3 };
+    ent = { ...base, r: 27, hp: 24 * s, maxHp: 24 * s, spd: 52 * sm, dmg: Math.round(7.8 * dm), color: '#ff9f1c', type, shotT: 2.0 + Math.random() * 1.0, mat: 3 };
   } else if (type === 'bomber') {
-    ent = { ...base, r: 15, hp: 18 * s, maxHp: 18 * s, spd: 114 * sm, dmg: Math.round(8.8 * dm), color: '#ff4d6d', type, primed: false, fuseT: 1.25, maxFuseT: 1.25, blastR: 86, mat: 2 };
+    ent = { ...base, r: 22, hp: 18 * s, maxHp: 18 * s, spd: 114 * sm, dmg: Math.round(8.8 * dm), color: '#ff4d6d', type, primed: false, fuseT: 1.25, maxFuseT: 1.25, blastR: 86, mat: 2 };
   } else if (type === 'splitter') {
-    ent = { ...base, r: 25, hp: 54 * s, maxHp: 54 * s, spd: 70 * sm, dmg: Math.round(4.8 * dm), color: '#52b788', type, hopT: 0.8 + Math.random() * 0.6, spitT: 2.1 + Math.random() * 0.9, mat: 3 };
+    // 宽大弹性软泥（r=34，蓄蹲停顿—猛然蛙跃逼近，纯近战不射子弹）
+    ent = { ...base, r: 34, hp: 58 * s, maxHp: 58 * s, spd: 68 * sm, dmg: Math.round(5.0 * dm), color: '#52b788', type, hopT: 0.9 + Math.random() * 0.5, mat: 3 };
   } else if (type === 'mini_slime') {
-    ent = { ...base, r: 10, hp: 9.0 * s, maxHp: 9.0 * s, spd: 140 * sm, dmg: Math.max(2, Math.round(2.6 * dm)), color: '#74c69d', type, mat: Math.random() < 0.35 ? 1 : 0 };
+    ent = { ...base, r: 17, hp: 9.0 * s, maxHp: 9.0 * s, spd: 140 * sm, dmg: Math.max(2, Math.round(2.6 * dm)), color: '#74c69d', type, mat: Math.random() < 0.35 ? 1 : 0 };
   } else if (type === 'shielder') {
-    ent = { ...base, r: 24, hp: 96 * s, maxHp: 96 * s, spd: 62 * sm, dmg: Math.round(6.0 * dm), color: '#5c677d', type, mat: 4 };
+    // 紧凑高甲塔盾卫（r=28，稳健 spd=54，近身发动重盾猛击震波）
+    ent = { ...base, r: 28, hp: 94 * s, maxHp: 94 * s, spd: 54 * sm, dmg: Math.round(6.2 * dm), color: '#5c677d', type, bashCd: 2.1 + Math.random() * 0.5, bashWindup: 0, mat: 4 };
   } else if (type === 'summoner') {
-    ent = { ...base, r: 18, hp: 22 * s, maxHp: 22 * s, spd: 54 * sm, dmg: Math.round(3.5 * dm), color: '#7209b7', type, sumT: 3.1 + Math.random(), boltT: 2.4, mat: 4 };
+    ent = { ...base, r: 25, hp: 22 * s, maxHp: 22 * s, spd: 54 * sm, dmg: Math.round(3.5 * dm), color: '#7209b7', type, sumT: 3.1 + Math.random(), boltT: 2.4, mat: 4 };
   } else if (type === 'healer') {
-    ent = { ...base, r: 17, hp: 28 * s, maxHp: 28 * s, spd: 62 * sm, dmg: Math.round(3.0 * dm), color: '#2ec4b6', type, healT: 2.5, mat: 4 };
+    ent = { ...base, r: 24, hp: 28 * s, maxHp: 28 * s, spd: 62 * sm, dmg: Math.round(3.0 * dm), color: '#2ec4b6', type, healT: 2.5, mat: 4 };
   } else if (type === 'brute') {
-    ent = { ...base, r: 33, hp: 195 * s, maxHp: 195 * s, spd: 56 * sm, dmg: Math.round(9.2 * dm), color: '#9d4edd', type, slamCd: 2.4, slamWindup: 0, bargeCd: 1.9 + Math.random() * 0.7, bargeT: 0, mat: 5 };
+    // 高大狂暴重锤卫（r=39，残血 <65% 狂暴提速 + 前向 90° 扇形锥区裂地重锤）
+    ent = { ...base, r: 39, hp: 190 * s, maxHp: 190 * s, spd: 64 * sm, dmg: Math.round(9.4 * dm), color: '#9d4edd', type, slamCd: 2.5, slamWindup: 0, bargeCd: 2.1 + Math.random() * 0.7, bargeT: 0, mat: 5 };
   } else {
-    ent = { ...base, r: 15, hp: 25.0 * s, maxHp: 25.0 * s, spd: (88 + wave * 2.0) * sm, dmg: Math.max(2, Math.round(3.8 * dm)), color: '#d65db1', type: 'chaser', lungeCd: 1.65 + Math.random() * 0.8, lungeT: 0, mat: Math.random() < 0.65 ? 1 : 2 };
+    ent = { ...base, r: 22, hp: 25.0 * s, maxHp: 25.0 * s, spd: (88 + wave * 2.0) * sm, dmg: Math.max(2, Math.round(3.8 * dm)), color: '#d65db1', type: 'chaser', lungeCd: 1.65 + Math.random() * 0.8, lungeT: 0, mat: Math.random() < 0.65 ? 1 : 2 };
   }
 
   // 第 3 波起按难度刷出【狂化精英词缀怪】（前 5 层降低精英刷新率与压迫，第 10 轮及以后精英刷新率与狂化血伤倍率显著提升！）
