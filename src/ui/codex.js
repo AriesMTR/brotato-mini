@@ -288,7 +288,7 @@ function renderCodex() {
               </div>
             </div>
           </div>
-          <div class="codex-card-desc">第 17 层无尽试炼起概率在层域中现世（屏幕边缘显示方位信标，主线 1~16 层绝不乱入）。<b>踏入祭坛驻留 1.1 秒</b>即可唤醒记忆首领（回合延长 +25s）！<br><b>${rel.rewardDesc}</b></div>`;
+          <div class="codex-card-desc">第 17 层无尽试炼起概率在层域中现世（屏幕边缘显示方位信标，主线 1~16 层绝不乱入）。<b>踏入祭坛驻留 1.1 秒</b>即可唤醒记忆首领（超时转入死战）！<br><b>${rel.rewardDesc}</b></div>`;
         gridEl.appendChild(card);
       });
     }

@@ -9,13 +9,13 @@
   <meta name="apple-mobile-web-app-title" content="烬塔残响">
   <meta name="format-detection" content="telephone=no,email=no">
   <title>烬塔残响：第999次救赎 · ECHOES OF THE ASHEN SPIRE</title>
-  <link rel="icon" type="image/jpeg" href="assets/spire/app_icon.jpg?v=2.1.5">
-  <link rel="apple-touch-icon" href="assets/spire/app_icon.jpg?v=2.1.5">
-  <link rel="manifest" href="manifest.json?v=2.1.5">
-  <link rel="stylesheet" href="styles/base.css?v=2.1.5">
-  <link rel="stylesheet" href="styles/mobile.css?v=2.1.5">
-  <link rel="stylesheet" href="styles/presentation.css?v=2.1.5">
-  <link rel="stylesheet" href="styles/narrative.css?v=2.1.5">
+  <link rel="icon" type="image/jpeg" href="assets/spire/app_icon.jpg?v=2.1.6">
+  <link rel="apple-touch-icon" href="assets/spire/app_icon.jpg?v=2.1.6">
+  <link rel="manifest" href="manifest.json?v=2.1.6">
+  <link rel="stylesheet" href="styles/base.css?v=2.1.6">
+  <link rel="stylesheet" href="styles/mobile.css?v=2.1.6">
+  <link rel="stylesheet" href="styles/presentation.css?v=2.1.6">
+  <link rel="stylesheet" href="styles/narrative.css?v=2.1.6">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
   <canvas id="spireDirectorCv" class="director-cv hidden"></canvas>
 
   <!-- 首屏全链路资源完整性校验门禁（内联关键样式保证 0ms 遮挡未就绪界面，防止脚本/样式/贴图未下载全时提前操作触发 Bug） -->
-  <div id="bootGate" class="boot-gate" data-html-version="v2.1.5" role="status" aria-live="polite" style="position:fixed;inset:0;z-index:9990;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(circle at 50% 36%,rgba(223,192,132,0.10),transparent 60%),#070a12;color:#efe8d8;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;">
+  <div id="bootGate" class="boot-gate" data-html-version="v2.1.6" role="status" aria-live="polite" style="position:fixed;inset:0;z-index:9990;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(circle at 50% 36%,rgba(223,192,132,0.10),transparent 60%),#070a12;color:#efe8d8;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;">
     <div class="boot-gate-card" style="width:100%;max-width:460px;padding:28px 26px 24px;border:1px solid rgba(223,192,132,0.34);border-radius:12px;background:linear-gradient(180deg,rgba(15,20,32,0.96),rgba(8,11,19,0.98));box-shadow:0 24px 60px rgba(0,0,0,0.78);text-align:center;">
       <div style="font-size:11px;letter-spacing:0.22em;color:#dfc084;opacity:0.88;margin-bottom:8px;">ASHEN SPIRE · INTEGRITY CHECK</div>
       <h2 id="bootGateTitle" style="margin:0 0 8px;font-size:21px;font-weight:800;color:#fff6dc;letter-spacing:0.04em;">🕯️ 魂灯引渡 · 校验资源完整性</h2>
@@ -79,7 +79,7 @@
       <div id="waveTitle" class="wave-badge">第 1 / 16 层</div>
       <div id="timerCapsule" class="timer-capsule">
         <div class="timer-row">
-          <div id="waveTimer" class="wave-timer">20</div>
+          <div id="waveTimer" class="wave-timer">30</div>
         </div>
         <div class="timer-track">
           <div id="timerFill" class="timer-fill" style="width:100%"></div>
@@ -155,7 +155,7 @@
     <!-- 视图 A：极简书卷原画主界面 -->
     <section id="menuHomeView" class="menu-stage">
       <header class="home-topbar">
-        <span id="startVersionPill" class="home-ver-pill">ECHOES OF THE ASHEN SPIRE · v2.1.5</span>
+        <span id="startVersionPill" class="home-ver-pill">ECHOES OF THE ASHEN SPIRE · v2.1.6</span>
         <nav class="home-top-actions" aria-label="声音设置">
           <button id="menuAudioBtn" class="ghost-pill-btn" onclick="openAudioModal()">🔊 音量 · 28%</button>
           <button id="menuBgmBtn" class="ghost-pill-btn" onclick="toggleSpireAudio()">音景 · 开启</button>
@@ -381,7 +381,7 @@
   <div id="changelogModal" class="overlay log-modal hidden">
     <div class="log-box changelog-box">
       <div class="log-head">
-        <h2 id="changelogTitle">烬塔纪元志 · v2.1.5</h2>
+        <h2 id="changelogTitle">烬塔纪元志 · v2.1.6</h2>
         <button class="icon-pill-btn" onclick="closeChangelogModal()">✕ 关闭</button>
       </div>
       <div id="changelogList" class="changelog-list"></div>
@@ -449,26 +449,26 @@
   </div>
 </div>
 
-  <!-- 模块化脚本按依赖拓扑顺序统一 defer 加载（v2.1.5） -->
-  <script defer src="src/core/env.js?v=2.1.5"></script>
-  <script defer src="src/core/logger.js?v=2.1.5"></script>
-  <script defer src="src/data/scenes.js?v=2.1.5"></script>
-  <script defer src="src/data/boss_portraits.js?v=2.1.5"></script>
-  <script defer src="src/world/textures.js?v=2.1.5"></script>
-  <script defer src="src/ui/viewport.js?v=2.1.5"></script>
-  <script defer src="src/core/audio.js?v=2.1.5"></script>
-  <script defer src="src/data/arsenal.js?v=2.1.5"></script>
-  <script defer src="src/data/monsters.js?v=2.1.5"></script>
-  <script defer src="src/ui/codex.js?v=2.1.5"></script>
-  <script defer src="src/data/story-v2.js?v=2.1.5"></script>
-  <script defer src="src/game/director.js?v=2.1.5"></script>
-  <script defer src="src/ui/menus.js?v=2.1.5"></script>
-  <script defer src="src/ui/presentation.js?v=2.1.5"></script>
-  <script defer src="src/game/spawner.js?v=2.1.5"></script>
-  <script defer src="src/game/combat.js?v=2.1.5"></script>
-  <script defer src="src/game/update.js?v=2.1.5"></script>
-  <script defer src="src/ui/shop.js?v=2.1.5"></script>
-  <script defer src="src/render/sprites.js?v=2.1.5"></script>
-  <script defer src="src/render/renderer.js?v=2.1.5"></script>
+  <!-- 模块化脚本按依赖拓扑顺序统一 defer 加载（v2.1.6） -->
+  <script defer src="src/core/env.js?v=2.1.6"></script>
+  <script defer src="src/core/logger.js?v=2.1.6"></script>
+  <script defer src="src/data/scenes.js?v=2.1.6"></script>
+  <script defer src="src/data/boss_portraits.js?v=2.1.6"></script>
+  <script defer src="src/world/textures.js?v=2.1.6"></script>
+  <script defer src="src/ui/viewport.js?v=2.1.6"></script>
+  <script defer src="src/core/audio.js?v=2.1.6"></script>
+  <script defer src="src/data/arsenal.js?v=2.1.6"></script>
+  <script defer src="src/data/monsters.js?v=2.1.6"></script>
+  <script defer src="src/ui/codex.js?v=2.1.6"></script>
+  <script defer src="src/data/story-v2.js?v=2.1.6"></script>
+  <script defer src="src/game/director.js?v=2.1.6"></script>
+  <script defer src="src/ui/menus.js?v=2.1.6"></script>
+  <script defer src="src/ui/presentation.js?v=2.1.6"></script>
+  <script defer src="src/game/spawner.js?v=2.1.6"></script>
+  <script defer src="src/game/combat.js?v=2.1.6"></script>
+  <script defer src="src/game/update.js?v=2.1.6"></script>
+  <script defer src="src/ui/shop.js?v=2.1.6"></script>
+  <script defer src="src/render/sprites.js?v=2.1.6"></script>
+  <script defer src="src/render/renderer.js?v=2.1.6"></script>
 </body>
 </html>

@@ -151,7 +151,15 @@ function finishLinearDash(e, nextCd) {
   e.dashT = nextCd;
 }
 
-// 首领高压扇形喷毒吐息状态机（扇面预警 -> 持续偏转横扫毒雾喷流 + 酸液飞沫 + 扇区腐蚀判定）
+function _turnAngleBounded(cur, target, maxStep) {
+  let diffA = (target - cur + Math.PI) % (Math.PI * 2);
+  if (diffA < 0) diffA += Math.PI * 2;
+  diffA -= Math.PI;
+  if (Math.abs(diffA) <= maxStep) return target;
+  return cur + (diffA > 0 ? maxStep : -maxStep);
+}
+
+// 首领高压扇形喷毒吐息状态机（扇面预警 -> 缓速有界偏转横扫毒雾喷流 + 酸液飞沫 + 扇区腐蚀判定，预留近战绕侧窗口）
 function tickBossVenomBreath(e, dt, aimToPlayer, paceMult) {
   const canVenom = (
     e.variant === 'plague_empress' ||
@@ -163,10 +171,13 @@ function tickBossVenomBreath(e, dt, aimToPlayer, paceMult) {
 
   if ((e.venomWindupT || 0) > 0) {
     e.venomWindupT -= dt;
-    e.venomAimA = _lerpAngle(e.venomAimA, aimToPlayer, Math.min(1, dt * 2.2));
+    // 蓄力最后 0.24s 锁定喷射方向不再跟转，保证近战提前侧移绕后 100% 有效
+    if (e.venomWindupT > 0.24) {
+      e.venomAimA = _turnAngleBounded(e.venomAimA !== undefined ? e.venomAimA : aimToPlayer, aimToPlayer, 1.15 * dt);
+    }
     if (e.venomWindupT <= 0) {
       e.venomWindupT = 0;
-      e.venomBreathMax = e.venomTwin ? 1.80 : 1.55;
+      e.venomBreathMax = e.venomTwin ? 1.75 : 1.50;
       e.venomBreathT = e.venomBreathMax;
       e._venomPulseCd = 0;
       e._venomHitCd = 0;
@@ -178,9 +189,11 @@ function tickBossVenomBreath(e, dt, aimToPlayer, paceMult) {
 
   if ((e.venomBreathT || 0) > 0) {
     e.venomBreathT -= dt;
-    e.venomAimA = _lerpAngle(e.venomAimA, aimToPlayer, Math.min(1, dt * (e.venomTwin ? 1.15 : 0.92)));
+    // 严格限制最大旋转角速度（约 27°~32°/s），杜绝贴脸甩头秒跟近战玩家
+    const maxTurnRate = e.venomTwin ? 0.46 : 0.54;
+    e.venomAimA = _turnAngleBounded(e.venomAimA !== undefined ? e.venomAimA : aimToPlayer, aimToPlayer, maxTurnRate * dt);
     const vLen = e.venomLen || 278;
-    const vSpan = e.venomSpan || 0.46;
+    const vSpan = e.venomSpan || 0.42;
     const nozzles = e.venomTwin ? [0, Math.PI] : [0];
 
     e._venomPulseCd = (e._venomPulseCd || 0) - dt;
@@ -255,12 +268,12 @@ function tickBossVenomBreath(e, dt, aimToPlayer, paceMult) {
   if (!e.dashing && !(e.sigWindupT > 0) && !(e.p2WindupT > 0)) {
     e.venomCd = (e.venomCd !== undefined ? e.venomCd : 4.5) - dt * paceMult;
     if (e.venomCd <= 0) {
-      e.venomCd = e.variant === 'plague_empress' ? 5.6 : (e.variant === 'venom_matriarch' ? 5.8 : 6.6);
-      e.venomWindupMax = 0.56;
-      e.venomWindupT = 0.56;
+      e.venomCd = e.variant === 'plague_empress' ? 5.8 : (e.variant === 'venom_matriarch' ? 6.0 : 6.8);
+      e.venomWindupMax = 0.68;
+      e.venomWindupT = 0.68;
       e.venomAimA = aimToPlayer;
-      e.venomSpan = 0.46;
-      e.venomLen = e.type === 'mini_boss' ? 252 : 282;
+      e.venomSpan = 0.40;
+      e.venomLen = e.type === 'mini_boss' ? 248 : 276;
       e.venomTwin = false;
       beep(330, 0.08, 'triangle', 0.048);
       addText(e.x, e.y - e.r - 18, '☠️ 高压剧毒喷流蓄力!', '#a3e635', 14, 1.1, true);
@@ -282,13 +295,13 @@ function tickBossPhase2Skill(e, dt, aimToPlayer, paceMult) {
       beep(215, 0.18, 'sawtooth', 0.07);
       if (e.p2Kind === 'p2_absolute_zero') {
         e.beamSweepQuad = true;
-        e.beamSweepMaxT = 1.90;
-        e.beamSweepT = 1.90;
+        e.beamSweepMaxT = 1.80;
+        e.beamSweepT = 1.80;
         e.beamSweepA = baseA;
         if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: 175, color: '#72efdd', t: 0.34, maxT: 0.34, kind: 'hex' });
         for (let k = 0; k < 8 && eBullets.length < 170; k++) {
           const ba = baseA + (k / 8) * Math.PI * 2 + 0.39;
-          eBullets.push({ x: e.x, y: e.y, vx: Math.cos(ba) * 166, vy: Math.sin(ba) * 166, dmg: Math.max(4, Math.round(e.dmg * 0.80)), r: 6.2, color: '#7dd3fc', shape: 'trident', chillPlayer: true });
+          eBullets.push({ x: e.x, y: e.y, vx: Math.cos(ba) * 148, vy: Math.sin(ba) * 148, dmg: Math.max(4, Math.round(e.dmg * 0.80)), r: 6.0, color: '#7dd3fc', shape: 'trident', chillPlayer: true });
         }
       } else if (e.p2Kind === 'p2_chrono_octa') {
         const gx = Number.isFinite(e.p2TargetX) ? e.p2TargetX : player.x;
@@ -302,35 +315,34 @@ function tickBossPhase2Skill(e, dt, aimToPlayer, paceMult) {
           if (beams.length < 32) beams.push({ x1, y1, x2, y2, color: k % 2 === 0 ? '#fde68a' : '#c084fc', t: 0.34, maxT: 0.34 });
           if (player && state === 'wave') {
             const seg = pointSegClosest(player.x, player.y, x1, y1, x2, y2);
-            if (seg.dSq <= (14 + player.r - 2) * (14 + player.r - 2)) {
-              hurtPlayer(Math.round(e.dmg * 1.16));
+            if (seg.dSq <= (10 + player.r - 2) * (10 + player.r - 2)) {
+              hurtPlayer(Math.round(e.dmg * 1.12));
               if (state !== 'wave') return true;
             }
           }
         }
       } else if (e.p2Kind === 'p2_omega_storm') {
         if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: 165, color: '#fb923c', t: 0.32, maxT: 0.32, kind: 'star' });
-        for (let k = 0; k < 8 && eBullets.length < 170; k++) {
-          const ba = baseA + (k / 8) * Math.PI * 2;
-          const side = k % 2 === 0 ? 1 : -1;
+        for (let k = 0; k < 6 && eBullets.length < 170; k++) {
+          const ba = baseA + (k / 6) * Math.PI * 2;
           eBullets.push({
             x: e.x, y: e.y, px: e.x, py: e.y,
-            vx: Math.cos(ba) * 148, vy: Math.sin(ba) * 148,
-            curve: side * 0.44, life: 2.8,
-            dmg: Math.max(4, Math.round(e.dmg * 0.82)), r: 8.4, color: '#ffd166', shape: 'disc', rot: 0
+            vx: Math.cos(ba) * 132, vy: Math.sin(ba) * 132,
+            curve: 0.28, life: 2.7,
+            dmg: Math.max(4, Math.round(e.dmg * 0.82)), r: 8.0, color: '#ffd166', shape: 'disc', rot: 0
           });
         }
         for (let k = 0; k < 4; k++) {
           const ha = baseA + k * (Math.PI * 0.5) + 0.39;
-          spawnHazard(e.x + Math.cos(ha) * 170, e.y + Math.sin(ha) * 170, 62, e.dmg * 1.12, 1.05, { color: '#fb5607', style: 'flame_pillar' });
+          spawnHazard(e.x + Math.cos(ha) * 175, e.y + Math.sin(ha) * 175, 58, e.dmg * 1.10, 1.15, { color: '#fb5607', style: 'flame_pillar' });
         }
       } else if (e.p2Kind === 'p2_twin_venom') {
         e.venomTwin = true;
         e.venomAimA = baseA;
-        e.venomSpan = 0.44;
-        e.venomLen = 288;
-        e.venomBreathMax = 1.85;
-        e.venomBreathT = 1.85;
+        e.venomSpan = 0.36;
+        e.venomLen = 278;
+        e.venomBreathMax = 1.75;
+        e.venomBreathT = 1.75;
         e._venomPulseCd = 0;
         e._venomHitCd = 0;
         if (rings.length < 40) rings.push({ x: e.x, y: e.y, r: 158, color: '#a3e635', t: 0.32, maxT: 0.32, kind: 'hex' });
@@ -365,20 +377,23 @@ function tickBossPhase2Skill(e, dt, aimToPlayer, paceMult) {
     return false;
   }
 
-  if (!e.dashing && !(e.sigWindupT > 0) && !(e.venomWindupT > 0) && !(e.venomBreathT > 0)) {
+  if (!e.dashing && !(e.sigWindupT > 0) && !(e.venomWindupT > 0) && !(e.venomBreathT > 0) && !(e.beamWindupT > 0) && !(e.beamSweepT > 0)) {
     e.p2SkillT = (e.p2SkillT !== undefined ? e.p2SkillT : 3.2) - dt * paceMult;
     if (e.p2SkillT <= 0) {
-      e.p2SkillT = 6.2;
-      e.p2WindupMax = 0.78;
-      e.p2WindupT = 0.78;
-      e.p2BaseA = aimToPlayer;
+      e.p2SkillT = 6.5;
+      const v = e.variant || 'butcher';
+      const isQuadIce = (v === 'frost_queen' || v === 'glacial_valkyrie');
+      const isOctaGrid = (v === 'void_weaver' || v === 'shadow_stalker' || v === 'storm_siren');
+      e.p2WindupMax = isOctaGrid ? 1.05 : (isQuadIce ? 0.96 : 0.88);
+      e.p2WindupT = e.p2WindupMax;
+      // 十字冰束初始角度自动与玩家错开 45° 象限中心，避免蓄力结束瞬间直接贴脸命中心脏位
+      e.p2BaseA = isQuadIce ? (aimToPlayer + Math.PI * 0.25) : aimToPlayer;
       e.p2TargetX = player.x;
       e.p2TargetY = player.y;
-      const v = e.variant || 'butcher';
-      if (v === 'frost_queen' || v === 'glacial_valkyrie') {
+      if (isQuadIce) {
         e.p2Kind = 'p2_absolute_zero';
         e.p2Label = '⚡ 二阶终式·绝对零度四翼星环';
-      } else if (v === 'void_weaver' || v === 'shadow_stalker' || v === 'storm_siren') {
+      } else if (isOctaGrid) {
         e.p2Kind = 'p2_chrono_octa';
         e.p2Label = '⚡ 二阶终式·逆时米字断罪光网';
       } else if (v === 'mech_colossus' || v === 'pyro_lord' || v === 'golden_golem' || v === 'iron_warden') {
@@ -843,7 +858,8 @@ function update(dt) {
     const h = hazards[i];
     if (!h) continue;
     h.t -= dt;
-    if (h.rotSpd) h.angle = (h.angle || 0) + h.rotSpd * dt;
+    // 旋转类地面机关在引爆前最后 0.30s 锁定角度不再转动，保证近战走位落点不被临时甩中
+    if (h.rotSpd && h.t > 0.30) h.angle = (h.angle || 0) + h.rotSpd * dt;
     if (h.t <= 0) {
       const hCol = h.color || '#ff3b6b';
       const st = h.style || 'circle';
@@ -2065,7 +2081,16 @@ function update(dt) {
     const freezeSlow = e.freezeT > 0 ? (isBossUnit ? 0.72 : 0.62) : 1;
     const exposeSlow = e.exposeT > 0 ? 0.68 : 1;
     const slowFactor = (e.chillT > 0 ? (isBossUnit ? 0.82 : 0.68) : 1) * freezeSlow * exposeSlow * globalSlow * terrainFactor;
-    const curSpd = isFrozenLocked ? 0 : e.spd * slowFactor;
+    // 首领在蓄力或引导旋转十字激光 / 喷毒横扫 / 终式法阵期间原地驻足（仅微幅悬浮），防止边转十字边追贴近战玩家
+    const isChannelingStationary = isBossUnit && (
+      (e.beamWindupT || 0) > 0 ||
+      (e.beamSweepT || 0) > 0 ||
+      (e.venomWindupT || 0) > 0 ||
+      (e.venomBreathT || 0) > 0 ||
+      (e.sigWindupT || 0) > 0 ||
+      (e.p2WindupT || 0) > 0
+    );
+    const curSpd = isFrozenLocked ? 0 : (isChannelingStationary ? e.spd * slowFactor * 0.10 : e.spd * slowFactor);
 
     if (!isFrozenLocked) {
       e.phase += dt * (e.type === 'swarmer' ? 18 : 7) * slowFactor;
@@ -2157,21 +2182,22 @@ function update(dt) {
               eBullets.push({ x: sx, y: sy, vx: Math.cos(fireA) * 188, vy: Math.sin(fireA) * 188, dmg: Math.max(5, Math.round(e.dmg * 0.82)), r: 6.4, color: '#fde68a', shape: 'trident' });
             }
           } else if (e.sigKind === 'omega_cross_beam') {
-            // 欧米茄：十字重型等离子歼灭主炮（4 向贯通激光炮轨 + 齿轮锯盘）
+            // 欧米茄：十字重型等离子歼灭主炮（4 向贯通激光炮轨，发射口外移避开体心重叠，给近战留出四象限安全空间）
+            const innerOff = (e.r || 42) + 18;
             const beamLen = 460;
             for (let k = 0; k < 4; k++) {
               const ba = baseA + k * (Math.PI * 0.5);
+              const bx1 = e.x + Math.cos(ba) * innerOff, by1 = e.y + Math.sin(ba) * innerOff;
               const bx2 = e.x + Math.cos(ba) * beamLen, by2 = e.y + Math.sin(ba) * beamLen;
-              if (beams.length < 24) beams.push({ x1: e.x, y1: e.y, x2: bx2, y2: by2, color: '#fb923c', t: 0.36, maxT: 0.36 });
-              const proj = Math.max(0, Math.min(1, ((player.x - e.x) * (bx2 - e.x) + (player.y - e.y) * (by2 - e.y)) / (beamLen * beamLen)));
-              const px = e.x + proj * (bx2 - e.x), py = e.y + proj * (by2 - e.y);
-              if (Math.hypot(player.x - px, player.y - py) <= player.r + 18) {
-                hurtPlayer(Math.round(e.dmg * 1.18));
+              if (beams.length < 24) beams.push({ x1: bx1, y1: by1, x2: bx2, y2: by2, color: '#fb923c', t: 0.36, maxT: 0.36 });
+              const seg = pointSegClosest(player.x, player.y, bx1, by1, bx2, by2);
+              if (seg.dSq <= (player.r + 12) * (player.r + 12)) {
+                hurtPlayer(Math.round(e.dmg * 1.15));
                 if (state !== 'wave') return;
               }
               const discA = ba + Math.PI * 0.25;
               if (eBullets.length < 170) {
-                eBullets.push({ x: e.x, y: e.y, vx: Math.cos(discA) * 155, vy: Math.sin(discA) * 155, dmg: Math.max(4, Math.round(e.dmg * 0.78)), r: 8.2, color: '#ffd166', shape: 'disc', rot: 0 });
+                eBullets.push({ x: e.x, y: e.y, vx: Math.cos(discA) * 142, vy: Math.sin(discA) * 142, dmg: Math.max(4, Math.round(e.dmg * 0.78)), r: 7.8, color: '#ffd166', shape: 'disc', rot: 0 });
               }
             }
             shake = Math.max(shake, 5.5);
@@ -2204,11 +2230,12 @@ function update(dt) {
         }
         const vId = e.variant || 'butcher';
         e.sigSkillT -= dt * bossMult;
-        if (e.sigSkillT <= 0) {
-          e.sigSkillT = enraged ? 6.0 : 7.4;
-          e.sigMaxW = 0.86;
-          e.sigWindupT = 0.86;
-          e.sigBaseA = a;
+        if (e.sigSkillT <= 0 && !(e.beamWindupT > 0) && !(e.beamSweepT > 0) && !(e.p2WindupT > 0)) {
+          e.sigSkillT = enraged ? 6.2 : 7.6;
+          e.sigMaxW = vId === 'mech_colossus' ? 0.98 : 0.90;
+          e.sigWindupT = e.sigMaxW;
+          // 欧米茄十字主炮初始与玩家错开 45° 象限，给近战留出充裕侧闪空间
+          e.sigBaseA = vId === 'mech_colossus' ? (a + Math.PI * 0.25) : a;
           e.sigTargetX = player.x;
           e.sigTargetY = player.y;
           if (vId === 'frost_queen') {
@@ -2236,39 +2263,51 @@ function update(dt) {
       }
 
       if (e.variant === 'frost_queen') {
-        // 【碎冕霜女皇 · 艾丝特莉亚】机制特征：旋转双翼/二阶四翼极光冰束扫射 + 寒渊三叉冰戟扇射 + 六合冰牢封走位 + 寒晶双轨突进
-        if ((e.beamSweepT || 0) > 0) {
+        // 【碎冕霜女皇 · 艾丝特莉亚】机制特征：先导轨预警后缓旋的双翼/二阶四翼极光冰束（近战可从容顺时针伴行挥砍） + 寒渊三叉冰戟 + 六合冰牢
+        if ((e.beamWindupT || 0) > 0) {
+          e.beamWindupT -= dt;
+          if (e.beamWindupT <= 0) {
+            e.beamWindupT = 0;
+            e.beamSweepT = e.beamSweepMaxT || 1.65;
+            addText(e.x, e.y - e.r - 18, '❄️ 极光双翼冰束扫射!', '#7dd3fc', 14, 1.25);
+            beep(520, 0.12, 'sine', 0.05);
+          }
+        } else if ((e.beamSweepT || 0) > 0) {
           e.beamSweepT -= dt;
-          e.beamSweepA = (e.beamSweepA || 0) + dt * (enraged ? 1.55 : 1.25);
+          // 大幅下调十字/双翼旋转角速度（四翼仅 0.48 rad/s ≈ 27.5°/s，双翼 0.56~0.66 rad/s），近战在 140px 处线速度仅 ~70px/s，可轻松边走边砍
+          const sweepSpd = e.beamSweepQuad ? 0.48 : (enraged ? 0.66 : 0.56);
+          e.beamSweepA = (e.beamSweepA || 0) + dt * sweepSpd;
           e._beamHitCd = Math.max(0, (e._beamHitCd || 0) - dt);
-          const bLen = e.beamSweepQuad ? 385 : 350;
+          const innerOff = (e.r || 42) + 20;
+          const bLen = e.beamSweepQuad ? 380 : 345;
           const beamCnt = e.beamSweepQuad ? 4 : 2;
           for (let bi = 0; bi < beamCnt; bi++) {
             const ba = e.beamSweepA + (bi / beamCnt) * Math.PI * 2;
+            const bx1 = e.x + Math.cos(ba) * innerOff, by1 = e.y + Math.sin(ba) * innerOff;
             const bx2 = e.x + Math.cos(ba) * bLen, by2 = e.y + Math.sin(ba) * bLen;
-            const proj = Math.max(0, Math.min(1, ((player.x - e.x) * (bx2 - e.x) + (player.y - e.y) * (by2 - e.y)) / (bLen * bLen)));
-            const px = e.x + proj * (bx2 - e.x), py = e.y + proj * (by2 - e.y);
-            if (e._beamHitCd <= 0 && Math.hypot(player.x - px, player.y - py) <= player.r + 13) {
-              e._beamHitCd = 0.32;
-              if (!player.noSlow) player.chillSlowT = 1.4;
-              hurtPlayer(Math.round(e.dmg * 0.92));
+            const seg = pointSegClosest(player.x, player.y, bx1, by1, bx2, by2);
+            if (e._beamHitCd <= 0 && seg.dSq <= (player.r + 9) * (player.r + 9)) {
+              e._beamHitCd = 0.42;
+              if (!player.noSlow) player.chillSlowT = Math.max(player.chillSlowT || 0, 0.75);
+              hurtPlayer(Math.round(e.dmg * 0.90));
               if (state !== 'wave') return;
             }
           }
           if (e.beamSweepT <= 0) {
             e.beamSweepQuad = false;
-            e.exposeT = Math.max(e.exposeT || 0, 1.15);
+            e.exposeT = Math.max(e.exposeT || 0, 1.25);
           }
         } else if (e.dashing) {
           if (!advanceLinearDash(e, dt)) {
-            finishLinearDash(e, enraged ? 3.2 : 3.9);
-            // 冲刺落地立即开启 1.65s 极光双翼冰束旋转扫射！
+            finishLinearDash(e, enraged ? 3.4 : 4.1);
+            // 冲刺落地先给出 0.55s 冰晶导轨虚线预警（且初始角度与玩家错开 ~52° 安全区），绝不无前摇糊近战一脸！
             e.beamSweepQuad = false;
-            e.beamSweepT = 1.65;
+            e.beamWindupMax = 0.55;
+            e.beamWindupT = 0.55;
             e.beamSweepMaxT = 1.65;
-            e.beamSweepA = a + 0.52;
-            addText(e.x, e.y - e.r - 18, '❄️ 极光双翼冰束扫射!', '#7dd3fc', 14, 1.35);
-            beep(520, 0.12, 'sine', 0.05);
+            e.beamSweepA = a + 0.90;
+            addText(e.x, e.y - e.r - 18, '❄️ 极光双翼冰束蓄力!', '#7dd3fc', 14, 1.25);
+            beep(460, 0.09, 'triangle', 0.045);
           }
         } else {
           e.dashT -= dt * slowFactor * bossMult;
@@ -2393,9 +2432,9 @@ function update(dt) {
         }
         e.meteorT = (e.meteorT || 3.6) - dt * bossMult;
         if (e.meteorT <= 0 && !(e.laserGridT > 0)) {
-          e.meteorT = enraged ? 3.8 : 4.7;
-          e.laserGridMaxT = 0.85;
-          e.laserGridT = 0.85;
+          e.meteorT = enraged ? 4.0 : 4.9;
+          e.laserGridMaxT = 0.98;
+          e.laserGridT = 0.98;
           e.laserGridX = player.x;
           e.laserGridY = player.y;
           e.laserGridA = ((e._gridFlip = !e._gridFlip) ? 0 : Math.PI * 0.25);
@@ -2591,15 +2630,15 @@ function update(dt) {
       if (tickBossVenomBreath(e, dt, a, mbPace)) return;
       if (tickBossPhase2Skill(e, dt, a, mbPace)) return;
       if (e.variant === 'pyro_lord') {
-        // 炽焰重炮统领：四臂旋转烈焰风车喷射 + 十字熔火柱轰击
+        // 炽焰重炮统领：四臂缓旋烈焰风车喷射（放缓射频与偏转角，留出近战切入象限空隙）+ 十字熔火柱轰击
         if (distP > 170) { e.x += Math.cos(a) * curSpd * dt; e.y += Math.sin(a) * curSpd * dt; }
-        e.shotT = (e.shotT || 0.85) - dt * slowFactor;
+        e.shotT = (e.shotT || 0.95) - dt * slowFactor;
         if (e.shotT <= 0) {
-          e.shotT = 0.72;
-          e._wheelA = (e._wheelA || 0) + 0.36;
+          e.shotT = 0.92;
+          e._wheelA = (e._wheelA || 0) + 0.28;
           for (let k = 0; k < 4 && eBullets.length < 170; k++) {
             const sa = e._wheelA + k * (Math.PI * 0.5);
-            eBullets.push({ x: e.x, y: e.y, vx: Math.cos(sa) * 148, vy: Math.sin(sa) * 148, dmg: Math.max(4, Math.round(e.dmg * 0.70)), r: 5.8, color: '#ff6b35', shape: 'fire' });
+            eBullets.push({ x: e.x, y: e.y, vx: Math.cos(sa) * 134, vy: Math.sin(sa) * 134, dmg: Math.max(4, Math.round(e.dmg * 0.70)), r: 5.6, color: '#ff6b35', shape: 'fire' });
           }
         }
         e.meteorT = (e.meteorT || 4.6) - dt;
@@ -2672,21 +2711,28 @@ function update(dt) {
           }
         }
       } else if (e.variant === 'glacial_valkyrie') {
-        // 凛霜圣枪统领：极北寒霜圣枪双轨导轨冲锋 + 落点三联寒霜三叉戟 + 直线冰川推进（二阶段支援四翼极光束）
-        if ((e.beamSweepT || 0) > 0) {
+        // 凛霜圣枪统领：极北寒霜圣枪双轨导轨冲锋 + 落点三联寒霜三叉戟 + 直线冰川推进（二阶段支援缓旋四翼极光束，友好适配近战）
+        if ((e.beamWindupT || 0) > 0) {
+          e.beamWindupT -= dt;
+          if (e.beamWindupT <= 0) {
+            e.beamWindupT = 0;
+            e.beamSweepT = e.beamSweepMaxT || 1.65;
+          }
+        } else if ((e.beamSweepT || 0) > 0) {
           e.beamSweepT -= dt;
-          e.beamSweepA = (e.beamSweepA || 0) + dt * 1.35;
+          e.beamSweepA = (e.beamSweepA || 0) + dt * (e.beamSweepQuad ? 0.48 : 0.56);
           e._beamHitCd = Math.max(0, (e._beamHitCd || 0) - dt);
-          const bLen = 330;
+          const innerOff = (e.r || 32) + 18;
+          const bLen = 325;
           const beamCnt = e.beamSweepQuad ? 4 : 2;
           for (let bi = 0; bi < beamCnt; bi++) {
             const ba = e.beamSweepA + (bi / beamCnt) * Math.PI * 2;
+            const bx1 = e.x + Math.cos(ba) * innerOff, by1 = e.y + Math.sin(ba) * innerOff;
             const bx2 = e.x + Math.cos(ba) * bLen, by2 = e.y + Math.sin(ba) * bLen;
-            const proj = Math.max(0, Math.min(1, ((player.x - e.x) * (bx2 - e.x) + (player.y - e.y) * (by2 - e.y)) / (bLen * bLen)));
-            const px = e.x + proj * (bx2 - e.x), py = e.y + proj * (by2 - e.y);
-            if (e._beamHitCd <= 0 && Math.hypot(player.x - px, player.y - py) <= player.r + 12) {
-              e._beamHitCd = 0.34;
-              hurtPlayer(Math.round(e.dmg * 0.90));
+            const seg = pointSegClosest(player.x, player.y, bx1, by1, bx2, by2);
+            if (e._beamHitCd <= 0 && seg.dSq <= (player.r + 9) * (player.r + 9)) {
+              e._beamHitCd = 0.42;
+              hurtPlayer(Math.round(e.dmg * 0.88));
               if (state !== 'wave') return;
             }
           }
@@ -2988,12 +3034,12 @@ function update(dt) {
           beep(175, 0.09, 'sawtooth', 0.042);
           if (rings.length < 36) rings.push({ x: e.x, y: e.y, r: 72, color: '#fbbf24', t: 0.28, maxT: 0.28, kind: 'hex' });
           addBurst(e.x, e.y, '#f59e0b', 9, 135);
-          for (let k = 0; k < 4 && eBullets.length < 170; k++) {
-            const ba = (k + 0.5) * (Math.PI * 0.5);
+          for (let k = 0; k < 3 && eBullets.length < 170; k++) {
+            const ba = (k / 3) * Math.PI * 2 + 0.52;
             eBullets.push({
               x: e.x, y: e.y, px: e.x, py: e.y,
-              vx: Math.cos(ba) * 145, vy: Math.sin(ba) * 145,
-              life: 0.68,
+              vx: Math.cos(ba) * 140, vy: Math.sin(ba) * 140,
+              life: 0.65,
               dmg: Math.max(3, Math.round(e.dmg * 0.78)), r: 5.4, hitR: 4.8, color: '#fde68a', shape: 'stinger'
             });
           }
@@ -3115,8 +3161,8 @@ function update(dt) {
       }
       e.shotT -= dt * slowFactor;
       if (e.shotT <= 0) {
-        e.shotT = e.elite ? 2.05 : 2.55;
-        const cnt = (e.elite || wave >= 8) ? 2 : 1;
+        e.shotT = e.elite ? 2.30 : 2.85;
+        const cnt = e.elite ? 2 : 1;
         for (let k = 0; k < cnt && eBullets.length < 170; k++) {
           const wSign = k === 0 ? 1 : -1;
           eBullets.push({
@@ -3135,13 +3181,13 @@ function update(dt) {
       if (e.shotT <= 0) {
         e.shotT = e.elite ? 2.65 : 3.25;
         if (distP > 92 && hazards.length < 28) {
-          spawnHazard(player.x + (Math.random() - 0.5) * 56, player.y + (Math.random() - 0.5) * 56, 32, e.dmg, 1.22, {
+          spawnHazard(player.x + (Math.random() - 0.5) * 56, player.y + (Math.random() - 0.5) * 56, 32, e.dmg, 1.30, {
             color: '#c084fc',
             style: 'cross_beam',
             angle: (e.phase || 0) * 0.4 + Math.PI * 0.25,
-            rotSpd: 0.42,
-            halfLen: e.elite ? 142 : 124,
-            halfW: 14
+            rotSpd: 0.24,
+            halfLen: e.elite ? 140 : 122,
+            halfW: 12
           });
         }
         const rot0 = e.phase * 0.5;
@@ -3385,24 +3431,32 @@ function update(dt) {
           }
         }
       } else if (e.type === 'blade_duelist') {
-        // 发条双刃剑客：高速绕侧逼近 -> 开启黄金双刃剑刃风暴旋斩追击！
-        if ((e.whirlT || 0) > 0) {
+        // 发条双刃剑客：高速绕侧逼近 -> 0.34s 十字架刃蓄力提示 -> 开启黄金双刃剑刃风暴旋斩追击（留给近战侧闪节奏）！
+        if ((e.whirlWindup || 0) > 0) {
+          e.whirlWindup -= dt * slowFactor;
+          moveMul = 0.22;
+          if (e.whirlWindup <= 0) {
+            e.whirlWindup = 0;
+            e.whirlT = 0.85;
+            e.whirlSpin = e.whirlSpin || 0;
+            e._whirlHitCd = 0;
+          }
+        } else if ((e.whirlT || 0) > 0) {
           e.whirlT -= dt;
-          e.whirlSpin = (e.whirlSpin || 0) + dt * 22;
-          moveMul = 1.62;
+          e.whirlSpin = (e.whirlSpin || 0) + dt * 15;
+          moveMul = 1.36;
           e._whirlHitCd = Math.max(0, (e._whirlHitCd || 0) - dt);
-          if (e._whirlHitCd <= 0 && distP <= e.r + player.r + 22) {
-            e._whirlHitCd = 0.42;
-            hurtPlayer(Math.round(e.dmg * 0.95));
+          if (e._whirlHitCd <= 0 && distP <= e.r + player.r + 18) {
+            e._whirlHitCd = 0.46;
+            hurtPlayer(Math.round(e.dmg * 0.92));
             if (state !== 'wave') return;
           }
         } else {
           e.whirlCd = (e.whirlCd || 2.1) - dt * slowFactor;
-          if (distP < 185 && e.whirlCd <= 0) {
-            e.whirlCd = 2.65;
-            e.whirlT = 0.90;
+          if (distP < 175 && e.whirlCd <= 0) {
+            e.whirlCd = 2.85;
+            e.whirlWindup = 0.34;
             e.whirlSpin = e.whirlSpin || 0;
-            e._whirlHitCd = 0;
             addSparks(e.x, e.y, a, '#fde68a', 4);
           } else if (distP > 95) {
             moveA = a + (e.orbitDir || 1) * 0.48;
@@ -3521,30 +3575,32 @@ function update(dt) {
           if (e.slamWindup <= 0) {
             e.slamWindup = 0;
             const sa = e._slamA !== undefined ? e._slamA : a;
+            const innerOff = e.r * 0.74;
             const armLen = 168;
             beep(115, 0.12, 'sawtooth', 0.05);
             if (rings.length < 36) rings.push({ x: e.x, y: e.y, r: 96, color: '#e2e8f0', t: 0.28, maxT: 0.28, kind: 'hex' });
             for (let k = 0; k < 4; k++) {
               const ba = sa + k * (Math.PI * 0.5);
+              const bx1 = e.x + Math.cos(ba) * innerOff, by1 = e.y + Math.sin(ba) * innerOff;
               const bx2 = e.x + Math.cos(ba) * armLen, by2 = e.y + Math.sin(ba) * armLen;
-              if (beams.length < 32) beams.push({ x1: e.x, y1: e.y, x2: bx2, y2: by2, color: '#f8fafc', t: 0.28, maxT: 0.28 });
-              const seg = pointSegClosest(player.x, player.y, e.x, e.y, bx2, by2);
-              if (seg.dSq <= (18 + player.r - 3) * (18 + player.r - 3)) {
-                hurtPlayer(Math.round(e.dmg * 1.18));
+              if (beams.length < 32) beams.push({ x1: bx1, y1: by1, x2: bx2, y2: by2, color: '#f8fafc', t: 0.28, maxT: 0.28 });
+              const seg = pointSegClosest(player.x, player.y, bx1, by1, bx2, by2);
+              if (seg.dSq <= (14 + player.r - 3) * (14 + player.r - 3)) {
+                hurtPlayer(Math.round(e.dmg * 1.15));
                 if (state !== 'wave') return;
               }
             }
-            for (let k = 0; k < 6 && eBullets.length < 170; k++) {
-              const ba = (k / 6) * Math.PI * 2 + sa + 0.35;
-              eBullets.push({ x: e.x, y: e.y, px: e.x, py: e.y, vx: Math.cos(ba) * 134, vy: Math.sin(ba) * 134, dmg: Math.max(4, Math.round(e.dmg * 0.75)), r: 6.4, hitR: 5.6, color: '#f8fafc', shape: 'shard' });
+            for (let k = 0; k < 4 && eBullets.length < 170; k++) {
+              const ba = (k / 4) * Math.PI * 2 + sa + Math.PI * 0.25;
+              eBullets.push({ x: e.x, y: e.y, px: e.x, py: e.y, vx: Math.cos(ba) * 124, vy: Math.sin(ba) * 124, dmg: Math.max(4, Math.round(e.dmg * 0.75)), r: 6.2, hitR: 5.4, color: '#f8fafc', shape: 'shard' });
             }
           }
         } else {
           e.slamCd = (e.slamCd || 3.1) - dt * slowFactor;
           if (distP < 146 && e.slamCd <= 0) {
-            e.slamCd = 3.35;
-            e.slamWindup = 0.56;
-            e.slamWindupMax = 0.56;
+            e.slamCd = 3.55;
+            e.slamWindup = 0.68;
+            e.slamWindupMax = 0.68;
             e._slamA = a;
           }
         }

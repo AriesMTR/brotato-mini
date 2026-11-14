@@ -1087,6 +1087,11 @@ function summonSpecialBoss(rel, forceCutscene = false) {
   logInfo('SPECIAL_BOSS', `召唤特殊首领 ${def.bossName}(${def.bossId}) · 立绘特写=${showRarePortrait} · 纯死战模式`);
 }
 
+function getWaveDuration(waveNum) {
+  const wv = Math.max(1, Math.floor(Number(waveNum) || 1));
+  return Math.min(60, 30 + (wv - 1) * 5);
+}
+
 function beginWave(retryMeta = null) {
   // 旧检查点也可能含尚未择定分支的五阶武器；先完成选择，再建立本层起点。
   if (typeof resetWeaponEvolutionUI === 'function') resetWeaponEvolutionUI();
@@ -1132,8 +1137,8 @@ function beginWave(retryMeta = null) {
   }
   if (typeof SpireAudio !== 'undefined') SpireAudio.syncScene(curScene.id);
   syncArenaAndZoom(true);
-  // 16 层平滑回合时长：第 1 层 27s 起步，逐层递增至 60s；首领层采用 45s~65s 紧凑回合时长（提前击杀首领可继续刷满小怪晶石，超时未杀则转入死战）
-  waveTime = isBossWave ? Math.min(65, 39 + Math.round(wave * 1.6)) : Math.min(60, 25 + Math.round(wave * 2.3));
+  // 回合时长：从第 1 层 30 秒起步，每层递增 +5 秒，最高封顶 60 秒（第 7 层起恒为 60 秒；首领层提前击杀可续刷晶石，超时未杀则转入死战）
+  waveTime = getWaveDuration(wave);
   waveMaxTime = waveTime;
   lastUrgentSec = -1;
   spawnAcc = 0.25;
@@ -1350,6 +1355,8 @@ function spawnWarning(x, y, type, variant = '') {
 }
 
 const RANGED_ENEMY_TYPES = new Set(['shooter', 'sniper_bug', 'mortar', 'spinner', 'rad_scorpion', 'frost_wisp', 'spore_mother', 'summoner']);
+const NEEDLE_RANGED_TYPES = new Set(['frost_wisp', 'shooter', 'rad_scorpion', 'sniper_bug']);
+const NEEDLE_RANGED_MUL = 0.70;
 const TANK_MELEE_TYPES = new Set(['shielder', 'brute', 'juggernaut', 'iron_guard', 'charger', 'splitter']);
 const BASIC_FODDER_MELEE_TYPES = new Set(['chaser', 'stalker', 'swarmer', 'magma_imp']);
 const EARLY_TANK_MELEE_MUL = 0.85;
@@ -1365,14 +1372,15 @@ function countActiveRangedEnemies() {
   return c;
 }
 
-// 生态多样化权重刷怪表（怪物总量保持 100% 不变；远程怪刷新占比与同屏上限精准降低 20%，空出份额 1:1 转为同波近战怪）
+// 生态多样化权重刷怪表（怪物总量保持 100% 不变；飞针/冰梭类远程怪刷新数量精准减少 30% 并 1:1 补充到近战怪上）
 function pickWaveEnemyType(wv) {
   const rangedCountMul = typeof RANGED_ENEMY_COUNT_MUL === 'number' ? RANGED_ENEMY_COUNT_MUL : 0.80;
   const maxRanged = Math.max(2, Math.round(Math.min(12, 3 + Math.floor(wave * 0.85)) * rangedCountMul));
   const allowRanged = countActiveRangedEnemies() < maxRanged;
 
   const isExclRanged = !!(curScene.exclMob && RANGED_ENEMY_TYPES.has(curScene.exclMob));
-  const exclProb = isExclRanged ? (0.14 * rangedCountMul) : 0.20;
+  const isExclNeedle = !!(curScene.exclMob && NEEDLE_RANGED_TYPES.has(curScene.exclMob));
+  const exclProb = (isExclRanged ? (0.14 * rangedCountMul) : 0.20) * (isExclNeedle ? NEEDLE_RANGED_MUL : 1.0);
   if (sceneMobEnabled && curScene.exclMob && Math.random() < exclProb) {
     if (!isExclRanged || allowRanged) {
       return curScene.exclMob;
@@ -1408,7 +1416,55 @@ function pickWaveEnemyType(wv) {
     meleeTable.push(['healer', 4.0]);
   }
 
-  // 前 10 波肉盾怪数量精准减少 15%，远程怪占比保持 100% 不变，减少的份额等量转化为普通小怪
+  const rangedTable = [
+    ['shooter', wv === 1 ? 5.5 : 7.0]
+  ];
+  if (wv >= 2) {
+    rangedTable.push(['rad_scorpion', 6.8]);
+  }
+  if (wv >= 3) {
+    rangedTable.push(['frost_wisp', 5.6]);
+    rangedTable.push(['sniper_bug', 5.2]);
+  }
+  if (wv >= 4) {
+    rangedTable.push(['spinner', 5.2]);
+    rangedTable.push(['mortar', 5.0]);
+  }
+  if (wv >= 5) {
+    rangedTable.push(['summoner', 5.3]);
+  }
+  if (wv >= 5 || hordeWave || (endlessMode && wv >= 7)) {
+    rangedTable.push(['spore_mother', 4.3]);
+  }
+
+  // 白芯针梭类远程怪（眠冬冰冠亡灵 / 折光霜晶浮灵 / 逆转发条猎蝎 / 寒晶狙击蛛）数量减少 30%，空出权重 1:1 等额补充至常规近战怪（怪物总量 100% 不变）
+  let freedNeedleW = 0;
+  for (let i = 0; i < rangedTable.length; i++) {
+    if (NEEDLE_RANGED_TYPES.has(rangedTable[i][0])) {
+      const cut = rangedTable[i][1] * (1 - NEEDLE_RANGED_MUL);
+      rangedTable[i][1] -= cut;
+      freedNeedleW += cut;
+    }
+  }
+  if (freedNeedleW > 0) {
+    let agileMeleeW = 0;
+    for (let i = 0; i < meleeTable.length; i++) {
+      const mType = meleeTable[i][0];
+      if (!TANK_MELEE_TYPES.has(mType) && mType !== 'sand_worm' && mType !== 'healer') {
+        agileMeleeW += meleeTable[i][1];
+      }
+    }
+    if (agileMeleeW > 0) {
+      for (let i = 0; i < meleeTable.length; i++) {
+        const mType = meleeTable[i][0];
+        if (!TANK_MELEE_TYPES.has(mType) && mType !== 'sand_worm' && mType !== 'healer') {
+          meleeTable[i][1] += freedNeedleW * (meleeTable[i][1] / agileMeleeW);
+        }
+      }
+    }
+  }
+
+  // 前 10 波肉盾怪数量精准减少 15%，减少的份额等量转化为普通近战小怪
   const curWaveNum = (typeof wave === 'number' && wave > 0) ? wave : wv;
   if (curWaveNum <= 10) {
     let freedTankW = 0;
@@ -1430,27 +1486,6 @@ function pickWaveEnemyType(wv) {
         }
       }
     }
-  }
-
-  const rangedTable = [
-    ['shooter', wv === 1 ? 5.5 : 7.0]
-  ];
-  if (wv >= 2) {
-    rangedTable.push(['rad_scorpion', 6.8]);
-  }
-  if (wv >= 3) {
-    rangedTable.push(['frost_wisp', 5.6]);
-    rangedTable.push(['sniper_bug', 5.2]);
-  }
-  if (wv >= 4) {
-    rangedTable.push(['spinner', 5.2]);
-    rangedTable.push(['mortar', 5.0]);
-  }
-  if (wv >= 5) {
-    rangedTable.push(['summoner', 5.3]);
-  }
-  if (wv >= 5 || hordeWave || (endlessMode && wv >= 7)) {
-    rangedTable.push(['spore_mother', 4.3]);
   }
 
   let meleeW = 0;

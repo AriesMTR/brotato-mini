@@ -844,11 +844,11 @@ function awardEnemyRewards(e) {
   }
   addBurst(e.x, e.y, e.elite ? '#ffd166' : e.color, isBigBoss ? 24 : (enemies.length > 26 ? 3 : 5), isBigBoss ? 240 : 145);
 
-  // 狂化精英亡语：向四周迸射 6 枚精致流光金梭弹（132px/s 留足走位空隙，清晰柔美不突兀）
+  // 狂化精英亡语：向四周迸射 4 枚精致流光金梭弹（减少细梭弹幕密度 ~33%，留足近战走位空隙）
   if (e.elite) {
     const baseA = Math.random() * Math.PI * 2;
-    for (let k = 0; k < 6 && eBullets.length < 170; k++) {
-      const ba = baseA + (k / 6) * Math.PI * 2;
+    for (let k = 0; k < 4 && eBullets.length < 170; k++) {
+      const ba = baseA + (k / 4) * Math.PI * 2;
       eBullets.push({ x: e.x, y: e.y, px: e.x, py: e.y, vx: Math.cos(ba) * 132, vy: Math.sin(ba) * 132, dmg: Math.max(3, Math.round(e.dmg * 0.72)), r: 5.6, hitR: 5.0, color: '#fbbf24', shape: 'lance' });
     }
   }

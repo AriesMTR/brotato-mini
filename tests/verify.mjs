@@ -519,8 +519,26 @@ function createEnv(mobile, w, h, dprVal = 2, audioMode = "running", preferences 
     }
 
     // Test T4 + T4 -> T5 merge & 2-choice evolution modal + multi-form elongated/oblique terrain blocks
+    if (
+      typeof getWaveDuration !== 'function' ||
+      getWaveDuration(1) !== 30 ||
+      getWaveDuration(2) !== 35 ||
+      getWaveDuration(3) !== 40 ||
+      getWaveDuration(4) !== 45 ||
+      getWaveDuration(5) !== 50 ||
+      getWaveDuration(6) !== 55 ||
+      getWaveDuration(7) !== 60 ||
+      getWaveDuration(8) !== 60 ||
+      getWaveDuration(16) !== 60 ||
+      getWaveDuration(25) !== 60
+    ) {
+      return { ok: false, reason: 'Bad getWaveDuration progression (expected 30s + 5s/floor capped at 60s)' };
+    }
     startGame('allrounder', { mode: 'endless' });
     __drainDirector();
+    if (waveTime !== 30 || waveMaxTime !== 30) {
+      return { ok: false, reason: 'Expected Wave 1 duration to start at 30s, got ' + waveTime };
+    }
     const seenForms = new Set();
     for (let sRun = 0; sRun < 6; sRun++) {
       spawnArenaTerrains();
@@ -1214,7 +1232,7 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     vBoss.venomCd = 0.02;
     player.maxHp = 9999; player.hp = 9999;
     let sawVenomSpray = false, sawP2Twin = false;
-    for (let k = 0; k < 24; k++) {
+    for (let k = 0; k < 30; k++) {
       update(0.05);
       if (vBoss.venomBreathT > 0) sawVenomSpray = true;
       draw();
@@ -1222,10 +1240,21 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     vBoss.venomBreathT = 0; vBoss.venomWindupT = 0; vBoss.venomCd = 99;
     vBoss.mythicPhase2 = true;
     vBoss.p2SkillT = 0.02;
-    for (let k = 0; k < 24; k++) {
+    for (let k = 0; k < 30; k++) {
       update(0.05);
       if (vBoss.venomTwin === true && vBoss.venomBreathT > 0) sawP2Twin = true;
       draw();
+    }
+    const fq = createEnemy(player.x + 150, player.y, 'boss', 'frost_queen');
+    fq.hp = 999999; fq.maxHp = 999999;
+    fq.beamSweepQuad = true; fq.beamWindupMax = 0.20; fq.beamWindupT = 0.10; fq.beamSweepMaxT = 1.80; fq.beamSweepA = 0;
+    draw();
+    update(0.12); // finishes windup -> activates beamSweepT
+    const aStart = fq.beamSweepA;
+    update(0.50);
+    const quadRotDelta = fq.beamSweepA - aStart;
+    if (!(fq.beamSweepT > 0 && quadRotDelta > 0.15 && quadRotDelta <= 0.30)) {
+      return { ok: false, reason: 'Frost Queen quad cross beam rotates too fast for melee: delta=' + quadRotDelta };
     }
     const bossVenomAndP2Ok = sawVenomSpray && sawP2Twin;
 
@@ -1295,6 +1324,15 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
     Math.random = origRand;
     const tankRatio = tankEarly / Math.max(1, tankLate);
     const earlyTankShiftOk = (tankRatio > 0.81 && tankRatio < 0.89 && basicEarly > basicLate && rangedEarly === rangedLate);
+    const needleShiftOk = (
+      typeof NEEDLE_RANGED_MUL === 'number' &&
+      Math.abs(NEEDLE_RANGED_MUL - 0.70) < 1e-6 &&
+      NEEDLE_RANGED_TYPES.has('frost_wisp') &&
+      NEEDLE_RANGED_TYPES.has('shooter') &&
+      NEEDLE_RANGED_TYPES.has('rad_scorpion') &&
+      NEEDLE_RANGED_TYPES.has('sniper_bug') &&
+      rangedEarly < (tankEarly + basicEarly)
+    );
 
     return {
       bootOnHome, storyViewShown, storyLockedToZero, returnedHome,
@@ -1304,7 +1342,7 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
       endlessRangerOk, endlessShopTitle,
       hpAfterBossNuke, invulnAfterHit, consecutiveHitRegistered,
       wCnt, iCnt, hCnt, mCnt, sCnt, diedCleanly, retryOk,
-      singleTerrainOk, frostTerrainOk, bossVenomAndP2Ok, midBulletBossKillOk, earlyTankShiftOk
+      singleTerrainOk, frostTerrainOk, bossVenomAndP2Ok, midBulletBossKillOk, earlyTankShiftOk, needleShiftOk
     };
   })()`, s);
 
@@ -1339,6 +1377,7 @@ runStoryV2Suite({ createEnv, vm, assert, ROOT, assetDimsMap });
   assert.strictEqual(coreCheck.bossVenomAndP2Ok, true, "Venom Boss must cast pressurized venom breath spray and Boss hidden Phase-2 must unlock exclusive ultimate skill");
   assert.strictEqual(coreCheck.midBulletBossKillOk, true, "Killing Story Boss mid-bullet-loop must transition cleanly to story state without undefined.x crash");
   assert.strictEqual(coreCheck.earlyTankShiftOk, true, "Waves 1..10 must reduce tanky melee by 15%, keep ranged unchanged, and increase ordinary fodder mobs");
+  assert.strictEqual(coreCheck.needleShiftOk, true, "White-needle ranged monsters must be reduced by 30% with freed weight transferred 1:1 to melee");
   assert(els.retryWaveBtn.textContent.includes("重试"), "Player defeat must offer a floor retry control");
   assert.strictEqual(stats.radialGradients, 0, "Mobile combat & UI suite must create ZERO per-frame radial gradients");
   assert.strictEqual(stats.shadowBlurs, 0, "Mobile combat & UI suite must use ZERO shadowBlur");
