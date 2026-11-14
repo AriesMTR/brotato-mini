@@ -522,7 +522,7 @@ if (cv.addEventListener) {
   cv.addEventListener('touchcancel', resetJoy, { passive: true });
 }
 
-let state = 'menu', wave = 1, waveTime = 20, waveMaxTime = 20, lastUrgentSec = -1, spawnAcc = 0, shake = 0, diff = DIFFS[1];
+let state = 'menu', wave = 1, waveTime = 30, waveMaxTime = 30, lastUrgentSec = -1, spawnAcc = 0, shake = 0, diff = DIFFS[1];
 let endlessMode = false, overtime = false, overtimeMeteorT = 1.6, hordeWave = false;
 let cam = { x: WORLD.w / 2, y: WORLD.h / 2 };
 let player, enemies = [], bullets = [], eBullets = [], hazards = [], drops = [], spawns = [], turrets = [], mines = [], rings = [], trees = [];

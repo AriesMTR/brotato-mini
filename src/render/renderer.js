@@ -1305,21 +1305,24 @@ function draw() {
           }
           ctx.setLineDash([]);
         } else if (e.sigKind === 'omega_cross_beam') {
-          // 欧米茄 · 十字重型等离子歼灭主炮充能导轨
+          // 欧米茄 · 十字重型等离子歼灭主炮充能导轨（发射口外移，与真实激光判定 1:1 对齐）
+          const innerOff = (e.r || 42) + 18;
           for (let k = 0; k < 4; k++) {
             const ba = baseA + k * (Math.PI * 0.5);
+            const sx = e.x + Math.cos(ba) * innerOff, sy = e.y + Math.sin(ba) * innerOff;
             const ex = e.x + Math.cos(ba) * 460, ey = e.y + Math.sin(ba) * 460;
-            ctx.strokeStyle = `rgba(251, 146, 60, ${0.15 + sProg * 0.25})`;
-            ctx.lineWidth = 28;
-            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+            const curLen = innerOff + (460 - innerOff) * sProg;
+            ctx.strokeStyle = `rgba(251, 146, 60, ${0.15 + sProg * 0.24})`;
+            ctx.lineWidth = 22;
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
             ctx.strokeStyle = '#fde68a';
-            ctx.lineWidth = 3.0;
+            ctx.lineWidth = 2.8;
             ctx.setLineDash([12, 8]);
-            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(ba) * 460 * sProg, e.y + Math.sin(ba) * 460 * sProg); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(e.x + Math.cos(ba) * curLen, e.y + Math.sin(ba) * curLen); ctx.stroke();
             ctx.setLineDash([]);
           }
           ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2.6;
-          ctx.beginPath(); ctx.arc(e.x, e.y, 64 + sProg * 28, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.arc(e.x, e.y, innerOff, 0, Math.PI * 2); ctx.stroke();
         } else if (e.sigKind === 'venom_vortex') {
           // 苍岚毒皇 · 万蛊翠岚龙卷阵
           ctx.strokeStyle = `rgba(110, 231, 183, ${0.32 + sProg * 0.52})`;
@@ -1355,25 +1358,45 @@ function draw() {
         }
         ctx.restore();
       }
-      // 艾丝特莉亚实时旋转双翼/四翼极光冰束 & 伽蓝十字次元锁定光轨 & 首领高压剧毒龙息喷流 & 二阶段专属终式预警
-      if ((e.beamSweepT || 0) > 0) {
-        const bLen = e.beamSweepQuad ? 385 : 350;
+      // 艾丝特莉亚 / 凛霜统领先导轨预警后缓旋的双翼/四翼极光冰束（内圈发射口外移 + 匹配精准窄光柱判定）
+      if ((e.beamWindupT || 0) > 0 || (e.beamSweepT || 0) > 0) {
+        const innerOff = (e.r || 36) + (e.type === 'mini_boss' ? 18 : 20);
+        const bLen = e.type === 'mini_boss' ? 325 : (e.beamSweepQuad ? 380 : 345);
         const beamCnt = e.beamSweepQuad ? 4 : 2;
         const ba0 = e.beamSweepA || 0;
         ctx.save();
         ctx.lineCap = 'round';
-        for (let bi = 0; bi < beamCnt; bi++) {
-          const ba = ba0 + (bi / beamCnt) * Math.PI * 2;
-          const bx2 = e.x + Math.cos(ba) * bLen, by2 = e.y + Math.sin(ba) * bLen;
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.28)';
-          ctx.lineWidth = 24;
-          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(bx2, by2); ctx.stroke();
-          ctx.strokeStyle = '#7dd3fc';
-          ctx.lineWidth = 9;
-          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(bx2, by2); ctx.stroke();
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 3.2;
-          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(bx2, by2); ctx.stroke();
+        if ((e.beamWindupT || 0) > 0) {
+          const wProg = Math.max(0.1, Math.min(1, 1 - e.beamWindupT / Math.max(0.1, e.beamWindupMax || 0.55)));
+          for (let bi = 0; bi < beamCnt; bi++) {
+            const ba = ba0 + (bi / beamCnt) * Math.PI * 2;
+            const bx1 = e.x + Math.cos(ba) * innerOff, by1 = e.y + Math.sin(ba) * innerOff;
+            const bx2 = e.x + Math.cos(ba) * bLen, by2 = e.y + Math.sin(ba) * bLen;
+            const curL = innerOff + (bLen - innerOff) * wProg;
+            ctx.strokeStyle = `rgba(56, 189, 248, ${0.14 + wProg * 0.20})`;
+            ctx.lineWidth = 18;
+            ctx.beginPath(); ctx.moveTo(bx1, by1); ctx.lineTo(bx2, by2); ctx.stroke();
+            ctx.strokeStyle = '#e0f2fe';
+            ctx.lineWidth = 2.4;
+            ctx.setLineDash([9, 6]);
+            ctx.beginPath(); ctx.moveTo(bx1, by1); ctx.lineTo(e.x + Math.cos(ba) * curL, e.y + Math.sin(ba) * curL); ctx.stroke();
+            ctx.setLineDash([]);
+          }
+        } else {
+          for (let bi = 0; bi < beamCnt; bi++) {
+            const ba = ba0 + (bi / beamCnt) * Math.PI * 2;
+            const bx1 = e.x + Math.cos(ba) * innerOff, by1 = e.y + Math.sin(ba) * innerOff;
+            const bx2 = e.x + Math.cos(ba) * bLen, by2 = e.y + Math.sin(ba) * bLen;
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.28)';
+            ctx.lineWidth = 18;
+            ctx.beginPath(); ctx.moveTo(bx1, by1); ctx.lineTo(bx2, by2); ctx.stroke();
+            ctx.strokeStyle = '#7dd3fc';
+            ctx.lineWidth = 7.5;
+            ctx.beginPath(); ctx.moveTo(bx1, by1); ctx.lineTo(bx2, by2); ctx.stroke();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2.8;
+            ctx.beginPath(); ctx.moveTo(bx1, by1); ctx.lineTo(bx2, by2); ctx.stroke();
+          }
         }
         ctx.restore();
       }
@@ -1489,23 +1512,25 @@ function draw() {
             ctx.setLineDash([]);
           }
         } else if (e.p2Kind === 'p2_absolute_zero') {
+          const innerOff = (e.r || 36) + (e.type === 'mini_boss' ? 18 : 20);
           for (let k = 0; k < 4; k++) {
             const ba = baseA + k * (Math.PI * 0.5);
+            const sx = e.x + Math.cos(ba) * innerOff, sy = e.y + Math.sin(ba) * innerOff;
             const ex = e.x + Math.cos(ba) * 380, ey = e.y + Math.sin(ba) * 380;
             ctx.strokeStyle = `rgba(125, 211, 252, ${0.16 + p2Prog * 0.22})`;
-            ctx.lineWidth = 20;
-            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+            ctx.lineWidth = 18;
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
             ctx.strokeStyle = '#e0f2fe'; ctx.lineWidth = 2.4; ctx.setLineDash([9, 6]);
-            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
             ctx.setLineDash([]);
           }
         } else if (e.p2Kind === 'p2_twin_venom') {
           for (let ni = 0; ni < 2; ni++) {
             const na = baseA + ni * Math.PI;
             ctx.fillStyle = `rgba(163, 230, 53, ${0.14 + p2Prog * 0.16})`;
-            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 288, na - 0.44, na + 0.44); ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.arc(e.x, e.y, 278, na - 0.36, na + 0.36); ctx.closePath(); ctx.fill();
             ctx.strokeStyle = '#d9f99d'; ctx.lineWidth = 2.2; ctx.setLineDash([8, 6]);
-            ctx.beginPath(); ctx.arc(e.x, e.y, 288 * p2Prog, na - 0.44, na + 0.44); ctx.stroke(); ctx.setLineDash([]);
+            ctx.beginPath(); ctx.arc(e.x, e.y, 278 * p2Prog, na - 0.36, na + 0.36); ctx.stroke(); ctx.setLineDash([]);
           }
         } else {
           const cx = (e.p2Kind === 'p2_eclipse_apocalypse' || e.p2Kind === 'p2_crimson_prison') && Number.isFinite(e.p2TargetX) ? e.p2TargetX : e.x;
@@ -1723,14 +1748,22 @@ function draw() {
         ctx.strokeStyle = '#e0f2fe'; ctx.lineWidth = 2.4;
         ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
         ctx.restore();
-      } else if (e.type === 'blade_duelist' && (e.whirlT || 0) > 0) {
+      } else if (e.type === 'blade_duelist' && ((e.whirlWindup || 0) > 0 || (e.whirlT || 0) > 0)) {
         const sp = Number.isFinite(e.whirlSpin) ? e.whirlSpin : (now * 0.02);
         ctx.save();
-        ctx.translate(e.x, e.y); ctx.rotate(sp);
-        ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 3.2;
-        for (let k = 0; k < 2; k++) {
-          const ba = k * Math.PI;
-          ctx.beginPath(); ctx.arc(0, 0, e.r + 18, ba, ba + 2.1); ctx.stroke();
+        if ((e.whirlWindup || 0) > 0) {
+          ctx.strokeStyle = 'rgba(251, 191, 36, 0.72)';
+          ctx.lineWidth = 2.0;
+          ctx.setLineDash([6, 5]);
+          ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 18, 0, Math.PI * 2); ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          ctx.translate(e.x, e.y); ctx.rotate(sp);
+          ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 3.2;
+          for (let k = 0; k < 2; k++) {
+            const ba = k * Math.PI;
+            ctx.beginPath(); ctx.arc(0, 0, e.r + 18, ba, ba + 2.1); ctx.stroke();
+          }
         }
         ctx.restore();
       } else if (e.type === 'shadow_reaper' && (e.reapWindup || 0) > 0) {
@@ -1752,16 +1785,19 @@ function draw() {
         ctx.restore();
       } else if (e.type === 'juggernaut' && (e.slamWindup || 0) > 0) {
         const sa = e._slamA !== undefined ? e._slamA : 0;
-        const sp = Math.max(0.1, Math.min(1, 1 - e.slamWindup / Math.max(0.1, e.slamWindupMax || 0.56)));
+        const innerOff = (e.r || 54) * 0.74;
+        const sp = Math.max(0.1, Math.min(1, 1 - e.slamWindup / Math.max(0.1, e.slamWindupMax || 0.68)));
         ctx.save();
         ctx.lineCap = 'round';
         for (let k = 0; k < 4; k++) {
           const ba = sa + k * (Math.PI * 0.5);
+          const sx = e.x + Math.cos(ba) * innerOff, sy = e.y + Math.sin(ba) * innerOff;
           const ex = e.x + Math.cos(ba) * 168, ey = e.y + Math.sin(ba) * 168;
-          ctx.strokeStyle = `rgba(226, 232, 240, ${0.16 + sp * 0.20})`; ctx.lineWidth = 22;
-          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ex, ey); ctx.stroke();
+          const curL = innerOff + (168 - innerOff) * sp;
+          ctx.strokeStyle = `rgba(226, 232, 240, ${0.16 + sp * 0.20})`; ctx.lineWidth = 18;
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
           ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 2.4; ctx.setLineDash([8, 5]);
-          ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(ba) * 168 * sp, e.y + Math.sin(ba) * 168 * sp); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(e.x + Math.cos(ba) * curL, e.y + Math.sin(ba) * curL); ctx.stroke();
           ctx.setLineDash([]);
         }
         ctx.restore();
@@ -2659,14 +2695,14 @@ function draw() {
       ctx.beginPath(); ctx.arc(joy.cx, joy.cy, 23, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     } else if (uiMode === 'mobile-portrait') {
       const gx = viewW * 0.5, gy = viewH - Math.min(135, viewH * 0.18);
-      ctx.globalAlpha = wave === 1 && waveTime > 15 ? 0.65 : 0.24;
+      ctx.globalAlpha = wave === 1 && waveTime > 18 ? 0.65 : 0.24;
       ctx.fillStyle = 'rgba(18, 15, 26, 0.35)';
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(gx, gy, 44, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.fillStyle = 'rgba(255, 209, 102, 0.72)';
       ctx.beginPath(); ctx.arc(gx, gy, 15, 0, Math.PI * 2); ctx.fill();
-      if (wave === 1 && waveTime > 15) {
+      if (wave === 1 && waveTime > 18) {
         ctx.fillStyle = '#f5f2eb';
         ctx.font = '800 14.5px -apple-system, sans-serif';
         ctx.textAlign = 'center';
